@@ -1,0 +1,9 @@
+import request from './request';
+export const getDatasourceList = () => request.get('/datasources');
+export const createDatasource = (data) => request.post('/datasources', data);
+export const updateDatasource = (id, data) => request.put(`/datasources/${id}`, data);
+export const deleteDatasource = (id) => request.delete(`/datasources/${id}`);
+export const testDatasourceConnection = (data) => request.post('/datasources/test-connection', data);
+export const getDatasourceTables = (id) => request.get(`/datasources/${id}/tables`);
+export const getTableColumns = (id, table) => request.get(`/datasources/${id}/columns`, { params: { table } });
+export const previewExtract = (data) => request.post('/datasources/extract/preview', data);

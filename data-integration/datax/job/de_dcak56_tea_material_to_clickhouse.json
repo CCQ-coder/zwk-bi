@@ -1,0 +1,43 @@
+{
+  "job": {
+    "setting": {
+      "speed": { "channel": 2 },
+      "errorLimit": { "record": 0, "percentage": 0.02 }
+    },
+    "content": [
+      {
+        "reader": {
+          "name": "mysqlreader",
+          "parameter": {
+            "username": "root",
+            "password": "123456",
+            "connection": [
+              {
+                "jdbcUrl": ["jdbc:mysql://192.168.3.136:3201/de_dcak56?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai"],
+                "querySql": [
+                  "SELECT `日期`, `店铺`, `用途`, `金额` FROM `demo_tea_material`"
+                ]
+              }
+            ],
+            "column": ["日期", "店铺", "用途", "金额"]
+          }
+        },
+        "writer": {
+          "name": "clickhousewriter",
+          "parameter": {
+            "username": "default",
+            "password": "",
+            "column": ["cost_date", "shop", "cost_type", "amount"],
+            "preSql": ["TRUNCATE TABLE ai_bi.tea_material_cost"],
+            "connection": [
+              {
+                "jdbcUrl": "jdbc:clickhouse://localhost:8123/ai_bi",
+                "table": ["tea_material_cost"]
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

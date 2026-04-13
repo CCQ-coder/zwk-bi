@@ -1,0 +1,52 @@
+{
+  "job": {
+    "setting": {
+      "speed": { "channel": 2 },
+      "errorLimit": { "record": 0, "percentage": 0.02 }
+    },
+    "content": [
+      {
+        "reader": {
+          "name": "mysqlreader",
+          "parameter": {
+            "username": "root",
+            "password": "123456",
+            "connection": [
+              {
+                "jdbcUrl": ["jdbc:mysql://192.168.3.136:3201/de_dcak56?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai"],
+                "querySql": [
+                  "SELECT `店铺`, `品线`, `菜品名称`, `冷/热`, `规格`, `销售数量`, `单价`, `账单流水号`, `销售日期` FROM `demo_tea_order`"
+                ]
+              }
+            ],
+            "column": ["店铺", "品线", "菜品名称", "冷/热", "规格", "销售数量", "单价", "账单流水号", "销售日期"]
+          }
+        },
+        "writer": {
+          "name": "clickhousewriter",
+          "parameter": {
+            "username": "default",
+            "password": "",
+            "column": ["shop", "product_line", "product_name", "hot_cold", "spec", "qty", "unit_price", "order_no", "sale_date", "sale_amount"],
+            "preSql": ["TRUNCATE TABLE ai_bi.tea_order_detail"],
+            "connection": [
+              {
+                "jdbcUrl": "jdbc:clickhouse://localhost:8123/ai_bi",
+                "table": ["tea_order_detail"]
+              }
+            ]
+          }
+        },
+        "transformer": [
+          {
+            "name": "dx_groovy",
+            "parameter": {
+              "code": "DXRecord record = super.getRecord(); Long qty = record.getColumn(5).asLong(); Long price = record.getColumn(6).asLong(); record.addColumn(new LongColumn(qty * price)); return record;",
+              "extraPackage": []
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

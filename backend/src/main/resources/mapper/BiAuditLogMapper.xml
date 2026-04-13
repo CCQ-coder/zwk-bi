@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.BiAuditLogMapper">
+
+    <resultMap id="BiAuditLogMap" type="com.aibi.bi.domain.BiAuditLog">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="username" property="username"/>
+        <result column="action" property="action"/>
+        <result column="resource_type" property="resourceType"/>
+        <result column="resource_id" property="resourceId"/>
+        <result column="detail" property="detail"/>
+        <result column="ip_addr" property="ipAddr"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="BiAuditLogMap">
+        SELECT id, user_id, username, action, resource_type, resource_id, detail, ip_addr, created_at
+        FROM bi_audit_log
+        ORDER BY id DESC
+        LIMIT 200
+    </select>
+
+    <select id="listByFilter" resultMap="BiAuditLogMap">
+        SELECT id, user_id, username, action, resource_type, resource_id, detail, ip_addr, created_at
+        FROM bi_audit_log
+        <where>
+            <if test="username != null and username != ''">
+                AND username = #{username}
+            </if>
+            <if test="actionPrefix != null and actionPrefix != ''">
+                AND action LIKE CONCAT(#{actionPrefix}, '%')
+            </if>
+        </where>
+        ORDER BY id DESC
+        <if test="limit != null">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+    <insert id="insert" parameterType="com.aibi.bi.domain.BiAuditLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bi_audit_log (user_id, username, action, resource_type, resource_id, detail, ip_addr)
+        VALUES (#{userId}, #{username}, #{action}, #{resourceType}, #{resourceId}, #{detail}, #{ipAddr})
+    </insert>
+</mapper>

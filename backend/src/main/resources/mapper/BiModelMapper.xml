@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.BiModelMapper">
+
+    <resultMap id="BiModelMap" type="com.aibi.bi.domain.BiModel">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="description" property="description"/>
+        <result column="config_json" property="configJson"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="BiModelMap">
+        SELECT id, name, description, config_json, created_at
+        FROM bi_model
+        ORDER BY id DESC
+    </select>
+
+    <select id="findById" resultMap="BiModelMap" parameterType="long">
+        SELECT id, name, description, config_json, created_at
+        FROM bi_model
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.aibi.bi.domain.BiModel" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bi_model (name, description, config_json)
+        VALUES (#{name}, #{description}, #{configJson})
+    </insert>
+
+    <update id="update" parameterType="com.aibi.bi.domain.BiModel">
+        UPDATE bi_model
+        SET name = #{name}, description = #{description}, config_json = #{configJson}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM bi_model WHERE id = #{id}
+    </delete>
+
+</mapper>

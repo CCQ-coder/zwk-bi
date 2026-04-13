@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.BiChartMapper">
+
+    <resultMap id="BiChartMap" type="com.aibi.bi.domain.BiChart">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="dataset_id" property="datasetId"/>
+        <result column="chart_type" property="chartType"/>
+        <result column="x_field" property="xField"/>
+        <result column="y_field" property="yField"/>
+        <result column="group_field" property="groupField"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="BiChartMap">
+        SELECT id, name, dataset_id, chart_type, x_field, y_field, group_field, created_at
+        FROM bi_chart
+        ORDER BY id DESC
+    </select>
+
+    <select id="findById" resultMap="BiChartMap" parameterType="long">
+        SELECT id, name, dataset_id, chart_type, x_field, y_field, group_field, created_at
+        FROM bi_chart
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.aibi.bi.domain.BiChart" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bi_chart (name, dataset_id, chart_type, x_field, y_field, group_field)
+        VALUES (#{name}, #{datasetId}, #{chartType}, #{xField}, #{yField}, #{groupField})
+    </insert>
+
+    <update id="update" parameterType="com.aibi.bi.domain.BiChart">
+        UPDATE bi_chart
+        SET name = #{name}, dataset_id = #{datasetId}, chart_type = #{chartType},
+            x_field = #{xField}, y_field = #{yField}, group_field = #{groupField}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM bi_chart WHERE id = #{id}
+    </delete>
+
+    <select id="listByDashboardId" resultMap="BiChartMap" parameterType="long">
+        SELECT c.id, c.name, c.dataset_id, c.chart_type, c.x_field, c.y_field, c.group_field, c.created_at
+        FROM bi_chart c
+                 INNER JOIN bi_dashboard_chart dc ON dc.chart_id = c.id
+        WHERE dc.dashboard_id = #{dashboardId}
+        ORDER BY c.id DESC
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(1)
+        FROM bi_chart
+    </select>
+</mapper>

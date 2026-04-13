@@ -1,0 +1,41 @@
+{
+  "job": {
+    "setting": {
+      "speed": {
+        "channel": 2
+      }
+    },
+    "content": [
+      {
+        "reader": {
+          "name": "mysqlreader",
+          "parameter": {
+            "username": "root",
+            "password": "123456",
+            "connection": [
+              {
+                "jdbcUrl": ["jdbc:mysql://localhost:3306/ai_bi"],
+                "table": ["dwd_order_detail"]
+              }
+            ],
+            "column": ["order_id", "product_name", "region", "amount", "biz_date"]
+          }
+        },
+        "writer": {
+          "name": "clickhousewriter",
+          "parameter": {
+            "username": "default",
+            "password": "",
+            "column": ["order_id", "product_name", "region", "amount", "biz_date"],
+            "connection": [
+              {
+                "jdbcUrl": "jdbc:clickhouse://localhost:8123/ai_bi",
+                "table": ["bi_order_detail"]
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

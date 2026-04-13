@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.BiDashboardMapper">
+
+    <resultMap id="BiDashboardMap" type="com.aibi.bi.domain.BiDashboard">
+        <id column="id" property="id"/>
+        <result column="name"        property="name"/>
+        <result column="configJson"  property="configJson"/>
+        <result column="created_at"  property="createdAt"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="BiDashboardMap">
+        SELECT id, name,
+               layout_json AS configJson,
+               created_at
+        FROM bi_dashboard
+        ORDER BY id DESC
+    </select>
+
+    <select id="findLatest" resultMap="BiDashboardMap">
+        SELECT id, name,
+               layout_json AS configJson,
+               created_at
+        FROM bi_dashboard
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findById" resultMap="BiDashboardMap" parameterType="long">
+        SELECT id, name,
+               layout_json AS configJson,
+               created_at
+        FROM bi_dashboard
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.aibi.bi.domain.BiDashboard"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bi_dashboard (name, layout_json)
+        VALUES (#{name}, IFNULL(#{configJson}, '{}'))
+    </insert>
+
+    <update id="update" parameterType="com.aibi.bi.domain.BiDashboard">
+        UPDATE bi_dashboard
+        SET name = #{name}, layout_json = IFNULL(#{configJson}, '{}')
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM bi_dashboard WHERE id = #{id}
+    </delete>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(1)
+        FROM bi_dashboard
+    </select>
+</mapper>

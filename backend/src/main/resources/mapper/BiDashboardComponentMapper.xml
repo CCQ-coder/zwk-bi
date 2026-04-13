@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.BiDashboardComponentMapper">
+
+    <resultMap id="ComponentMap" type="com.aibi.bi.domain.BiDashboardComponent">
+        <id     column="id"           property="id"/>
+        <result column="dashboard_id" property="dashboardId"/>
+        <result column="chart_id"     property="chartId"/>
+        <result column="pos_x"        property="posX"/>
+        <result column="pos_y"        property="posY"/>
+        <result column="width"        property="width"/>
+        <result column="height"       property="height"/>
+        <result column="z_index"      property="zIndex"/>
+    </resultMap>
+
+    <select id="listByDashboardId" resultMap="ComponentMap" parameterType="long">
+        SELECT id, dashboard_id, chart_id, pos_x, pos_y, width, height, z_index
+        FROM bi_dashboard_component
+        WHERE dashboard_id = #{dashboardId}
+        ORDER BY z_index, id
+    </select>
+
+    <select id="findById" resultMap="ComponentMap" parameterType="long">
+        SELECT id, dashboard_id, chart_id, pos_x, pos_y, width, height, z_index
+        FROM bi_dashboard_component
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.aibi.bi.domain.BiDashboardComponent"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bi_dashboard_component
+            (dashboard_id, chart_id, pos_x, pos_y, width, height, z_index)
+        VALUES
+            (#{dashboardId}, #{chartId}, #{posX}, #{posY}, #{width}, #{height}, #{zIndex})
+    </insert>
+
+    <update id="update" parameterType="com.aibi.bi.domain.BiDashboardComponent">
+        UPDATE bi_dashboard_component
+        SET pos_x = #{posX}, pos_y = #{posY},
+            width = #{width}, height = #{height}, z_index = #{zIndex}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM bi_dashboard_component WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByDashboardId" parameterType="long">
+        DELETE FROM bi_dashboard_component WHERE dashboard_id = #{dashboardId}
+    </delete>
+
+</mapper>

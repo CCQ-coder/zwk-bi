@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.BiDatasetMapper">
+
+    <resultMap id="BiDatasetMap" type="com.aibi.bi.domain.BiDataset">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="datasource_id" property="datasourceId"/>
+        <result column="sql_text" property="sqlText"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="BiDatasetMap">
+        SELECT id, name, datasource_id, sql_text, created_at
+        FROM bi_dataset
+        ORDER BY id DESC
+    </select>
+
+    <select id="findById" resultMap="BiDatasetMap" parameterType="long">
+        SELECT id, name, datasource_id, sql_text, created_at
+        FROM bi_dataset
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.aibi.bi.domain.BiDataset" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bi_dataset (name, datasource_id, sql_text)
+        VALUES (#{name}, #{datasourceId}, #{sqlText})
+    </insert>
+
+    <update id="update" parameterType="com.aibi.bi.domain.BiDataset">
+        UPDATE bi_dataset
+        SET name = #{name}, datasource_id = #{datasourceId}, sql_text = #{sqlText}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM bi_dataset WHERE id = #{id}
+    </delete>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(1)
+        FROM bi_dataset
+    </select>
+</mapper>
