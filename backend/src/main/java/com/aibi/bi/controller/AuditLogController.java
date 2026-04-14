@@ -1,6 +1,7 @@
 package com.aibi.bi.controller;
 
 import com.aibi.bi.common.ApiResponse;
+import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiAuditLog;
 import com.aibi.bi.service.AuditLogService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/audit-logs")
+@RequireRoles("ADMIN")
 public class AuditLogController {
 
     private final AuditLogService auditLogService;

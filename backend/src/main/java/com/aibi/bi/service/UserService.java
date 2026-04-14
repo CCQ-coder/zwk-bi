@@ -1,7 +1,10 @@
 package com.aibi.bi.service;
 
 import com.aibi.bi.domain.BiUser;
+import com.aibi.bi.domain.SysRole;
 import com.aibi.bi.mapper.BiUserMapper;
+import com.aibi.bi.mapper.SysRoleMapper;
+import com.aibi.bi.mapper.SysUserRoleMapper;
 import com.aibi.bi.model.request.CreateUserRequest;
 import com.aibi.bi.model.request.UpdateUserRequest;
 import com.aibi.bi.model.response.UserResponse;
@@ -13,10 +16,17 @@ import java.util.List;
 public class UserService {
 
     private final BiUserMapper biUserMapper;
+    private final SysRoleMapper sysRoleMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
     private final AuditLogService auditLogService;
 
-    public UserService(BiUserMapper biUserMapper, AuditLogService auditLogService) {
+    public UserService(BiUserMapper biUserMapper,
+                       SysRoleMapper sysRoleMapper,
+                       SysUserRoleMapper sysUserRoleMapper,
+                       AuditLogService auditLogService) {
         this.biUserMapper = biUserMapper;
+        this.sysRoleMapper = sysRoleMapper;
+        this.sysUserRoleMapper = sysUserRoleMapper;
         this.auditLogService = auditLogService;
     }
 
@@ -37,6 +47,7 @@ public class UserService {
         user.setEmail(normalizeText(request.getEmail()));
 
         biUserMapper.insert(user);
+    syncUserRole(user);
         auditLogService.record(null, operator, "USER_CREATE", "USER", String.valueOf(user.getId()),
                 "创建用户: " + user.getUsername(), ipAddr);
         return toResponse(user);
@@ -56,6 +67,7 @@ public class UserService {
         }
 
         biUserMapper.update(user);
+        syncUserRole(user);
         auditLogService.record(null, operator, "USER_UPDATE", "USER", String.valueOf(user.getId()),
                 "更新用户: " + user.getUsername(), ipAddr);
         return toResponse(user);
@@ -69,9 +81,19 @@ public class UserService {
         if ("admin".equalsIgnoreCase(user.getUsername())) {
             throw new IllegalArgumentException("默认管理员账号不允许删除");
         }
+        sysUserRoleMapper.deleteByUserId(id);
         biUserMapper.deleteById(id);
         auditLogService.record(null, operator, "USER_DELETE", "USER", String.valueOf(id),
                 "删除用户: " + user.getUsername(), ipAddr);
+    }
+
+    private void syncUserRole(BiUser user) {
+        SysRole role = sysRoleMapper.findByName(normalizeRole(user.getRole()));
+        if (role == null) {
+            throw new IllegalArgumentException("角色不存在: " + user.getRole());
+        }
+        sysUserRoleMapper.deleteByUserId(user.getId());
+        sysUserRoleMapper.insert(user.getId(), role.getId());
     }
 
     private UserResponse toResponse(BiUser user) {

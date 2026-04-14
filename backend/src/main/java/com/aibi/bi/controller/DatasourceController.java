@@ -1,6 +1,7 @@
 package com.aibi.bi.controller;
 
 import com.aibi.bi.common.ApiResponse;
+import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiDatasource;
 import com.aibi.bi.model.request.CreateDatasourceRequest;
 import com.aibi.bi.model.request.DatasourceConnectionTestRequest;
@@ -49,22 +50,26 @@ public class DatasourceController {
     }
 
     @PostMapping
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiDatasource> create(@Valid @RequestBody CreateDatasourceRequest request) {
         return ApiResponse.ok(datasourceService.create(request));
     }
 
     @PostMapping("/test-connection")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<DatasourceConnectionTestResponse> testConnection(
             @Valid @RequestBody DatasourceConnectionTestRequest request) {
         return ApiResponse.ok(datasourceService.testConnection(request));
     }
 
     @PostMapping("/extract/preview")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<ExtractPreviewResponse> previewExtract(@Valid @RequestBody ExtractPreviewRequest request) {
         return ApiResponse.ok(datasourceService.previewExtract(request));
     }
 
     @PutMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiDatasource> update(@PathVariable Long id,
                                              @Valid @RequestBody UpdateDatasourceRequest request) {
         return ApiResponse.ok(datasourceService.update(id, request));
@@ -82,6 +87,7 @@ public class DatasourceController {
     }
 
     @DeleteMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<Void> delete(@PathVariable Long id) {
         datasourceService.delete(id);
         return ApiResponse.ok(null);

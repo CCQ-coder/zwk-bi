@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8081
 
 spring:
   datasource:
@@ -7,6 +7,11 @@ spring:
     url: jdbc:mysql://localhost:3306/ai_bi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
     username: root
     password: 123456
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 4
+    locations: classpath:db/migration
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
@@ -17,3 +22,8 @@ clickhouse:
     url: jdbc:clickhouse://localhost:8123/ai_bi
     username: default
     password: ""
+
+app:
+  jwt:
+    secret: AI_BI_JWT_SECRET_2026_CHANGE_ME_TO_A_LONG_RANDOM_VALUE
+    expire-hours: 12

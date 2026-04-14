@@ -2,14 +2,55 @@
 USE ai_bi;
 
 -- 1. 修复 bi_chart：补齐字段配置列
-ALTER TABLE bi_chart
-  ADD COLUMN IF NOT EXISTS x_field VARCHAR(128) NOT NULL DEFAULT '' AFTER chart_type,
-  ADD COLUMN IF NOT EXISTS y_field VARCHAR(128) NOT NULL DEFAULT '' AFTER x_field,
-  ADD COLUMN IF NOT EXISTS group_field VARCHAR(128) NOT NULL DEFAULT '' AFTER y_field;
+SET @has_x_field := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'bi_chart'
+    AND column_name = 'x_field'
+);
+SET @add_x_field_sql := IF(
+  @has_x_field = 0,
+  "ALTER TABLE bi_chart ADD COLUMN x_field VARCHAR(128) NOT NULL DEFAULT '' AFTER chart_type",
+  "SELECT 1"
+);
+PREPARE add_x_field_stmt FROM @add_x_field_sql;
+EXECUTE add_x_field_stmt;
+DEALLOCATE PREPARE add_x_field_stmt;
 
--- 2. 修复 bi_dashboard：将 layout_json 列重命名为 config_json（MySQL 8.0+）
-ALTER TABLE bi_dashboard
-  RENAME COLUMN layout_json TO config_json;
+SET @has_y_field := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'bi_chart'
+    AND column_name = 'y_field'
+);
+SET @add_y_field_sql := IF(
+  @has_y_field = 0,
+  "ALTER TABLE bi_chart ADD COLUMN y_field VARCHAR(128) NOT NULL DEFAULT '' AFTER x_field",
+  "SELECT 1"
+);
+PREPARE add_y_field_stmt FROM @add_y_field_sql;
+EXECUTE add_y_field_stmt;
+DEALLOCATE PREPARE add_y_field_stmt;
+
+SET @has_group_field := (
+  SELECT COUNT(1)
+  FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'bi_chart'
+    AND column_name = 'group_field'
+);
+SET @add_group_field_sql := IF(
+  @has_group_field = 0,
+  "ALTER TABLE bi_chart ADD COLUMN group_field VARCHAR(128) NOT NULL DEFAULT '' AFTER y_field",
+  "SELECT 1"
+);
+PREPARE add_group_field_stmt FROM @add_group_field_sql;
+EXECUTE add_group_field_stmt;
+DEALLOCATE PREPARE add_group_field_stmt;
+
+-- 2. 保持 bi_dashboard 继续使用 layout_json，与当前后端 Mapper 一致
 
 -- 3. 新建仪表板组件布局表（替代无位置信息的 bi_dashboard_chart）
 CREATE TABLE IF NOT EXISTS bi_dashboard_component (

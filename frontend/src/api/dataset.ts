@@ -20,6 +20,15 @@ export interface DatasetPreviewResult {
   rowCount: number
 }
 
+export interface DatasetField {
+  id: number
+  datasetId: number
+  fieldName: string
+  fieldType: string
+  fieldLabel: string
+  createdAt: string
+}
+
 export const getDatasetList = (): Promise<Dataset[]> =>
   request.get('/datasets')
 
@@ -36,4 +45,7 @@ export const previewDatasetSql = (data: {
   datasourceId: number
   sqlText: string
 }): Promise<DatasetPreviewResult> => request.post('/datasets/preview', data)
+
+export const getDatasetFields = (id: number): Promise<DatasetField[]> =>
+  request.get(`/datasets/${id}/fields`)
 

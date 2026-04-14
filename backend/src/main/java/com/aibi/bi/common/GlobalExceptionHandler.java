@@ -12,6 +12,16 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(40001, ex.getMessage());
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ApiResponse<Object> handleUnauthorizedException(UnauthorizedException ex) {
+        return ApiResponse.fail(40100, ex.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ApiResponse<Object> handleForbiddenException(ForbiddenException ex) {
+        return ApiResponse.fail(40300, ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ApiResponse<Object> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().isEmpty()

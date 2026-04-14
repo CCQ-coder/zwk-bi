@@ -6,9 +6,12 @@
         <span class="sidebar-title">仪表板</span>
         <el-button type="primary" size="small" :icon="Plus" @click="openCreateDashboard" />
       </div>
+      <div class="sidebar-search-wrap">
+        <el-input v-model="dashboardSearch" :prefix-icon="Search" placeholder="检索目录" clearable />
+      </div>
       <div class="sidebar-list">
         <div
-          v-for="db in dashboards"
+          v-for="db in filteredDashboards"
           :key="db.id"
           class="sidebar-item"
           :class="{ active: currentDashboard?.id === db.id }"
@@ -55,14 +58,21 @@
 
         <!-- 工具栏 -->
         <div class="section-bar">
-          <span class="section-title">{{ currentDashboard.name }}</span>
+          <div class="section-title-wrap">
+            <span class="section-title">{{ currentDashboard.name }}</span>
+            <el-tag size="small" :type="isPublished ? 'success' : 'info'">{{ isPublished ? '已发布' : '草稿' }}</el-tag>
+          </div>
           <div class="section-actions">
             <el-button size="small" :icon="Plus" type="primary" @click="openAddChart">添加图表</el-button>
             <el-button size="small" :icon="Refresh" :loading="compLoading" @click="loadComponents">刷新</el-button>
+            <el-button size="small" :icon="View" @click="openPreview">预览</el-button>
+            <el-button size="small" :icon="Promotion" @click="openPublishDialog">{{ isPublished ? '发布设置' : '发布' }}</el-button>
+            <el-button size="small" :icon="Share" @click="openShareDialog">分享</el-button>
+            <el-button size="small" :icon="Download" @click="exportDashboardJson">导出</el-button>
           </div>
         </div>
 
-        <div class="layout-hint">拖动卡片标题可移动组件，拖动右下角可调整大小</div>
+        <div class="layout-hint">拖动卡片标题可移动组件，拖动组件边框或四角可直接调整大小</div>
 
         <!-- 图表组件网格 -->
         <div ref="canvasRef" class="chart-grid" :style="{ minHeight: `${canvasMinHeight}px` }" v-loading="compLoading">
@@ -75,10 +85,10 @@
             @mousedown="focusComponent(comp)"
           >
             <div class="chart-card-header" @mousedown.stop.prevent="startDrag($event, comp)">
-              <span class="chart-card-name">{{ chartMap.get(comp.chartId)?.name ?? '图表' }}</span>
+              <span class="chart-card-name">{{ getComponentChartConfig(comp).name || '图表' }}</span>
               <div class="chart-card-actions">
                 <el-tag size="small" type="info" style="margin-right:6px">
-                  {{ chartMap.get(comp.chartId)?.chartType ?? '' }}
+                  {{ chartTypeLabel(getComponentChartConfig(comp).chartType) }}
                 </el-tag>
                 <el-popconfirm title="从仪表板移除此图表？" @confirm="removeComponent(comp.id)">
                   <template #reference>
@@ -91,10 +101,19 @@
               :ref="(el) => setChartRef(el as HTMLElement | null, comp.id)"
               class="chart-canvas"
             />
-            <div v-if="!chartMap.get(comp.chartId)?.xField || !chartMap.get(comp.chartId)?.yField" class="no-field-tip">
-              尚未配置坐标字段，请前往「图表设计」配置
+            <div v-if="showNoField(comp)" class="no-field-tip">
+              尚未配置完整字段，请在右侧组件属性中补充后再预览
             </div>
-            <div class="resize-handle" @mousedown.stop.prevent="startResize($event, comp)"></div>
+            <div v-else-if="!isRenderableChart(comp)" class="no-field-tip">
+              当前仪表板暂未支持 {{ chartTypeLabel(getComponentChartConfig(comp).chartType) }} 的实时渲染
+            </div>
+            <div
+              v-for="handle in resizeHandles"
+              :key="handle"
+              class="resize-handle"
+              :class="`resize-handle--${handle}`"
+              @mousedown.stop.prevent="startResize($event, comp, handle)"
+            ></div>
           </div>
           <el-empty
             v-if="!components.length && !compLoading"
@@ -104,6 +123,19 @@
         </div>
       </template>
     </main>
+
+    <aside class="dash-inspector">
+      <EditorComponentInspector
+        scene="dashboard"
+        :component="activeComponent"
+        :chart="activeChart"
+        @apply-layout="applyLayoutPatch"
+        @bring-front="bringComponentToFront"
+        @remove="handleRemoveActiveComponent"
+        @preview-component="previewActiveComponent"
+        @save-component="saveActiveComponent"
+      />
+    </aside>
 
     <!-- 新建仪表板对话框 -->
     <el-dialog v-model="createDashVisible" title="新建仪表板" width="400px" destroy-on-close>
@@ -140,14 +172,64 @@
         <el-button type="primary" :loading="addingChart" :disabled="!selectedChartId" @click="handleAddChart">添加</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="shareVisible" title="分享仪表板" width="520px" destroy-on-close>
+      <div v-if="isPublished" class="share-block">
+        <div class="share-label">只读预览链接</div>
+        <el-input :model-value="shareLink" readonly />
+        <div class="share-tip">分享对象可通过该链接预览仪表板，也可用于打印 / PDF 导出。</div>
+      </div>
+      <el-alert
+        v-else
+        title="当前仪表板尚未正式发布"
+        type="warning"
+        :closable="false"
+        description="请先设置发布状态、允许访问角色和正式分享链接，再对外分享。"
+      />
+      <template #footer>
+        <el-button @click="shareVisible = false">关闭</el-button>
+        <el-button v-if="!isPublished" type="primary" @click="openPublishDialog">去发布</el-button>
+        <template v-else>
+          <el-button @click="openPreview(true)">打开预览</el-button>
+          <el-button type="primary" @click="copyShareLink">复制链接</el-button>
+        </template>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="publishVisible" title="发布仪表板" width="560px" destroy-on-close>
+      <el-form label-width="120px">
+        <el-form-item label="发布状态">
+          <el-switch v-model="publishForm.published" active-text="已发布" inactive-text="草稿" />
+        </el-form-item>
+        <el-form-item label="允许匿名链接">
+          <el-switch v-model="publishForm.allowAnonymousAccess" active-text="允许" inactive-text="关闭" />
+        </el-form-item>
+        <el-form-item label="允许访问角色">
+          <el-checkbox-group v-model="publishForm.allowedRoles">
+            <el-checkbox v-for="role in roleOptions" :key="role" :label="role">{{ role }}</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="正式分享链接">
+          <el-input :model-value="draftPublishedLink" readonly />
+        </el-form-item>
+      </el-form>
+      <div class="publish-tip">
+        发布后会生成固定分享链接。未登录访问时，需使用该正式链接；登录用户则按角色权限决定是否可查看。
+      </div>
+      <template #footer>
+        <el-button @click="publishVisible = false">取消</el-button>
+        <el-button type="primary" :loading="publishSaving" @click="savePublishSettings">保存发布设置</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Close, Delete, Grid, PieChart, Plus, Refresh } from '@element-plus/icons-vue'
+import { Close, Delete, Download, Grid, PieChart, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import EditorComponentInspector from './EditorComponentInspector.vue'
 import {
   addDashboardComponent,
   createDashboard,
@@ -156,11 +238,24 @@ import {
   getDashboardList,
   getDefaultDashboard,
   removeDashboardComponent,
+  updateDashboard,
   updateDashboardComponent,
   type Dashboard,
   type DashboardComponent
 } from '../api/dashboard'
 import { getChartData, getChartList, type Chart } from '../api/chart'
+import {
+  buildChartSnapshot,
+  buildComponentConfig,
+  buildComponentOption,
+  chartTypeLabel,
+  getMissingChartFields,
+  isCanvasRenderableChartType,
+  mergeComponentRequestFilters,
+  materializeChartData,
+  normalizeComponentConfig,
+} from '../utils/component-config'
+import { buildPublishedLink, buildReportConfig, normalizePublishConfig, parseReportConfig } from '../utils/report-config'
 
 // ---- state ----
 const loading    = ref(false)
@@ -183,6 +278,16 @@ const LEGACY_GRID_ROW_PX = 70
 const createDashVisible = ref(false)
 const dashSaving = ref(false)
 const dashForm = reactive({ name: '' })
+const dashboardSearch = ref('')
+const shareVisible = ref(false)
+const publishVisible = ref(false)
+const publishSaving = ref(false)
+const publishForm = reactive({
+  published: false,
+  allowAnonymousAccess: true,
+  allowedRoles: ['ADMIN', 'ANALYST'],
+  shareToken: ''
+})
 
 // add chart dialog
 const addChartVisible = ref(false)
@@ -194,6 +299,31 @@ const filteredCharts = computed(() => {
   const q = chartSearch.value.toLowerCase()
   return q ? allCharts.value.filter(c => c.name.toLowerCase().includes(q)) : allCharts.value
 })
+
+const filteredDashboards = computed(() => {
+  const q = dashboardSearch.value.trim().toLowerCase()
+  return q ? dashboards.value.filter(d => d.name.toLowerCase().includes(q)) : dashboards.value
+})
+
+const shareLink = computed(() => currentDashboard.value
+  ? buildPublishedLink('dashboard', currentDashboard.value.id, currentPublishConfig.value.shareToken)
+  : '')
+const previewLink = computed(() => currentDashboard.value
+  ? `${window.location.origin}/preview/dashboard/${currentDashboard.value.id}`
+  : '')
+const roleOptions = ['ADMIN', 'ANALYST', 'VIEWER']
+const currentPublishConfig = computed(() => normalizePublishConfig(parseReportConfig(currentDashboard.value?.configJson).publish))
+const isPublished = computed(() => currentPublishConfig.value.status === 'PUBLISHED')
+const draftPublishedLink = computed(() => currentDashboard.value
+  ? buildPublishedLink('dashboard', currentDashboard.value.id, publishForm.shareToken || currentPublishConfig.value.shareToken)
+  : '')
+const activeComponent = computed(() => components.value.find((item) => item.id === activeCompId.value) ?? null)
+const activeChart = computed(() => activeComponent.value ? chartMap.value.get(activeComponent.value.chartId) ?? null : null)
+
+const getComponentConfig = (comp: DashboardComponent) => normalizeComponentConfig(comp.configJson, chartMap.value.get(comp.chartId))
+const getComponentChartConfig = (comp: DashboardComponent) => getComponentConfig(comp).chart
+const showNoField = (comp: DashboardComponent) => getMissingChartFields(getComponentChartConfig(comp)).length > 0
+const isRenderableChart = (comp: DashboardComponent) => isCanvasRenderableChartType(getComponentChartConfig(comp).chartType ?? '')
 
 // echarts instances
 const chartRefs = new Map<number, HTMLElement>()
@@ -239,6 +369,58 @@ const focusComponent = (comp: DashboardComponent) => {
   if ((comp.zIndex ?? 0) <= maxZ) comp.zIndex = maxZ + 1
 }
 
+const applyLayoutPatch = async (patch: Partial<DashboardComponent>) => {
+  const comp = activeComponent.value
+  if (!comp) return
+  if (typeof patch.posX === 'number') comp.posX = Math.max(0, Math.round(patch.posX))
+  if (typeof patch.posY === 'number') comp.posY = Math.max(0, Math.round(patch.posY))
+  if (typeof patch.width === 'number') comp.width = Math.max(MIN_CARD_WIDTH, Math.round(patch.width))
+  if (typeof patch.height === 'number') comp.height = Math.max(MIN_CARD_HEIGHT, Math.round(patch.height))
+  if (typeof patch.zIndex === 'number') comp.zIndex = Math.max(0, Math.round(patch.zIndex))
+  normalizeLayout(comp)
+  await nextTick()
+  chartInstances.get(comp.id)?.resize()
+  await persistLayout(comp)
+}
+
+const bringComponentToFront = async () => {
+  const comp = activeComponent.value
+  if (!comp) return
+  await applyLayoutPatch({ zIndex: getMaxZ() + 1 })
+}
+
+const handleRemoveActiveComponent = async () => {
+  if (!activeComponent.value) return
+  await removeComponent(activeComponent.value.id)
+}
+
+const previewActiveComponent = async (payload: { chartId: number; configJson: string }) => {
+  const comp = activeComponent.value
+  if (!comp) return
+  comp.chartId = payload.chartId
+  comp.configJson = payload.configJson
+  await nextTick()
+  if (showNoField(comp)) {
+    chartInstances.get(comp.id)?.clear()
+    return
+  }
+  if (!isRenderableChart(comp)) {
+    chartInstances.get(comp.id)?.clear()
+    return
+  }
+  await renderChart(comp)
+}
+
+const saveActiveComponent = async (payload: { chartId: number; configJson: string }) => {
+  const comp = activeComponent.value
+  if (!comp || !currentDashboard.value) return
+  await updateDashboardComponent(currentDashboard.value.id, comp.id, payload)
+  comp.chartId = payload.chartId
+  comp.configJson = payload.configJson
+  await loadComponents()
+  ElMessage.success('组件实例配置已保存')
+}
+
 // ---- load ----
 const loadAll = async () => {
   loading.value = true
@@ -262,6 +444,7 @@ const loadAll = async () => {
 
 const selectDashboard = async (db: Dashboard) => {
   currentDashboard.value = db
+  activeCompId.value = null
   await loadComponents()
 }
 
@@ -277,8 +460,7 @@ const loadComponents = async () => {
     components.value.forEach(normalizeLayout)
     await nextTick()
     for (const comp of components.value) {
-      const chart = chartMap.value.get(comp.chartId)
-      if (chart?.xField && chart?.yField) renderChart(comp)
+      if (!showNoField(comp) && isRenderableChart(comp)) renderChart(comp)
     }
   } finally {
     compLoading.value = false
@@ -286,48 +468,30 @@ const loadComponents = async () => {
 }
 
 // ---- render ----
-const buildOption = (data: ReturnType<typeof getChartData> extends Promise<infer T> ? T : never) => {
-  const { chartType: type, labels, series } = data
-  if (type === 'pie' || type === 'doughnut') {
-    const pieData = series[0]?.data.map((v, i) => ({ name: labels[i] ?? String(i), value: v })) ?? []
-    return {
-      tooltip: { trigger: 'item', formatter: '{b}: {d}%' },
-      series: [{ type: 'pie', radius: type === 'doughnut' ? ['40%', '70%'] : '60%', data: pieData }]
-    }
-  }
-  if (type === 'funnel') {
-    return {
-      tooltip: { trigger: 'item' },
-      series: [{ type: 'funnel', data: series[0]?.data.map((v, i) => ({ name: labels[i] ?? String(i), value: v })) ?? [] }]
-    }
-  }
-  return {
-    tooltip: { trigger: 'axis' },
-    legend: series.length > 1 ? {} : undefined,
-    grid: { left: 30, right: 20, bottom: 20, top: series.length > 1 ? 36 : 16, containLabel: true },
-    xAxis: { type: 'category', data: labels, axisLabel: { rotate: labels.length > 8 ? 30 : 0 } },
-    yAxis: { type: 'value' },
-    series: series.map(s => ({ name: s.name, type: type === 'bar_horizontal' ? 'bar' : type, data: s.data }))
-  }
-}
-
 const renderChart = async (comp: DashboardComponent) => {
   const el = chartRefs.get(comp.id)
   if (!el) return
+  if (!isRenderableChart(comp)) return
   try {
-    const data = await getChartData(comp.chartId)
+    const resolved = getComponentConfig(comp)
+    const data = await getChartData(comp.chartId, {
+      configJson: comp.configJson,
+      filters: mergeComponentRequestFilters(resolved.interaction.dataFilters),
+    })
+    const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], resolved.chart)
     let inst = chartInstances.get(comp.id)
     if (!inst) {
       inst = echarts.init(el)
       chartInstances.set(comp.id, inst)
       window.addEventListener('resize', () => inst?.resize())
     }
-    inst.setOption(buildOption(data), true)
+    inst.setOption(buildComponentOption(materialized, resolved.chart, resolved.style), true)
   } catch { /* ignore */ }
 }
 
 // ---- drag & resize ----
 type InteractionMode = 'move' | 'resize'
+type ResizeHandle = 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 interface InteractionState {
   mode: InteractionMode
   compId: number
@@ -337,9 +501,11 @@ interface InteractionState {
   startY: number
   startWidth: number
   startHeight: number
+  handle?: ResizeHandle
 }
 
 let interaction: InteractionState | null = null
+const resizeHandles: ResizeHandle[] = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw']
 
 const findComp = (id: number) => components.value.find(c => c.id === id)
 
@@ -374,7 +540,7 @@ const startDrag = (evt: MouseEvent, comp: DashboardComponent) => {
   document.addEventListener('mouseup', onPointerUp)
 }
 
-const startResize = (evt: MouseEvent, comp: DashboardComponent) => {
+const startResize = (evt: MouseEvent, comp: DashboardComponent, handle: ResizeHandle = 'se') => {
   focusComponent(comp)
   interaction = {
     mode: 'resize',
@@ -384,7 +550,8 @@ const startResize = (evt: MouseEvent, comp: DashboardComponent) => {
     startX: comp.posX,
     startY: comp.posY,
     startWidth: comp.width,
-    startHeight: comp.height
+    startHeight: comp.height,
+    handle,
   }
   document.addEventListener('mousemove', onPointerMove)
   document.addEventListener('mouseup', onPointerUp)
@@ -403,9 +570,34 @@ const onPointerMove = (evt: MouseEvent) => {
     comp.posX = Math.min(maxX, Math.max(0, interaction.startX + dx))
     comp.posY = Math.max(0, interaction.startY + dy)
   } else {
-    const maxWidth = Math.max(MIN_CARD_WIDTH, getCanvasWidth() - comp.posX)
-    comp.width = Math.min(maxWidth, Math.max(MIN_CARD_WIDTH, interaction.startWidth + dx))
-    comp.height = Math.max(MIN_CARD_HEIGHT, interaction.startHeight + dy)
+    const handle = interaction.handle ?? 'se'
+    let nextX = interaction.startX
+    let nextY = interaction.startY
+    let nextWidth = interaction.startWidth
+    let nextHeight = interaction.startHeight
+    const canvasWidth = getCanvasWidth()
+
+    if (handle.includes('e')) {
+      nextWidth = Math.min(Math.max(MIN_CARD_WIDTH, interaction.startWidth + dx), Math.max(MIN_CARD_WIDTH, canvasWidth - interaction.startX))
+    }
+    if (handle.includes('s')) {
+      nextHeight = Math.max(MIN_CARD_HEIGHT, interaction.startHeight + dy)
+    }
+    if (handle.includes('w')) {
+      const maxLeft = interaction.startX + interaction.startWidth - MIN_CARD_WIDTH
+      nextX = Math.min(Math.max(0, interaction.startX + dx), maxLeft)
+      nextWidth = interaction.startWidth - (nextX - interaction.startX)
+    }
+    if (handle.includes('n')) {
+      const maxTop = interaction.startY + interaction.startHeight - MIN_CARD_HEIGHT
+      nextY = Math.min(Math.max(0, interaction.startY + dy), maxTop)
+      nextHeight = interaction.startHeight - (nextY - interaction.startY)
+    }
+
+    comp.posX = Math.round(nextX)
+    comp.posY = Math.round(nextY)
+    comp.width = Math.round(nextWidth)
+    comp.height = Math.round(nextHeight)
     chartInstances.get(comp.id)?.resize()
   }
 }
@@ -432,7 +624,7 @@ const handleCreateDashboard = async () => {
   if (!dashForm.name.trim()) return ElMessage.warning('请输入仪表板名称')
   dashSaving.value = true
   try {
-    const newDb = await createDashboard({ name: dashForm.name })
+    const newDb = await createDashboard({ name: dashForm.name, configJson: buildReportConfig(null, 'dashboard') })
     dashboards.value.unshift(newDb)
     createDashVisible.value = false
     await selectDashboard(newDb)
@@ -451,6 +643,79 @@ const handleDeleteDashboard = async (id: number) => {
     else components.value = []
   }
   ElMessage.success('已删除')
+}
+
+const openPreview = (focusShare = false) => {
+  if (!currentDashboard.value) return ElMessage.warning('请先选择仪表板')
+  window.open(focusShare && isPublished.value ? shareLink.value : previewLink.value, '_blank', 'noopener,noreferrer')
+}
+
+const openShareDialog = () => {
+  if (!currentDashboard.value) return ElMessage.warning('请先选择仪表板')
+  shareVisible.value = true
+}
+
+const openPublishDialog = () => {
+  if (!currentDashboard.value) return ElMessage.warning('请先选择仪表板')
+  const publish = currentPublishConfig.value
+  publishForm.published = publish.status === 'PUBLISHED'
+  publishForm.allowAnonymousAccess = publish.allowAnonymousAccess
+  publishForm.allowedRoles = [...publish.allowedRoles]
+  publishForm.shareToken = publish.shareToken
+  publishVisible.value = true
+}
+
+const savePublishSettings = async () => {
+  if (!currentDashboard.value) return
+  publishSaving.value = true
+  try {
+    const configJson = buildReportConfig(currentDashboard.value.configJson, 'dashboard', {
+      status: publishForm.published ? 'PUBLISHED' : 'DRAFT',
+      allowAnonymousAccess: publishForm.allowAnonymousAccess,
+      allowedRoles: publishForm.allowedRoles,
+      shareToken: publishForm.shareToken,
+      publishedAt: publishForm.published ? new Date().toISOString() : undefined,
+    })
+    const updated = await updateDashboard(currentDashboard.value.id, { configJson })
+    currentDashboard.value = updated
+    dashboards.value = dashboards.value.map((item) => item.id === updated.id ? updated : item)
+    publishVisible.value = false
+    ElMessage.success('发布设置已保存')
+  } finally {
+    publishSaving.value = false
+  }
+}
+
+const copyShareLink = async () => {
+  if (!isPublished.value) {
+    ElMessage.warning('请先发布仪表板')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(shareLink.value)
+    ElMessage.success('分享链接已复制')
+  } catch {
+    ElMessage.warning('复制失败，请手动复制链接')
+  }
+}
+
+const exportDashboardJson = () => {
+  if (!currentDashboard.value) return ElMessage.warning('请先选择仪表板')
+  const payload = {
+    dashboard: currentDashboard.value,
+    components: components.value,
+    charts: components.value
+      .map((comp) => chartMap.value.get(comp.chartId))
+      .filter((chart): chart is Chart => Boolean(chart))
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `${currentDashboard.value.name}-dashboard.json`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(link.href)
 }
 
 // ---- component CRUD ----
@@ -472,15 +737,17 @@ const handleAddChart = async () => {
       posY: lastY + 12,
       width: 520,
       height: 320,
-      zIndex: getMaxZ() + 1
+      zIndex: getMaxZ() + 1,
+      configJson: buildComponentConfig(chartMap.value.get(selectedChartId.value) ?? null, undefined, {
+        chart: buildChartSnapshot(chartMap.value.get(selectedChartId.value) ?? null),
+      })
     })
     normalizeLayout(comp)
     components.value.push(comp)
     addChartVisible.value = false
     ElMessage.success('图表已添加到仪表板')
     await nextTick()
-    const chart = chartMap.value.get(comp.chartId)
-    if (chart?.xField && chart?.yField) renderChart(comp)
+    if (!showNoField(comp) && isRenderableChart(comp)) renderChart(comp)
   } finally {
     addingChart.value = false
   }
@@ -492,6 +759,7 @@ const removeComponent = async (compId: number) => {
   const inst = chartInstances.get(compId)
   if (inst) { inst.dispose(); chartInstances.delete(compId) }
   components.value = components.value.filter(c => c.id !== compId)
+  if (activeCompId.value === compId) activeCompId.value = null
   ElMessage.success('已从仪表板移除')
 }
 
@@ -529,6 +797,7 @@ onBeforeUnmount(() => {
   padding: 12px 12px 8px;
   border-bottom: 1px solid #ebeef5;
 }
+.sidebar-search-wrap { padding: 10px 10px 6px; border-bottom: 1px solid #f2f4f7; }
 .sidebar-title { font-size: 13px; font-weight: 700; color: #303133; }
 .sidebar-list { flex: 1; overflow-y: auto; padding: 4px 0; }
 .sidebar-item {
@@ -558,6 +827,14 @@ onBeforeUnmount(() => {
   padding: 16px;
   min-width: 0;
 }
+
+.dash-inspector {
+  width: 320px;
+  flex-shrink: 0;
+  padding: 16px 16px 16px 0;
+  overflow-y: auto;
+}
+
 .dash-empty { margin-top: 80px; }
 
 /* KPI */
@@ -583,9 +860,15 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   margin-bottom: 12px;
 }
+.section-title-wrap { display: flex; align-items: center; gap: 8px; }
 .section-title { font-size: 15px; font-weight: 700; color: #303133; }
-.section-actions { display: flex; gap: 8px; }
+.section-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .layout-hint { color: #909399; font-size: 12px; margin-bottom: 8px; }
+
+.share-block { display: flex; flex-direction: column; gap: 10px; }
+.share-label { font-size: 13px; font-weight: 600; color: #303133; }
+.share-tip { font-size: 12px; color: #909399; line-height: 1.6; }
+.publish-tip { margin-top: 8px; font-size: 12px; line-height: 1.7; color: #909399; }
 
 /* chart grid — 24 column */
 .chart-grid {
@@ -607,6 +890,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   border: 1px solid transparent;
   user-select: none;
+  will-change: transform, width, height;
 }
 .chart-card.active {
   border-color: #409eff;
@@ -628,18 +912,112 @@ onBeforeUnmount(() => {
 .grid-empty { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; }
 .resize-handle {
   position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 14px;
-  height: 14px;
-  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
+
+.chart-card:hover .resize-handle,
+.chart-card.active .resize-handle {
+  opacity: 1;
+}
+
 .resize-handle::before {
   content: '';
   position: absolute;
-  inset: 0;
-  border-right: 2px solid #b8c2d1;
-  border-bottom: 2px solid #b8c2d1;
+  border-radius: 999px;
+  background: #409eff;
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
+.resize-handle--n,
+.resize-handle--s {
+  left: 18px;
+  right: 18px;
+  height: 12px;
+}
+
+.resize-handle--n {
+  top: -6px;
+  cursor: ns-resize;
+}
+
+.resize-handle--s {
+  bottom: -6px;
+  cursor: ns-resize;
+}
+
+.resize-handle--n::before,
+.resize-handle--s::before {
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 4px;
+  transform: translate(-50%, -50%);
+}
+
+.resize-handle--e,
+.resize-handle--w {
+  top: 18px;
+  bottom: 18px;
+  width: 12px;
+}
+
+.resize-handle--e {
+  right: -6px;
+  cursor: ew-resize;
+}
+
+.resize-handle--w {
+  left: -6px;
+  cursor: ew-resize;
+}
+
+.resize-handle--e::before,
+.resize-handle--w::before {
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+}
+
+.resize-handle--ne,
+.resize-handle--nw,
+.resize-handle--se,
+.resize-handle--sw {
+  width: 16px;
+  height: 16px;
+}
+
+.resize-handle--ne {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+
+.resize-handle--nw {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+
+.resize-handle--se {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+
+.resize-handle--sw {
+  left: -6px;
+  bottom: -6px;
+  cursor: nesw-resize;
+}
+
+.resize-handle--ne::before,
+.resize-handle--nw::before,
+.resize-handle--se::before,
+.resize-handle--sw::before {
+  inset: 2px;
 }
 
 /* add chart picker */
@@ -659,5 +1037,35 @@ onBeforeUnmount(() => {
 .chart-pick-item:hover { background: #f5f7fa; }
 .chart-pick-item.selected { background: #ecf5ff; color: #409eff; }
 .pick-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 1200px) {
+  .dash-root {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .dash-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e4e7ed;
+  }
+
+  .dash-inspector {
+    width: auto;
+    padding: 0 16px 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .kpi-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .kpi-row {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
 

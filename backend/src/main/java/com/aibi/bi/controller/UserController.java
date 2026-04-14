@@ -1,6 +1,8 @@
 package com.aibi.bi.controller;
 
 import com.aibi.bi.common.ApiResponse;
+import com.aibi.bi.auth.AuthContext;
+import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.model.request.CreateUserRequest;
 import com.aibi.bi.model.request.UpdateUserRequest;
 import com.aibi.bi.model.response.UserResponse;
@@ -20,6 +22,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
+@RequireRoles("ADMIN")
 public class UserController {
 
     private final UserService userService;
@@ -54,6 +57,10 @@ public class UserController {
     }
 
     private String operator(HttpServletRequest request) {
+        String currentUser = AuthContext.username();
+        if (currentUser != null && !currentUser.isBlank()) {
+            return currentUser;
+        }
         String op = request.getHeader("X-Operator");
         return (op == null || op.isBlank()) ? "system" : op.trim();
     }

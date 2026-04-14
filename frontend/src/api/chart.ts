@@ -24,8 +24,14 @@ export interface ChartDataResult {
   chartType: string
   columns: string[]
   labels: string[]
-  series: { name: string; data: (number | string)[] }[]
+  series: { name: string; data: Array<number | string | [number, number]> }[]
   rawRows?: Record<string, unknown>[]
+  filters?: Record<string, string>
+}
+
+export interface ChartDataQueryOptions {
+  filters?: Record<string, string>
+  configJson?: string
 }
 
 export const getChartList = (): Promise<Chart[]> =>
@@ -40,6 +46,11 @@ export const updateChart = (id: number, data: ChartForm): Promise<Chart> =>
 export const deleteChart = (id: number): Promise<void> =>
   request.delete(`/charts/${id}`)
 
-export const getChartData = (id: number): Promise<ChartDataResult> =>
-  request.get(`/charts/${id}/data`)
+export const getChartData = (id: number, options?: ChartDataQueryOptions): Promise<ChartDataResult> =>
+  request.get(`/charts/${id}/data`, {
+    params: {
+      ...(options?.filters && Object.keys(options.filters).length ? { filterJson: JSON.stringify(options.filters) } : {}),
+      ...(options?.configJson ? { configJson: options.configJson } : {}),
+    }
+  })
 

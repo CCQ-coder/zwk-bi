@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.SysMenuMapper">
+
+    <resultMap id="SysMenuMap" type="com.aibi.bi.domain.SysMenu">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="path" property="path"/>
+        <result column="component" property="component"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="type" property="type"/>
+        <result column="permission" property="permission"/>
+        <result column="icon" property="icon"/>
+        <result column="sort" property="sort"/>
+        <result column="visible" property="visible"/>
+        <result column="dashboard_id" property="dashboardId"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="listVisibleMenusByUserId" resultMap="SysMenuMap" parameterType="long">
+        SELECT DISTINCT m.id,
+               m.name,
+               m.path,
+               m.component,
+               m.parent_id,
+               m.type,
+               m.permission,
+               m.icon,
+               m.sort,
+               m.visible,
+               m.dashboard_id,
+               m.created_at
+        FROM sys_menu m
+                 INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
+                 INNER JOIN sys_user_role ur ON ur.role_id = rm.role_id
+        WHERE ur.user_id = #{userId}
+          AND m.visible = 1
+        ORDER BY COALESCE(m.parent_id, 0), m.sort ASC, m.id ASC
+    </select>
+
+    <select id="listAll" resultMap="SysMenuMap">
+        SELECT id,
+               name,
+               path,
+               component,
+               parent_id,
+               type,
+               permission,
+               icon,
+               sort,
+               visible,
+               dashboard_id,
+               created_at
+        FROM sys_menu
+        ORDER BY COALESCE(parent_id, 0), sort ASC, id ASC
+    </select>
+
+    <select id="findById" resultMap="SysMenuMap" parameterType="long">
+        SELECT id,
+               name,
+               path,
+               component,
+               parent_id,
+               type,
+               permission,
+               icon,
+               sort,
+               visible,
+               dashboard_id,
+               created_at
+        FROM sys_menu
+        WHERE id = #{id}
+    </select>
+
+    <select id="countByPath" resultType="long">
+        SELECT COUNT(1)
+        FROM sys_menu
+        WHERE path = #{path}
+          AND (#{excludeId} IS NULL OR id &lt;&gt; #{excludeId})
+    </select>
+
+    <select id="countChildren" resultType="long" parameterType="long">
+        SELECT COUNT(1)
+        FROM sys_menu
+        WHERE parent_id = #{parentId}
+    </select>
+
+    <insert id="insert" parameterType="com.aibi.bi.domain.SysMenu" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_menu (name, path, component, parent_id, type, permission, icon, sort, visible, dashboard_id)
+        VALUES (#{name}, #{path}, #{component}, #{parentId}, #{type}, #{permission}, #{icon}, #{sort}, #{visible}, #{dashboardId})
+    </insert>
+
+    <update id="update" parameterType="com.aibi.bi.domain.SysMenu">
+        UPDATE sys_menu
+        SET name = #{name},
+            path = #{path},
+            component = #{component},
+            parent_id = #{parentId},
+            type = #{type},
+            permission = #{permission},
+            icon = #{icon},
+            sort = #{sort},
+            visible = #{visible},
+            dashboard_id = #{dashboardId}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM sys_menu
+        WHERE id = #{id}
+    </delete>
+</mapper>

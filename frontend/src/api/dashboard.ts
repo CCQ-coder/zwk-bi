@@ -40,6 +40,7 @@ export interface DashboardComponent {
   width: number
   height: number
   zIndex: number
+  configJson?: string
 }
 
 // 首页默认仪表板（最新一条）
@@ -49,6 +50,9 @@ export const getDefaultDashboard = (): Promise<DashboardData> =>
 // 仪表板 CRUD
 export const getDashboardList = (): Promise<Dashboard[]> =>
   request.get('/dashboard')
+
+export const getDashboardById = (id: number): Promise<Dashboard> =>
+  request.get(`/dashboard/${id}`)
 
 export const createDashboard = (data: { name: string; configJson?: string }): Promise<Dashboard> =>
   request.post('/dashboard', data)

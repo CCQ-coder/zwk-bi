@@ -1,6 +1,7 @@
 package com.aibi.bi.controller;
 
 import com.aibi.bi.common.ApiResponse;
+import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiChartTemplate;
 import com.aibi.bi.service.ChartTemplateService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -45,17 +46,20 @@ public class ChartTemplateController {
     }
 
     @PostMapping
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiChartTemplate> create(@RequestBody BiChartTemplate req) {
         return ApiResponse.ok(service.create(req));
     }
 
     @PutMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiChartTemplate> update(@PathVariable Long id,
                                                 @RequestBody BiChartTemplate req) {
         return ApiResponse.ok(service.update(id, req));
     }
 
     @DeleteMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ApiResponse.ok(null);

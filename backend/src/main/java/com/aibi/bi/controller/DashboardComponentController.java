@@ -1,6 +1,7 @@
 package com.aibi.bi.controller;
 
 import com.aibi.bi.common.ApiResponse;
+import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiDashboardComponent;
 import com.aibi.bi.service.DashboardComponentService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,6 +38,7 @@ public class DashboardComponentController {
     }
 
     @PostMapping
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiDashboardComponent> add(@PathVariable Long dashboardId,
                                                   @RequestBody BiDashboardComponent req) {
         req.setDashboardId(dashboardId);
@@ -44,16 +46,18 @@ public class DashboardComponentController {
     }
 
     @PutMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiDashboardComponent> update(@PathVariable Long dashboardId,
                                                      @PathVariable Long id,
                                                      @RequestBody BiDashboardComponent req) {
-        return ApiResponse.ok(service.update(id, req));
+        return ApiResponse.ok(service.update(dashboardId, id, req));
     }
 
     @DeleteMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<Void> delete(@PathVariable Long dashboardId,
                                     @PathVariable Long id) {
-        service.delete(id);
+        service.delete(dashboardId, id);
         return ApiResponse.ok(null);
     }
 }

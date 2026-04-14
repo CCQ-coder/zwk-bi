@@ -14,9 +14,9 @@
 - 前端层: Vue3 + Element Plus + ECharts
 
 ## 业务模块划分
-- 前端模块: 登录、数据源管理、数据集 SQL、图表设计、仪表盘
-- 后端模块: AuthAPI、DatasourceAPI、DatasetAPI、ChartAPI、DashboardAPI
-- 数据模型: bi_datasource、bi_dataset、bi_chart、bi_dashboard、bi_dashboard_chart、bi_user
+- 前端模块: 登录、数据源管理、数据集 SQL、图表设计、仪表盘、大屏设计、只读预览/分享
+- 后端模块: AuthAPI、DatasourceAPI、DatasetAPI、ChartAPI、DashboardAPI、DashboardComponentAPI
+- 数据模型: sys_user、sys_role、sys_user_role、sys_menu、sys_role_menu、bi_datasource、bi_dataset、bi_dataset_field、bi_chart、bi_dashboard、bi_dashboard_component、bi_chart_template
 
 ## 目录
 - `frontend`: 前端项目
@@ -48,15 +48,56 @@ npm run dev
 ```
 
 4. 健康检查
-- 后端: `http://localhost:8080/api/health`
+- 后端: `http://localhost:8081/api/health`
 - 前端: `http://localhost:5173`
+
+## 当前系统状态
+- 仪表盘和大屏组件已升级为实例级配置模型: 共享资产存放在 `bi_chart`，画布实例存放在 `bi_dashboard_component`
+- 每个组件实例都可以独立保存名称、数据集、图表类型、字段绑定、样式和交互配置
+- 预览层支持发布控制、分享链接、查询组件筛选和图表点击联动
+- RBAC 已改为数据库驱动: 当前用户菜单来自 `sys_user_role -> sys_role_menu -> sys_menu`，前端导航按接口动态渲染
+- 数据集字段元数据已结构化入库到 `bi_dataset_field`，数据集创建/更新和应用启动时都会自动同步字段定义
+
+## 本次改造对应的后端与数据库更新
+- 后端已支持组件实例配置持久化: `bi_dashboard_component.config_json`
+- 后端已支持预览查询联动: `GET /api/charts/{id}/data?filterJson=...`
+- 后端已支持按 ID 获取报告: `GET /api/dashboard/{id}`
+- 后端已支持获取当前登录用户菜单: `GET /api/menus/current`
+- 后端已正式接入 Flyway，启动时会自动执行 `backend/src/main/resources/db/migration` 下的版本化迁移
+- 数据库初始化脚本已更新: `database/mysql/init.sql`
+- 增量迁移脚本已新增: `database/mysql/migration_v6_component_config.sql`
+- 增量迁移脚本已新增: `database/mysql/migration_v8_rbac_menu_and_dataset_fields.sql`
+
+默认情况下，不再需要手工记忆执行数据库升级脚本：
+
+- 新库初始化可直接使用 `database/mysql/init.sql`
+- 已有库在启动后端时会由 Flyway 自动从 baseline v4 升级到当前版本
+- `database/mysql/migration_v5.sql`、`database/mysql/migration_v6_component_config.sql`、`database/mysql/migration_v8_rbac_menu_and_dataset_fields.sql` 保留为离线兜底脚本，仅在无法通过应用启动自动迁移时手动执行
+
+如需手工兜底，可执行:
+
+```sql
+SOURCE database/mysql/migration_v5.sql;
+SOURCE database/mysql/migration_v6_component_config.sql;
+SOURCE database/mysql/migration_v8_rbac_menu_and_dataset_fields.sql;
+```
+
+## 全链路同步要求
+- 任何功能变更都必须同时检查前端、后端、数据库、数据脚本四层是否受影响，不能只改一层
+- 如果前端新增字段、配置或交互，必须同步确认后端接口、MyBatis 映射、数据库初始化脚本和增量 migration 是否已更新
+- 如果涉及数据表结构、指标口径、同步链路或数仓表，必须同步更新 `data-integration` 下的 DataX/ETL 脚本
+- 如果本次改动不影响 DataX/ETL，也要在说明中明确写出“数据层无需变更”，不能省略判断
+- 完成改动后，README 需要同步更新到当前真实状态，不能继续保留旧表名或旧流程
 
 ## 后端 API（基础骨架）
 - POST `/api/auth/login`
 - GET `/api/datasources`
 - GET `/api/datasets`
 - GET `/api/charts`
+- GET `/api/charts/{id}/data`
 - GET `/api/dashboard/default`
+- GET `/api/dashboard/{id}`
+- GET `/api/dashboard/{id}/components`
 
 ## DataX 示例
 DataX 任务示例位于 `data-integration/datax/job/mysql_to_clickhouse.json`，示例为 MySQL 订单明细同步到 ClickHouse `bi_order_detail`。

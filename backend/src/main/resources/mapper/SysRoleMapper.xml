@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.SysRoleMapper">
+
+    <resultMap id="SysRoleMap" type="com.aibi.bi.domain.SysRole">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="user_count" property="userCount"/>
+        <result column="menu_count" property="menuCount"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="listAllWithStats" resultMap="SysRoleMap">
+        SELECT r.id,
+               r.name,
+               COUNT(DISTINCT ur.user_id) AS user_count,
+               COUNT(DISTINCT rm.menu_id) AS menu_count,
+               r.created_at
+        FROM sys_role r
+        LEFT JOIN sys_user_role ur ON ur.role_id = r.id
+        LEFT JOIN sys_role_menu rm ON rm.role_id = r.id
+        GROUP BY r.id, r.name, r.created_at
+        ORDER BY CASE r.name
+                     WHEN 'ADMIN' THEN 1
+                     WHEN 'ANALYST' THEN 2
+                     WHEN 'VIEWER' THEN 3
+                     ELSE 99
+                 END,
+                 r.id ASC
+    </select>
+
+    <select id="findById" resultMap="SysRoleMap" parameterType="long">
+        SELECT r.id,
+               r.name,
+               0 AS user_count,
+               0 AS menu_count,
+               r.created_at
+        FROM sys_role r
+        WHERE r.id = #{id}
+    </select>
+
+    <select id="findByName" resultMap="SysRoleMap" parameterType="string">
+        SELECT r.id,
+               r.name,
+               0 AS user_count,
+               0 AS menu_count,
+               r.created_at
+        FROM sys_role r
+        WHERE r.name = #{name}
+        LIMIT 1
+    </select>
+</mapper>

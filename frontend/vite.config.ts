@@ -11,7 +11,7 @@ export default defineConfig({
     proxy: {
       // /api 开头的请求全部转发到后端，解决前后端跨域问题
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
         changeOrigin: true
       }
     }

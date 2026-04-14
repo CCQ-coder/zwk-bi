@@ -4,6 +4,7 @@ import com.aibi.bi.domain.BiUser;
 import com.aibi.bi.mapper.BiUserMapper;
 import com.aibi.bi.model.request.LoginRequest;
 import com.aibi.bi.model.response.LoginResponse;
+import com.aibi.bi.auth.JwtTokenService;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -11,10 +12,14 @@ public class AuthService {
 
     private final BiUserMapper biUserMapper;
     private final AuditLogService auditLogService;
+    private final JwtTokenService jwtTokenService;
 
-    public AuthService(BiUserMapper biUserMapper, AuditLogService auditLogService) {
+    public AuthService(BiUserMapper biUserMapper,
+                       AuditLogService auditLogService,
+                       JwtTokenService jwtTokenService) {
         this.biUserMapper = biUserMapper;
         this.auditLogService = auditLogService;
+        this.jwtTokenService = jwtTokenService;
     }
 
     public LoginResponse login(LoginRequest request, String ipAddr) {
@@ -33,7 +38,8 @@ public class AuthService {
         response.setId(user.getId());
         response.setUsername(user.getUsername());
         response.setDisplayName(user.getDisplayName());
-        response.setToken("token-" + user.getId() + "-" + System.currentTimeMillis());
+        response.setRole(user.getRole());
+        response.setToken(jwtTokenService.generateToken(user));
         return response;
     }
 }

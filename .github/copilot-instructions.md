@@ -1,4 +1,13 @@
 <!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+- [ ] Verify full-stack sync for every feature change
+	<!--
+	Any user-visible feature change must explicitly verify whether frontend, backend, database scripts, and data-integration scripts are affected.
+	If a layer is affected, update it in the same task.
+	If a layer is not affected, state that it was checked and why no change was required.
+	For schema/config changes, update both init.sql and an incremental migration file.
+	Do not finish a task with only frontend changes when backend or database support is required.
+	-->
+
 - [ ] Verify that the copilot-instructions.md file in the .github directory is created.
 
 - [ ] Clarify Project Requirements

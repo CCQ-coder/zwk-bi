@@ -1,6 +1,7 @@
 package com.aibi.bi.controller;
 
 import com.aibi.bi.common.ApiResponse;
+import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiDashboard;
 import com.aibi.bi.model.response.DashboardSummaryResponse;
 import com.aibi.bi.service.DashboardService;
@@ -43,16 +44,19 @@ public class DashboardController {
     }
 
     @PostMapping
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiDashboard> create(@RequestBody BiDashboard req) {
         return ApiResponse.ok(dashboardService.create(req));
     }
 
     @PutMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiDashboard> update(@PathVariable Long id, @RequestBody BiDashboard req) {
         return ApiResponse.ok(dashboardService.update(id, req));
     }
 
     @DeleteMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<Void> delete(@PathVariable Long id) {
         dashboardService.delete(id);
         return ApiResponse.ok(null);

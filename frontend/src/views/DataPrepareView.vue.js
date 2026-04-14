@@ -1,9 +1,35 @@
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import TopNavBar from '../components/TopNavBar.vue';
 import DatasourcePanel from '../components/DatasourcePanel.vue';
 import DatasetPanel from '../components/DatasetPanel.vue';
 import ExtractPanel from '../components/ExtractPanel.vue';
+import ComponentAssetPanel from '../components/ComponentAssetPanel.vue';
+const route = useRoute();
+const router = useRouter();
 const activeTab = ref('datasource');
+const tabRouteMap = {
+    datasource: '/home/prepare/datasource',
+    dataset: '/home/prepare/dataset',
+    components: '/home/prepare/components',
+    extract: '/home/prepare/extract',
+};
+const routeTabMap = computed(() => ({
+    '/home/prepare': 'datasource',
+    '/home/prepare/datasource': 'datasource',
+    '/home/prepare/dataset': 'dataset',
+    '/home/prepare/components': 'components',
+    '/home/prepare/extract': 'extract',
+}));
+watch(() => route.path, (path) => {
+    activeTab.value = routeTabMap.value[path] ?? 'datasource';
+}, { immediate: true });
+watch(activeTab, (tab) => {
+    const targetPath = tabRouteMap[tab];
+    if (targetPath && targetPath !== route.path) {
+        router.push(targetPath);
+    }
+});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -76,19 +102,36 @@ const __VLS_21 = {}.ElTabPane;
 /** @type {[typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, ]} */ ;
 // @ts-ignore
 const __VLS_22 = __VLS_asFunctionalComponent(__VLS_21, new __VLS_21({
+    label: "组件管理",
+    name: "components",
+}));
+const __VLS_23 = __VLS_22({
+    label: "组件管理",
+    name: "components",
+}, ...__VLS_functionalComponentArgsRest(__VLS_22));
+__VLS_24.slots.default;
+/** @type {[typeof ComponentAssetPanel, ]} */ ;
+// @ts-ignore
+const __VLS_25 = __VLS_asFunctionalComponent(ComponentAssetPanel, new ComponentAssetPanel({}));
+const __VLS_26 = __VLS_25({}, ...__VLS_functionalComponentArgsRest(__VLS_25));
+var __VLS_24;
+const __VLS_28 = {}.ElTabPane;
+/** @type {[typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, ]} */ ;
+// @ts-ignore
+const __VLS_29 = __VLS_asFunctionalComponent(__VLS_28, new __VLS_28({
     label: "数据抽取",
     name: "extract",
 }));
-const __VLS_23 = __VLS_22({
+const __VLS_30 = __VLS_29({
     label: "数据抽取",
     name: "extract",
-}, ...__VLS_functionalComponentArgsRest(__VLS_22));
-__VLS_24.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_29));
+__VLS_31.slots.default;
 /** @type {[typeof ExtractPanel, ]} */ ;
 // @ts-ignore
-const __VLS_25 = __VLS_asFunctionalComponent(ExtractPanel, new ExtractPanel({}));
-const __VLS_26 = __VLS_25({}, ...__VLS_functionalComponentArgsRest(__VLS_25));
-var __VLS_24;
+const __VLS_32 = __VLS_asFunctionalComponent(ExtractPanel, new ExtractPanel({}));
+const __VLS_33 = __VLS_32({}, ...__VLS_functionalComponentArgsRest(__VLS_32));
+var __VLS_31;
 var __VLS_6;
 /** @type {__VLS_StyleScopedClasses['page-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['page-main']} */ ;
@@ -101,6 +144,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             DatasourcePanel: DatasourcePanel,
             DatasetPanel: DatasetPanel,
             ExtractPanel: ExtractPanel,
+            ComponentAssetPanel: ComponentAssetPanel,
             activeTab: activeTab,
         };
     },

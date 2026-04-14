@@ -209,22 +209,35 @@
       </el-form-item>
       <el-form-item label="图表类型" prop="chartType">
         <el-select v-model="form.chartType" placeholder="请选择" style="width:100%">
-          <el-option-group label="比较类">
-            <el-option label="柱状图" value="bar" />
-            <el-option label="条形图" value="bar_horizontal" />
-            <el-option label="折线图" value="line" />
-            <el-option label="雷达图" value="radar" />
+          <el-option-group label="柱/条图">
+            <el-option label="基础柱状图" value="bar" />
+            <el-option label="堆叠柱状图" value="bar_stack" />
+            <el-option label="百分比柱状图" value="bar_percent" />
+            <el-option label="分组柱状图" value="bar_group" />
+            <el-option label="基础条形图" value="bar_horizontal" />
+            <el-option label="堆叠条形图" value="bar_horizontal_stack" />
           </el-option-group>
-          <el-option-group label="占比类">
+          <el-option-group label="线/面图">
+            <el-option label="基础折线图" value="line" />
+            <el-option label="面积图" value="area" />
+            <el-option label="堆叠折线图" value="line_stack" />
+          </el-option-group>
+          <el-option-group label="分布图">
             <el-option label="饼图" value="pie" />
             <el-option label="环形图" value="doughnut" />
+            <el-option label="玫瑰图" value="rose" />
+            <el-option label="雷达图" value="radar" />
+            <el-option label="漏斗图" value="funnel" />
+            <el-option label="矩形树图" value="treemap" />
           </el-option-group>
-          <el-option-group label="关系类">
+          <el-option-group label="关系图">
             <el-option label="散点图" value="scatter" />
           </el-option-group>
-          <el-option-group label="高级">
-            <el-option label="漏斗图" value="funnel" />
+          <el-option-group label="指标">
             <el-option label="仪表盘" value="gauge" />
+          </el-option-group>
+          <el-option-group label="表格">
+            <el-option label="明细表" value="table" />
           </el-option-group>
         </el-select>
       </el-form-item>

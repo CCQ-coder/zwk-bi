@@ -1,20 +1,35 @@
-import { computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { getCurrentMenus } from '../api/menu';
+import { clearAuthSession, getAuthDisplayName, getAuthMenus, hasAuthSession, saveAuthMenus, } from '../utils/auth-session';
 const __VLS_props = defineProps();
 const router = useRouter();
-const displayName = computed(() => {
-    return localStorage.getItem('bi_display_name') || localStorage.getItem('bi_username') || '未登录用户';
-});
+const route = useRoute();
+const menus = ref(getAuthMenus());
+const displayName = computed(() => getAuthDisplayName());
+const avatarText = computed(() => displayName.value.slice(0, 1) || '用');
+const navMenus = computed(() => menus.value.filter((item) => item.visible !== false && item.type === 'menu' && item.path && !item.parentId));
 const go = (path) => {
     router.push(path);
 };
+const isMenuActive = (path) => route.path === path || (path !== '/home' && route.path.startsWith(`${path}/`));
+const loadMenus = async () => {
+    if (!hasAuthSession())
+        return;
+    try {
+        const latestMenus = await getCurrentMenus();
+        menus.value = latestMenus;
+        saveAuthMenus(latestMenus);
+    }
+    catch {
+        menus.value = getAuthMenus();
+    }
+};
 const logout = () => {
-    localStorage.removeItem('bi_user_id');
-    localStorage.removeItem('bi_token');
-    localStorage.removeItem('bi_username');
-    localStorage.removeItem('bi_display_name');
+    clearAuthSession();
     router.push('/login');
 };
+onMounted(loadMenus);
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -32,54 +47,24 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.nav, __VLS_intrinsicElements.nav)({
     ...{ class: "nav-items" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.go('/home');
-        } },
-    ...{ class: "nav-btn" },
-    ...{ class: ({ 'nav-btn--active': __VLS_ctx.active === 'workbench' }) },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.go('/home/dashboard');
-        } },
-    ...{ class: "nav-btn" },
-    ...{ class: ({ 'nav-btn--active': __VLS_ctx.active === 'dashboard' }) },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.go('/home/screen');
-        } },
-    ...{ class: "nav-btn" },
-    ...{ class: ({ 'nav-btn--active': __VLS_ctx.active === 'screen' }) },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.go('/home/prepare');
-        } },
-    ...{ class: "nav-btn" },
-    ...{ class: ({ 'nav-btn--active': __VLS_ctx.active === 'prepare' }) },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.go('/home/modeling');
-        } },
-    ...{ class: "nav-btn" },
-    ...{ class: ({ 'nav-btn--active': __VLS_ctx.active === 'modeling' }) },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (...[$event]) => {
-            __VLS_ctx.go('/home/system');
-        } },
-    ...{ class: "nav-btn" },
-    ...{ class: ({ 'nav-btn--active': __VLS_ctx.active === 'system' }) },
-});
+for (const [menu] of __VLS_getVForSourceType((__VLS_ctx.navMenus))) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                __VLS_ctx.go(menu.path);
+            } },
+        key: (menu.id),
+        ...{ class: "nav-btn" },
+        ...{ class: ({ 'nav-btn--active': __VLS_ctx.isMenuActive(menu.path) }) },
+    });
+    (menu.name);
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "user-menu" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
     ...{ class: "user-avatar" },
 });
+(__VLS_ctx.avatarText);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 (__VLS_ctx.displayName);
 const __VLS_0 = {}.ElButton;
@@ -107,11 +92,6 @@ var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['brand']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-items']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['user-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['user-avatar']} */ ;
 /** @type {__VLS_StyleScopedClasses['logout-btn']} */ ;
@@ -120,7 +100,10 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             displayName: displayName,
+            avatarText: avatarText,
+            navMenus: navMenus,
             go: go,
+            isMenuActive: isMenuActive,
             logout: logout,
         };
     },

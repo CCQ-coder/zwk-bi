@@ -9,6 +9,9 @@
         <el-tab-pane label="数据集管理" name="dataset">
           <DatasetPanel />
         </el-tab-pane>
+        <el-tab-pane label="组件管理" name="components">
+          <ComponentAssetPanel />
+        </el-tab-pane>
         <el-tab-pane label="数据抽取" name="extract">
           <ExtractPanel />
         </el-tab-pane>
@@ -18,13 +21,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import TopNavBar from '../components/TopNavBar.vue'
 import DatasourcePanel from '../components/DatasourcePanel.vue'
 import DatasetPanel from '../components/DatasetPanel.vue'
 import ExtractPanel from '../components/ExtractPanel.vue'
+import ComponentAssetPanel from '../components/ComponentAssetPanel.vue'
 
+const route = useRoute()
+const router = useRouter()
 const activeTab = ref('datasource')
+
+const tabRouteMap: Record<string, string> = {
+  datasource: '/home/prepare/datasource',
+  dataset: '/home/prepare/dataset',
+  components: '/home/prepare/components',
+  extract: '/home/prepare/extract',
+}
+
+const routeTabMap = computed<Record<string, string>>(() => ({
+  '/home/prepare': 'datasource',
+  '/home/prepare/datasource': 'datasource',
+  '/home/prepare/dataset': 'dataset',
+  '/home/prepare/components': 'components',
+  '/home/prepare/extract': 'extract',
+}))
+
+watch(() => route.path, (path) => {
+  activeTab.value = routeTabMap.value[path] ?? 'datasource'
+}, { immediate: true })
+
+watch(activeTab, (tab) => {
+  const targetPath = tabRouteMap[tab]
+  if (targetPath && targetPath !== route.path) {
+    router.push(targetPath)
+  }
+})
 </script>
 
 <style scoped>

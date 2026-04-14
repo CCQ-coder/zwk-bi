@@ -1366,289 +1366,410 @@ const __VLS_258 = {}.ElOptionGroup;
 /** @type {[typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, ]} */ ;
 // @ts-ignore
 const __VLS_259 = __VLS_asFunctionalComponent(__VLS_258, new __VLS_258({
-    label: "比较类",
+    label: "柱/条图",
 }));
 const __VLS_260 = __VLS_259({
-    label: "比较类",
+    label: "柱/条图",
 }, ...__VLS_functionalComponentArgsRest(__VLS_259));
 __VLS_261.slots.default;
 const __VLS_262 = {}.ElOption;
 /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_263 = __VLS_asFunctionalComponent(__VLS_262, new __VLS_262({
-    label: "柱状图",
+    label: "基础柱状图",
     value: "bar",
 }));
 const __VLS_264 = __VLS_263({
-    label: "柱状图",
+    label: "基础柱状图",
     value: "bar",
 }, ...__VLS_functionalComponentArgsRest(__VLS_263));
 const __VLS_266 = {}.ElOption;
 /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_267 = __VLS_asFunctionalComponent(__VLS_266, new __VLS_266({
-    label: "条形图",
-    value: "bar_horizontal",
+    label: "堆叠柱状图",
+    value: "bar_stack",
 }));
 const __VLS_268 = __VLS_267({
-    label: "条形图",
-    value: "bar_horizontal",
+    label: "堆叠柱状图",
+    value: "bar_stack",
 }, ...__VLS_functionalComponentArgsRest(__VLS_267));
 const __VLS_270 = {}.ElOption;
 /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_271 = __VLS_asFunctionalComponent(__VLS_270, new __VLS_270({
-    label: "折线图",
-    value: "line",
+    label: "百分比柱状图",
+    value: "bar_percent",
 }));
 const __VLS_272 = __VLS_271({
-    label: "折线图",
-    value: "line",
+    label: "百分比柱状图",
+    value: "bar_percent",
 }, ...__VLS_functionalComponentArgsRest(__VLS_271));
 const __VLS_274 = {}.ElOption;
 /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_275 = __VLS_asFunctionalComponent(__VLS_274, new __VLS_274({
-    label: "雷达图",
-    value: "radar",
+    label: "分组柱状图",
+    value: "bar_group",
 }));
 const __VLS_276 = __VLS_275({
-    label: "雷达图",
-    value: "radar",
+    label: "分组柱状图",
+    value: "bar_group",
 }, ...__VLS_functionalComponentArgsRest(__VLS_275));
-var __VLS_261;
-const __VLS_278 = {}.ElOptionGroup;
-/** @type {[typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, ]} */ ;
+const __VLS_278 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_279 = __VLS_asFunctionalComponent(__VLS_278, new __VLS_278({
-    label: "占比类",
+    label: "基础条形图",
+    value: "bar_horizontal",
 }));
 const __VLS_280 = __VLS_279({
-    label: "占比类",
+    label: "基础条形图",
+    value: "bar_horizontal",
 }, ...__VLS_functionalComponentArgsRest(__VLS_279));
-__VLS_281.slots.default;
 const __VLS_282 = {}.ElOption;
 /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_283 = __VLS_asFunctionalComponent(__VLS_282, new __VLS_282({
-    label: "饼图",
-    value: "pie",
+    label: "堆叠条形图",
+    value: "bar_horizontal_stack",
 }));
 const __VLS_284 = __VLS_283({
-    label: "饼图",
-    value: "pie",
+    label: "堆叠条形图",
+    value: "bar_horizontal_stack",
 }, ...__VLS_functionalComponentArgsRest(__VLS_283));
-const __VLS_286 = {}.ElOption;
-/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
-// @ts-ignore
-const __VLS_287 = __VLS_asFunctionalComponent(__VLS_286, new __VLS_286({
-    label: "环形图",
-    value: "doughnut",
-}));
-const __VLS_288 = __VLS_287({
-    label: "环形图",
-    value: "doughnut",
-}, ...__VLS_functionalComponentArgsRest(__VLS_287));
-var __VLS_281;
-const __VLS_290 = {}.ElOptionGroup;
+var __VLS_261;
+const __VLS_286 = {}.ElOptionGroup;
 /** @type {[typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, ]} */ ;
 // @ts-ignore
+const __VLS_287 = __VLS_asFunctionalComponent(__VLS_286, new __VLS_286({
+    label: "线/面图",
+}));
+const __VLS_288 = __VLS_287({
+    label: "线/面图",
+}, ...__VLS_functionalComponentArgsRest(__VLS_287));
+__VLS_289.slots.default;
+const __VLS_290 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+// @ts-ignore
 const __VLS_291 = __VLS_asFunctionalComponent(__VLS_290, new __VLS_290({
-    label: "关系类",
+    label: "基础折线图",
+    value: "line",
 }));
 const __VLS_292 = __VLS_291({
-    label: "关系类",
+    label: "基础折线图",
+    value: "line",
 }, ...__VLS_functionalComponentArgsRest(__VLS_291));
-__VLS_293.slots.default;
 const __VLS_294 = {}.ElOption;
 /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_295 = __VLS_asFunctionalComponent(__VLS_294, new __VLS_294({
-    label: "散点图",
-    value: "scatter",
+    label: "面积图",
+    value: "area",
 }));
 const __VLS_296 = __VLS_295({
-    label: "散点图",
-    value: "scatter",
+    label: "面积图",
+    value: "area",
 }, ...__VLS_functionalComponentArgsRest(__VLS_295));
-var __VLS_293;
-const __VLS_298 = {}.ElOptionGroup;
-/** @type {[typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, ]} */ ;
-// @ts-ignore
-const __VLS_299 = __VLS_asFunctionalComponent(__VLS_298, new __VLS_298({
-    label: "高级",
-}));
-const __VLS_300 = __VLS_299({
-    label: "高级",
-}, ...__VLS_functionalComponentArgsRest(__VLS_299));
-__VLS_301.slots.default;
-const __VLS_302 = {}.ElOption;
+const __VLS_298 = {}.ElOption;
 /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
+const __VLS_299 = __VLS_asFunctionalComponent(__VLS_298, new __VLS_298({
+    label: "堆叠折线图",
+    value: "line_stack",
+}));
+const __VLS_300 = __VLS_299({
+    label: "堆叠折线图",
+    value: "line_stack",
+}, ...__VLS_functionalComponentArgsRest(__VLS_299));
+var __VLS_289;
+const __VLS_302 = {}.ElOptionGroup;
+/** @type {[typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, ]} */ ;
+// @ts-ignore
 const __VLS_303 = __VLS_asFunctionalComponent(__VLS_302, new __VLS_302({
-    label: "漏斗图",
-    value: "funnel",
+    label: "分布图",
 }));
 const __VLS_304 = __VLS_303({
-    label: "漏斗图",
-    value: "funnel",
+    label: "分布图",
 }, ...__VLS_functionalComponentArgsRest(__VLS_303));
+__VLS_305.slots.default;
 const __VLS_306 = {}.ElOption;
 /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_307 = __VLS_asFunctionalComponent(__VLS_306, new __VLS_306({
-    label: "仪表盘",
-    value: "gauge",
+    label: "饼图",
+    value: "pie",
 }));
 const __VLS_308 = __VLS_307({
-    label: "仪表盘",
-    value: "gauge",
+    label: "饼图",
+    value: "pie",
 }, ...__VLS_functionalComponentArgsRest(__VLS_307));
-var __VLS_301;
-var __VLS_257;
-var __VLS_253;
-const __VLS_310 = {}.ElDivider;
-/** @type {[typeof __VLS_components.ElDivider, typeof __VLS_components.elDivider, typeof __VLS_components.ElDivider, typeof __VLS_components.elDivider, ]} */ ;
+const __VLS_310 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_311 = __VLS_asFunctionalComponent(__VLS_310, new __VLS_310({
-    contentPosition: "left",
-    ...{ style: {} },
+    label: "环形图",
+    value: "doughnut",
 }));
 const __VLS_312 = __VLS_311({
-    contentPosition: "left",
-    ...{ style: {} },
+    label: "环形图",
+    value: "doughnut",
 }, ...__VLS_functionalComponentArgsRest(__VLS_311));
-__VLS_313.slots.default;
-var __VLS_313;
-const __VLS_314 = {}.ElFormItem;
-/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
+const __VLS_314 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_315 = __VLS_asFunctionalComponent(__VLS_314, new __VLS_314({
-    label: "X轴（维度）",
+    label: "玫瑰图",
+    value: "rose",
 }));
 const __VLS_316 = __VLS_315({
-    label: "X轴（维度）",
+    label: "玫瑰图",
+    value: "rose",
 }, ...__VLS_functionalComponentArgsRest(__VLS_315));
-__VLS_317.slots.default;
-const __VLS_318 = {}.ElSelect;
-/** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
+const __VLS_318 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
 // @ts-ignore
 const __VLS_319 = __VLS_asFunctionalComponent(__VLS_318, new __VLS_318({
-    modelValue: (__VLS_ctx.form.xField),
-    placeholder: "选择列",
-    clearable: true,
-    ...{ style: {} },
+    label: "雷达图",
+    value: "radar",
 }));
 const __VLS_320 = __VLS_319({
+    label: "雷达图",
+    value: "radar",
+}, ...__VLS_functionalComponentArgsRest(__VLS_319));
+const __VLS_322 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+// @ts-ignore
+const __VLS_323 = __VLS_asFunctionalComponent(__VLS_322, new __VLS_322({
+    label: "漏斗图",
+    value: "funnel",
+}));
+const __VLS_324 = __VLS_323({
+    label: "漏斗图",
+    value: "funnel",
+}, ...__VLS_functionalComponentArgsRest(__VLS_323));
+const __VLS_326 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+// @ts-ignore
+const __VLS_327 = __VLS_asFunctionalComponent(__VLS_326, new __VLS_326({
+    label: "矩形树图",
+    value: "treemap",
+}));
+const __VLS_328 = __VLS_327({
+    label: "矩形树图",
+    value: "treemap",
+}, ...__VLS_functionalComponentArgsRest(__VLS_327));
+var __VLS_305;
+const __VLS_330 = {}.ElOptionGroup;
+/** @type {[typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, ]} */ ;
+// @ts-ignore
+const __VLS_331 = __VLS_asFunctionalComponent(__VLS_330, new __VLS_330({
+    label: "关系图",
+}));
+const __VLS_332 = __VLS_331({
+    label: "关系图",
+}, ...__VLS_functionalComponentArgsRest(__VLS_331));
+__VLS_333.slots.default;
+const __VLS_334 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+// @ts-ignore
+const __VLS_335 = __VLS_asFunctionalComponent(__VLS_334, new __VLS_334({
+    label: "散点图",
+    value: "scatter",
+}));
+const __VLS_336 = __VLS_335({
+    label: "散点图",
+    value: "scatter",
+}, ...__VLS_functionalComponentArgsRest(__VLS_335));
+var __VLS_333;
+const __VLS_338 = {}.ElOptionGroup;
+/** @type {[typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, ]} */ ;
+// @ts-ignore
+const __VLS_339 = __VLS_asFunctionalComponent(__VLS_338, new __VLS_338({
+    label: "指标",
+}));
+const __VLS_340 = __VLS_339({
+    label: "指标",
+}, ...__VLS_functionalComponentArgsRest(__VLS_339));
+__VLS_341.slots.default;
+const __VLS_342 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+// @ts-ignore
+const __VLS_343 = __VLS_asFunctionalComponent(__VLS_342, new __VLS_342({
+    label: "仪表盘",
+    value: "gauge",
+}));
+const __VLS_344 = __VLS_343({
+    label: "仪表盘",
+    value: "gauge",
+}, ...__VLS_functionalComponentArgsRest(__VLS_343));
+var __VLS_341;
+const __VLS_346 = {}.ElOptionGroup;
+/** @type {[typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, typeof __VLS_components.ElOptionGroup, typeof __VLS_components.elOptionGroup, ]} */ ;
+// @ts-ignore
+const __VLS_347 = __VLS_asFunctionalComponent(__VLS_346, new __VLS_346({
+    label: "表格",
+}));
+const __VLS_348 = __VLS_347({
+    label: "表格",
+}, ...__VLS_functionalComponentArgsRest(__VLS_347));
+__VLS_349.slots.default;
+const __VLS_350 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+// @ts-ignore
+const __VLS_351 = __VLS_asFunctionalComponent(__VLS_350, new __VLS_350({
+    label: "明细表",
+    value: "table",
+}));
+const __VLS_352 = __VLS_351({
+    label: "明细表",
+    value: "table",
+}, ...__VLS_functionalComponentArgsRest(__VLS_351));
+var __VLS_349;
+var __VLS_257;
+var __VLS_253;
+const __VLS_354 = {}.ElDivider;
+/** @type {[typeof __VLS_components.ElDivider, typeof __VLS_components.elDivider, typeof __VLS_components.ElDivider, typeof __VLS_components.elDivider, ]} */ ;
+// @ts-ignore
+const __VLS_355 = __VLS_asFunctionalComponent(__VLS_354, new __VLS_354({
+    contentPosition: "left",
+    ...{ style: {} },
+}));
+const __VLS_356 = __VLS_355({
+    contentPosition: "left",
+    ...{ style: {} },
+}, ...__VLS_functionalComponentArgsRest(__VLS_355));
+__VLS_357.slots.default;
+var __VLS_357;
+const __VLS_358 = {}.ElFormItem;
+/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
+// @ts-ignore
+const __VLS_359 = __VLS_asFunctionalComponent(__VLS_358, new __VLS_358({
+    label: "X轴（维度）",
+}));
+const __VLS_360 = __VLS_359({
+    label: "X轴（维度）",
+}, ...__VLS_functionalComponentArgsRest(__VLS_359));
+__VLS_361.slots.default;
+const __VLS_362 = {}.ElSelect;
+/** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
+// @ts-ignore
+const __VLS_363 = __VLS_asFunctionalComponent(__VLS_362, new __VLS_362({
     modelValue: (__VLS_ctx.form.xField),
     placeholder: "选择列",
     clearable: true,
     ...{ style: {} },
-}, ...__VLS_functionalComponentArgsRest(__VLS_319));
-__VLS_321.slots.default;
+}));
+const __VLS_364 = __VLS_363({
+    modelValue: (__VLS_ctx.form.xField),
+    placeholder: "选择列",
+    clearable: true,
+    ...{ style: {} },
+}, ...__VLS_functionalComponentArgsRest(__VLS_363));
+__VLS_365.slots.default;
 for (const [col] of __VLS_getVForSourceType((__VLS_ctx.previewColumns))) {
-    const __VLS_322 = {}.ElOption;
+    const __VLS_366 = {}.ElOption;
     /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
     // @ts-ignore
-    const __VLS_323 = __VLS_asFunctionalComponent(__VLS_322, new __VLS_322({
+    const __VLS_367 = __VLS_asFunctionalComponent(__VLS_366, new __VLS_366({
         key: (col),
         label: (col),
         value: (col),
     }));
-    const __VLS_324 = __VLS_323({
+    const __VLS_368 = __VLS_367({
         key: (col),
         label: (col),
         value: (col),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_323));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_367));
 }
-var __VLS_321;
-var __VLS_317;
-const __VLS_326 = {}.ElFormItem;
+var __VLS_365;
+var __VLS_361;
+const __VLS_370 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_327 = __VLS_asFunctionalComponent(__VLS_326, new __VLS_326({
+const __VLS_371 = __VLS_asFunctionalComponent(__VLS_370, new __VLS_370({
     label: "Y轴（度量）",
 }));
-const __VLS_328 = __VLS_327({
+const __VLS_372 = __VLS_371({
     label: "Y轴（度量）",
-}, ...__VLS_functionalComponentArgsRest(__VLS_327));
-__VLS_329.slots.default;
-const __VLS_330 = {}.ElSelect;
+}, ...__VLS_functionalComponentArgsRest(__VLS_371));
+__VLS_373.slots.default;
+const __VLS_374 = {}.ElSelect;
 /** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
 // @ts-ignore
-const __VLS_331 = __VLS_asFunctionalComponent(__VLS_330, new __VLS_330({
+const __VLS_375 = __VLS_asFunctionalComponent(__VLS_374, new __VLS_374({
     modelValue: (__VLS_ctx.form.yField),
     placeholder: "选择列",
     clearable: true,
     ...{ style: {} },
 }));
-const __VLS_332 = __VLS_331({
+const __VLS_376 = __VLS_375({
     modelValue: (__VLS_ctx.form.yField),
     placeholder: "选择列",
     clearable: true,
     ...{ style: {} },
-}, ...__VLS_functionalComponentArgsRest(__VLS_331));
-__VLS_333.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_375));
+__VLS_377.slots.default;
 for (const [col] of __VLS_getVForSourceType((__VLS_ctx.previewColumns))) {
-    const __VLS_334 = {}.ElOption;
+    const __VLS_378 = {}.ElOption;
     /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
     // @ts-ignore
-    const __VLS_335 = __VLS_asFunctionalComponent(__VLS_334, new __VLS_334({
+    const __VLS_379 = __VLS_asFunctionalComponent(__VLS_378, new __VLS_378({
         key: (col),
         label: (col),
         value: (col),
     }));
-    const __VLS_336 = __VLS_335({
+    const __VLS_380 = __VLS_379({
         key: (col),
         label: (col),
         value: (col),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_335));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_379));
 }
-var __VLS_333;
-var __VLS_329;
-const __VLS_338 = {}.ElFormItem;
+var __VLS_377;
+var __VLS_373;
+const __VLS_382 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_339 = __VLS_asFunctionalComponent(__VLS_338, new __VLS_338({
+const __VLS_383 = __VLS_asFunctionalComponent(__VLS_382, new __VLS_382({
     label: "分组字段",
 }));
-const __VLS_340 = __VLS_339({
+const __VLS_384 = __VLS_383({
     label: "分组字段",
-}, ...__VLS_functionalComponentArgsRest(__VLS_339));
-__VLS_341.slots.default;
-const __VLS_342 = {}.ElSelect;
+}, ...__VLS_functionalComponentArgsRest(__VLS_383));
+__VLS_385.slots.default;
+const __VLS_386 = {}.ElSelect;
 /** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
 // @ts-ignore
-const __VLS_343 = __VLS_asFunctionalComponent(__VLS_342, new __VLS_342({
+const __VLS_387 = __VLS_asFunctionalComponent(__VLS_386, new __VLS_386({
     modelValue: (__VLS_ctx.form.groupField),
     placeholder: "可选",
     clearable: true,
     ...{ style: {} },
 }));
-const __VLS_344 = __VLS_343({
+const __VLS_388 = __VLS_387({
     modelValue: (__VLS_ctx.form.groupField),
     placeholder: "可选",
     clearable: true,
     ...{ style: {} },
-}, ...__VLS_functionalComponentArgsRest(__VLS_343));
-__VLS_345.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_387));
+__VLS_389.slots.default;
 for (const [col] of __VLS_getVForSourceType((__VLS_ctx.previewColumns))) {
-    const __VLS_346 = {}.ElOption;
+    const __VLS_390 = {}.ElOption;
     /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
     // @ts-ignore
-    const __VLS_347 = __VLS_asFunctionalComponent(__VLS_346, new __VLS_346({
+    const __VLS_391 = __VLS_asFunctionalComponent(__VLS_390, new __VLS_390({
         key: (col),
         label: (col),
         value: (col),
     }));
-    const __VLS_348 = __VLS_347({
+    const __VLS_392 = __VLS_391({
         key: (col),
         label: (col),
         value: (col),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_347));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_391));
 }
-var __VLS_345;
-var __VLS_341;
+var __VLS_389;
+var __VLS_385;
 if (__VLS_ctx.previewLoading) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ style: {} },
@@ -1657,46 +1778,46 @@ if (__VLS_ctx.previewLoading) {
 var __VLS_223;
 {
     const { footer: __VLS_thisSlot } = __VLS_219.slots;
-    const __VLS_350 = {}.ElButton;
+    const __VLS_394 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_351 = __VLS_asFunctionalComponent(__VLS_350, new __VLS_350({
+    const __VLS_395 = __VLS_asFunctionalComponent(__VLS_394, new __VLS_394({
         ...{ 'onClick': {} },
     }));
-    const __VLS_352 = __VLS_351({
+    const __VLS_396 = __VLS_395({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_351));
-    let __VLS_354;
-    let __VLS_355;
-    let __VLS_356;
-    const __VLS_357 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_395));
+    let __VLS_398;
+    let __VLS_399;
+    let __VLS_400;
+    const __VLS_401 = {
         onClick: (...[$event]) => {
             __VLS_ctx.dialogVisible = false;
         }
     };
-    __VLS_353.slots.default;
-    var __VLS_353;
-    const __VLS_358 = {}.ElButton;
+    __VLS_397.slots.default;
+    var __VLS_397;
+    const __VLS_402 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_359 = __VLS_asFunctionalComponent(__VLS_358, new __VLS_358({
+    const __VLS_403 = __VLS_asFunctionalComponent(__VLS_402, new __VLS_402({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.saving),
     }));
-    const __VLS_360 = __VLS_359({
+    const __VLS_404 = __VLS_403({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.saving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_359));
-    let __VLS_362;
-    let __VLS_363;
-    let __VLS_364;
-    const __VLS_365 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_403));
+    let __VLS_406;
+    let __VLS_407;
+    let __VLS_408;
+    const __VLS_409 = {
         onClick: (__VLS_ctx.handleSubmit)
     };
-    __VLS_361.slots.default;
-    var __VLS_361;
+    __VLS_405.slots.default;
+    var __VLS_405;
 }
 var __VLS_219;
 /** @type {__VLS_StyleScopedClasses['cdesigner-wrap']} */ ;

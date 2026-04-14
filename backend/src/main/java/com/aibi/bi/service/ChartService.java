@@ -9,6 +9,9 @@ import com.aibi.bi.mapper.BiDatasourceMapper;
 import com.aibi.bi.model.request.CreateChartRequest;
 import com.aibi.bi.model.request.UpdateChartRequest;
 import com.aibi.bi.model.response.DatasetPreviewResponse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -20,15 +23,18 @@ public class ChartService {
     private final BiDatasetMapper biDatasetMapper;
     private final BiDatasourceMapper biDatasourceMapper;
     private final JdbcPreviewService jdbcPreviewService;
+    private final ObjectMapper objectMapper;
 
     public ChartService(BiChartMapper biChartMapper,
                         BiDatasetMapper biDatasetMapper,
                         BiDatasourceMapper biDatasourceMapper,
-                        JdbcPreviewService jdbcPreviewService) {
+                        JdbcPreviewService jdbcPreviewService,
+                        ObjectMapper objectMapper) {
         this.biChartMapper = biChartMapper;
         this.biDatasetMapper = biDatasetMapper;
         this.biDatasourceMapper = biDatasourceMapper;
         this.jdbcPreviewService = jdbcPreviewService;
+        this.objectMapper = objectMapper;
     }
 
     public List<BiChart> list() {
@@ -74,32 +80,36 @@ public class ChartService {
      * Execute the chart's dataset SQL and aggregate data for ECharts rendering.
      * Returns: { labels:[...], series:[{name, data:[...]}] }
      */
-    public Map<String, Object> getChartData(Long chartId) {
+    public Map<String, Object> getChartData(Long chartId, String filterJson, String configJson) {
         BiChart chart = biChartMapper.findById(chartId);
         if (chart == null) throw new IllegalArgumentException("Chart not found: " + chartId);
 
-        BiDataset dataset = biDatasetMapper.findById(chart.getDatasetId());
+        ResolvedChartConfig resolvedConfig = resolveChartConfig(chart, configJson);
+
+        BiDataset dataset = biDatasetMapper.findById(resolvedConfig.datasetId());
         if (dataset == null) throw new IllegalArgumentException("Dataset not found");
 
         BiDatasource datasource = biDatasourceMapper.findById(dataset.getDatasourceId());
         if (datasource == null) throw new IllegalArgumentException("Datasource not found");
 
         DatasetPreviewResponse preview = jdbcPreviewService.preview(datasource, dataset.getSqlText());
-        List<Map<String, Object>> rows = preview.getRows();
+        Map<String, String> filters = parseFilters(filterJson);
+        List<Map<String, Object>> rows = applyFilters(preview.getRows(), filters);
 
-        String xField = chart.getXField();
-        String yField = chart.getYField();
-        String groupField = chart.getGroupField();
+        String xField = resolvedConfig.xField();
+        String yField = resolvedConfig.yField();
+        String groupField = resolvedConfig.groupField();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("columns", preview.getColumns());
-        result.put("chartType", chart.getChartType());
+        result.put("chartType", resolvedConfig.chartType());
 
         if (xField == null || xField.isEmpty() || yField == null || yField.isEmpty()) {
             // No field config: just return raw rows
             result.put("labels", List.of());
             result.put("series", List.of());
             result.put("rawRows", rows);
+            result.put("filters", filters);
             return result;
         }
 
@@ -141,7 +151,104 @@ public class ChartService {
             result.put("series", List.of(Map.of("name", yField, "data", data)));
         }
 
+        result.put("rawRows", rows);
+        result.put("filters", filters);
+
         return result;
+    }
+
+    private ResolvedChartConfig resolveChartConfig(BiChart chart, String configJson) {
+        Long datasetId = chart.getDatasetId();
+        String chartType = chart.getChartType();
+        String xField = chart.getXField();
+        String yField = chart.getYField();
+        String groupField = chart.getGroupField();
+
+        if (configJson == null || configJson.isBlank()) {
+            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField);
+        }
+
+        try {
+            JsonNode chartNode = objectMapper.readTree(configJson).path("chart");
+            if (!chartNode.isObject()) {
+                return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField);
+            }
+
+            datasetId = readLong(chartNode.get("datasetId"), datasetId);
+            chartType = readText(chartNode.get("chartType"), chartType);
+            xField = readText(chartNode.get("xField"), xField);
+            yField = readText(chartNode.get("yField"), yField);
+            groupField = readText(chartNode.get("groupField"), groupField);
+            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("组件配置格式不正确");
+        }
+    }
+
+    private Long readLong(JsonNode node, Long fallback) {
+        if (node == null || node.isNull()) {
+            return fallback;
+        }
+        if (node.isNumber()) {
+            return node.longValue();
+        }
+        String text = node.asText("").trim();
+        if (text.isEmpty()) {
+            return fallback;
+        }
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private String readText(JsonNode node, String fallback) {
+        if (node == null || node.isNull()) {
+            return fallback;
+        }
+        String text = node.asText("").trim();
+        return text.isEmpty() ? fallback : text;
+    }
+
+    private Map<String, String> parseFilters(String filterJson) {
+        if (filterJson == null || filterJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Map<String, String> parsed = objectMapper.readValue(filterJson, new TypeReference<Map<String, String>>() {});
+            Map<String, String> normalized = new LinkedHashMap<>();
+            for (Map.Entry<String, String> entry : parsed.entrySet()) {
+                String key = entry.getKey() == null ? "" : entry.getKey().trim();
+                String value = entry.getValue() == null ? "" : entry.getValue().trim();
+                if (!key.isEmpty() && !value.isEmpty()) {
+                    normalized.put(key, value);
+                }
+            }
+            return normalized;
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("过滤参数格式不正确");
+        }
+    }
+
+    private List<Map<String, Object>> applyFilters(List<Map<String, Object>> rows, Map<String, String> filters) {
+        if (filters.isEmpty()) {
+            return rows;
+        }
+        return rows.stream()
+                .filter(row -> filters.entrySet().stream().allMatch(entry -> matchFilterValue(row.get(entry.getKey()), entry.getValue())))
+                .toList();
+    }
+
+    private boolean matchFilterValue(Object rawValue, String expectedValue) {
+        if (rawValue == null) {
+            return false;
+        }
+        String actual = String.valueOf(rawValue).trim();
+        if (actual.equalsIgnoreCase(expectedValue)) {
+            return true;
+        }
+        return actual.toLowerCase(Locale.ROOT).contains(expectedValue.toLowerCase(Locale.ROOT));
     }
 
     private Object addNumbers(Object a, Object b) {
@@ -153,6 +260,13 @@ public class ChartService {
         } catch (NumberFormatException e) {
             return a;
         }
+    }
+
+    private record ResolvedChartConfig(Long datasetId,
+                                       String chartType,
+                                       String xField,
+                                       String yField,
+                                       String groupField) {
     }
 }
 

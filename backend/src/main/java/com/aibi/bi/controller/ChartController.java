@@ -1,6 +1,7 @@
 package com.aibi.bi.controller;
 
 import com.aibi.bi.common.ApiResponse;
+import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiChart;
 import com.aibi.bi.model.request.CreateChartRequest;
 import com.aibi.bi.model.request.UpdateChartRequest;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -42,25 +44,30 @@ public class ChartController {
     }
 
     @PostMapping
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiChart> create(@Valid @RequestBody CreateChartRequest request) {
         return ApiResponse.ok(chartService.create(request));
     }
 
     @PutMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiChart> update(@PathVariable Long id,
                                         @Valid @RequestBody UpdateChartRequest request) {
         return ApiResponse.ok(chartService.update(id, request));
     }
 
     @DeleteMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<Void> delete(@PathVariable Long id) {
         chartService.delete(id);
         return ApiResponse.ok(null);
     }
 
     @GetMapping("/{id}/data")
-    public ApiResponse<java.util.Map<String, Object>> getChartData(@PathVariable Long id) {
-        return ApiResponse.ok(chartService.getChartData(id));
+    public ApiResponse<java.util.Map<String, Object>> getChartData(@PathVariable Long id,
+                                                                   @RequestParam(required = false) String filterJson,
+                                                                   @RequestParam(required = false) String configJson) {
+        return ApiResponse.ok(chartService.getChartData(id, filterJson, configJson));
     }
 }
 

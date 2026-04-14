@@ -3,6 +3,7 @@ import request from './request';
 export const getDefaultDashboard = () => request.get('/dashboard/default');
 // 仪表板 CRUD
 export const getDashboardList = () => request.get('/dashboard');
+export const getDashboardById = (id) => request.get(`/dashboard/${id}`);
 export const createDashboard = (data) => request.post('/dashboard', data);
 export const updateDashboard = (id, data) => request.put(`/dashboard/${id}`, data);
 export const deleteDashboard = (id) => request.delete(`/dashboard/${id}`);

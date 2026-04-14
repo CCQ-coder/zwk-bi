@@ -6,32 +6,42 @@
     <resultMap id="TemplateMap" type="com.aibi.bi.domain.BiChartTemplate">
         <id     column="id"          property="id"/>
         <result column="name"        property="name"/>
+        <result column="description" property="description"/>
         <result column="chart_type"  property="chartType"/>
         <result column="config_json" property="configJson"/>
+        <result column="built_in"    property="builtIn"/>
+        <result column="sort_order"  property="sortOrder"/>
+        <result column="created_by"  property="createdBy"/>
         <result column="created_at"  property="createdAt"/>
     </resultMap>
 
     <select id="listAll" resultMap="TemplateMap">
-        SELECT id, name, chart_type, config_json, created_at
+        SELECT id, name, description, chart_type, config_json, built_in, sort_order, created_by, created_at
         FROM bi_chart_template
-        ORDER BY id ASC
+        ORDER BY built_in DESC, sort_order ASC, id ASC
     </select>
 
     <select id="findById" resultMap="TemplateMap" parameterType="long">
-        SELECT id, name, chart_type, config_json, created_at
+        SELECT id, name, description, chart_type, config_json, built_in, sort_order, created_by, created_at
         FROM bi_chart_template
         WHERE id = #{id}
     </select>
 
     <insert id="insert" parameterType="com.aibi.bi.domain.BiChartTemplate"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO bi_chart_template (name, chart_type, config_json)
-        VALUES (#{name}, #{chartType}, #{configJson})
+        INSERT INTO bi_chart_template (name, description, chart_type, config_json, built_in, sort_order, created_by)
+        VALUES (#{name}, #{description}, #{chartType}, #{configJson}, #{builtIn}, #{sortOrder}, #{createdBy})
     </insert>
 
     <update id="update" parameterType="com.aibi.bi.domain.BiChartTemplate">
         UPDATE bi_chart_template
-        SET name = #{name}, chart_type = #{chartType}, config_json = #{configJson}
+        SET name = #{name},
+            description = #{description},
+            chart_type = #{chartType},
+            config_json = #{configJson},
+            built_in = #{builtIn},
+            sort_order = #{sortOrder},
+            created_by = #{createdBy}
         WHERE id = #{id}
     </update>
 

@@ -1,7 +1,9 @@
 package com.aibi.bi.controller;
 
 import com.aibi.bi.common.ApiResponse;
+import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiDataset;
+import com.aibi.bi.domain.BiDatasetField;
 import com.aibi.bi.model.request.CreateDatasetRequest;
 import com.aibi.bi.model.request.DatasetPreviewRequest;
 import com.aibi.bi.model.request.UpdateDatasetRequest;
@@ -43,23 +45,32 @@ public class DatasetController {
         return ApiResponse.ok(dataset);
     }
 
+    @GetMapping("/{id}/fields")
+    public ApiResponse<List<BiDatasetField>> listFields(@PathVariable Long id) {
+        return ApiResponse.ok(datasetService.listFields(id));
+    }
+
     @PostMapping
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiDataset> create(@Valid @RequestBody CreateDatasetRequest request) {
         return ApiResponse.ok(datasetService.create(request));
     }
 
     @PostMapping("/preview")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<DatasetPreviewResponse> preview(@Valid @RequestBody DatasetPreviewRequest request) {
         return ApiResponse.ok(datasetService.preview(request));
     }
 
     @PutMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiDataset> update(@PathVariable Long id,
                                           @Valid @RequestBody UpdateDatasetRequest request) {
         return ApiResponse.ok(datasetService.update(id, request));
     }
 
     @DeleteMapping("/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<Void> delete(@PathVariable Long id) {
         datasetService.delete(id);
         return ApiResponse.ok(null);

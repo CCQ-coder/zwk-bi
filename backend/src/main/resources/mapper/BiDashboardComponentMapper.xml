@@ -12,17 +12,18 @@
         <result column="width"        property="width"/>
         <result column="height"       property="height"/>
         <result column="z_index"      property="zIndex"/>
+        <result column="config_json"  property="configJson"/>
     </resultMap>
 
     <select id="listByDashboardId" resultMap="ComponentMap" parameterType="long">
-        SELECT id, dashboard_id, chart_id, pos_x, pos_y, width, height, z_index
+        SELECT id, dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json
         FROM bi_dashboard_component
         WHERE dashboard_id = #{dashboardId}
         ORDER BY z_index, id
     </select>
 
     <select id="findById" resultMap="ComponentMap" parameterType="long">
-        SELECT id, dashboard_id, chart_id, pos_x, pos_y, width, height, z_index
+        SELECT id, dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json
         FROM bi_dashboard_component
         WHERE id = #{id}
     </select>
@@ -30,15 +31,15 @@
     <insert id="insert" parameterType="com.aibi.bi.domain.BiDashboardComponent"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO bi_dashboard_component
-            (dashboard_id, chart_id, pos_x, pos_y, width, height, z_index)
+            (dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
         VALUES
-            (#{dashboardId}, #{chartId}, #{posX}, #{posY}, #{width}, #{height}, #{zIndex})
+            (#{dashboardId}, #{chartId}, #{posX}, #{posY}, #{width}, #{height}, #{zIndex}, #{configJson})
     </insert>
 
     <update id="update" parameterType="com.aibi.bi.domain.BiDashboardComponent">
         UPDATE bi_dashboard_component
         SET pos_x = #{posX}, pos_y = #{posY},
-            width = #{width}, height = #{height}, z_index = #{zIndex}
+            width = #{width}, height = #{height}, z_index = #{zIndex}, config_json = #{configJson}, chart_id = #{chartId}
         WHERE id = #{id}
     </update>
 

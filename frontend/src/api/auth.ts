@@ -10,6 +10,7 @@ export interface LoginResult {
   token: string
   username: string
   displayName: string
+  role: string
 }
 
 // 登录接口

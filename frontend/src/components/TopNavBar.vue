@@ -2,15 +2,18 @@
   <header class="top-nav">
     <div class="brand">AI BI</div>
     <nav class="nav-items">
-      <button class="nav-btn" :class="{ 'nav-btn--active': active === 'workbench' }" @click="go('/home')">工作台</button>
-      <button class="nav-btn" :class="{ 'nav-btn--active': active === 'dashboard' }" @click="go('/home/dashboard')">仪表板</button>
-      <button class="nav-btn" :class="{ 'nav-btn--active': active === 'screen' }" @click="go('/home/screen')">数据大屏</button>
-      <button class="nav-btn" :class="{ 'nav-btn--active': active === 'prepare' }" @click="go('/home/prepare')">数据准备</button>
-      <button class="nav-btn" :class="{ 'nav-btn--active': active === 'modeling' }" @click="go('/home/modeling')">数据建模</button>
-      <button class="nav-btn" :class="{ 'nav-btn--active': active === 'system' }" @click="go('/home/system')">系统管理</button>
+      <button
+        v-for="menu in navMenus"
+        :key="menu.id"
+        class="nav-btn"
+        :class="{ 'nav-btn--active': isMenuActive(menu.path) }"
+        @click="go(menu.path)"
+      >
+        {{ menu.name }}
+      </button>
     </nav>
     <div class="user-menu">
-      <span class="user-avatar">管</span>
+      <span class="user-avatar">{{ avatarText }}</span>
       <span>{{ displayName }}</span>
       <el-button link class="logout-btn" @click="logout">退出</el-button>
     </div>
@@ -18,28 +21,51 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getCurrentMenus } from '../api/menu'
+import {
+  clearAuthSession,
+  getAuthDisplayName,
+  getAuthMenus,
+  hasAuthSession,
+  saveAuthMenus,
+  type AuthMenuItem,
+} from '../utils/auth-session'
 
-defineProps<{ active: 'workbench' | 'dashboard' | 'screen' | 'prepare' | 'modeling' | 'system' }>()
+defineProps<{ active?: 'workbench' | 'dashboard' | 'screen' | 'prepare' | 'modeling' | 'system' }>()
 
 const router = useRouter()
+const route = useRoute()
+const menus = ref<AuthMenuItem[]>(getAuthMenus())
 
-const displayName = computed(() => {
-  return localStorage.getItem('bi_display_name') || localStorage.getItem('bi_username') || '未登录用户'
-})
+const displayName = computed(() => getAuthDisplayName())
+const avatarText = computed(() => displayName.value.slice(0, 1) || '用')
+const navMenus = computed(() => menus.value.filter((item) => item.visible !== false && item.type === 'menu' && item.path && !item.parentId))
 
 const go = (path: string) => {
   router.push(path)
 }
 
+const isMenuActive = (path: string) => route.path === path || (path !== '/home' && route.path.startsWith(`${path}/`))
+
+const loadMenus = async () => {
+  if (!hasAuthSession()) return
+  try {
+    const latestMenus = await getCurrentMenus()
+    menus.value = latestMenus
+    saveAuthMenus(latestMenus)
+  } catch {
+    menus.value = getAuthMenus()
+  }
+}
+
 const logout = () => {
-  localStorage.removeItem('bi_user_id')
-  localStorage.removeItem('bi_token')
-  localStorage.removeItem('bi_username')
-  localStorage.removeItem('bi_display_name')
+  clearAuthSession()
   router.push('/login')
 }
+
+onMounted(loadMenus)
 </script>
 
 <style scoped>

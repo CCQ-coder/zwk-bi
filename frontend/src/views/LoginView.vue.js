@@ -2,6 +2,8 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { login } from '../api/auth';
+import { getCurrentMenus } from '../api/menu';
+import { saveAuthMenus, saveAuthSession } from '../utils/auth-session';
 const router = useRouter();
 const username = ref('');
 const password = ref('');
@@ -15,10 +17,9 @@ const handleLogin = async () => {
     loading.value = true;
     try {
         const result = await login({ username: username.value, password: password.value });
-        localStorage.setItem('bi_user_id', String(result.id));
-        localStorage.setItem('bi_token', result.token);
-        localStorage.setItem('bi_username', result.username);
-        localStorage.setItem('bi_display_name', result.displayName);
+        saveAuthSession(result);
+        const menus = await getCurrentMenus();
+        saveAuthMenus(menus);
         if (rememberUser.value) {
             localStorage.setItem('bi_last_username', username.value);
         }

@@ -5,6 +5,7 @@ public class LoginResponse {
     private String token;
     private String username;
     private String displayName;
+    private String role;
 
     public Long getId() {
         return id;
@@ -36,5 +37,13 @@ public class LoginResponse {
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 }
