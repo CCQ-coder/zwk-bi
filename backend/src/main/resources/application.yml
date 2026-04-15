@@ -27,3 +27,5 @@ app:
   jwt:
     secret: AI_BI_JWT_SECRET_2026_CHANGE_ME_TO_A_LONG_RANDOM_VALUE
     expire-hours: 12
+  upload:
+    path: D:/bi/jpg

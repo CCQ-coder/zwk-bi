@@ -13,18 +13,48 @@ export const COLOR_THEMES = {
 };
 export const DEFAULT_COMPONENT_STYLE = {
     theme: '海湾晨光',
-    bgColor: '#f7fbff',
+    bgColor: 'rgba(0,0,0,0)',
     showLegend: true,
-    showLabel: true,
+    showLabel: false,
     labelSize: 12,
     showXName: false,
     showYName: false,
     showGrid: true,
     smooth: false,
     areaFill: false,
-    barRadius: 6,
+    barRadius: 4,
     barMaxWidth: 40,
     legendPos: 'bottom',
+    showTitle: false,
+    titleText: '',
+    titleFontSize: 14,
+    titleColor: '#e8f4ff',
+    showTooltip: true,
+    borderShow: false,
+    borderColor: 'rgba(77,179,255,0.5)',
+    borderWidth: 1,
+    cardRadius: 12,
+    // 表格样式默认值
+    tableHeaderBg: '#1a2a3d',
+    tableHeaderColor: '#c8e0f4',
+    tableHeaderFontSize: 13,
+    tableRowHeight: 36,
+    tableOddRowBg: 'rgba(10,30,60,0.6)',
+    tableEvenRowBg: 'rgba(20,45,80,0.5)',
+    tableRowHoverBg: 'rgba(64,158,255,0.15)',
+    tableBorderColor: 'rgba(77,155,219,0.2)',
+    tableBorderWidth: 1,
+    tableShowIndex: false,
+    tableEnableSort: true,
+    tableFontColor: '#c0d8f0',
+    tableFontSize: 12,
+    tableStriped: true,
+    // 高级
+    componentOpacity: 1,
+    shadowShow: false,
+    shadowColor: 'rgba(0,0,0,0.4)',
+    shadowBlur: 12,
+    padding: 12,
 };
 export const DEFAULT_COMPONENT_INTERACTION = {
     clickAction: 'filter',
@@ -1226,4 +1256,28 @@ export const buildComponentOption = (data, chartConfig, style) => {
             }));
         })(),
     };
+};
+/**
+ * 对 ECharts option 追加标题 / 提示框可见性后处理（就地修改）
+ * 在 renderChart 调用 setOption 之前执行
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const postProcessChartOption = (option, style, chartName) => {
+    if (style.showTitle) {
+        option.title = {
+            text: style.titleText || chartName,
+            textStyle: { fontSize: style.titleFontSize, color: style.titleColor, fontWeight: 600 },
+            top: 6,
+            left: 10,
+        };
+        if (option.grid && typeof option.grid.top === 'number') {
+            option.grid = { ...option.grid, top: option.grid.top + style.titleFontSize + 12 };
+        }
+        else if (option.grid) {
+            option.grid = { ...option.grid, top: style.titleFontSize + 20 };
+        }
+    }
+    if (!style.showTooltip) {
+        delete option.tooltip;
+    }
 };

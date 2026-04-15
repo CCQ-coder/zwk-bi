@@ -4,6 +4,7 @@ import com.aibi.bi.common.ApiResponse;
 import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiDataset;
 import com.aibi.bi.domain.BiDatasetField;
+import com.aibi.bi.domain.BiDatasetFolder;
 import com.aibi.bi.model.request.CreateDatasetRequest;
 import com.aibi.bi.model.request.DatasetPreviewRequest;
 import com.aibi.bi.model.request.UpdateDatasetRequest;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/datasets")
@@ -36,6 +38,11 @@ public class DatasetController {
         return ApiResponse.ok(datasetService.list());
     }
 
+    @GetMapping("/folder-tree")
+    public ApiResponse<List<BiDatasetFolder>> folderTree() {
+        return ApiResponse.ok(datasetService.listFolderTree());
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<BiDataset> getById(@PathVariable Long id) {
         BiDataset dataset = datasetService.getById(id);
@@ -48,6 +55,11 @@ public class DatasetController {
     @GetMapping("/{id}/fields")
     public ApiResponse<List<BiDatasetField>> listFields(@PathVariable Long id) {
         return ApiResponse.ok(datasetService.listFields(id));
+    }
+
+    @GetMapping("/{id}/preview-data")
+    public ApiResponse<DatasetPreviewResponse> previewDataset(@PathVariable Long id) {
+        return ApiResponse.ok(datasetService.previewDataset(id));
     }
 
     @PostMapping
@@ -73,6 +85,30 @@ public class DatasetController {
     @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<Void> delete(@PathVariable Long id) {
         datasetService.delete(id);
+        return ApiResponse.ok(null);
+    }
+
+    // ---- Folder endpoints ----
+
+    @PostMapping("/folders")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<BiDatasetFolder> createFolder(@RequestBody Map<String, Object> body) {
+        String name = (String) body.get("name");
+        Long parentId = body.get("parentId") != null ? Long.valueOf(body.get("parentId").toString()) : null;
+        return ApiResponse.ok(datasetService.createFolder(name, parentId));
+    }
+
+    @PutMapping("/folders/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<BiDatasetFolder> renameFolder(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String name = (String) body.get("name");
+        return ApiResponse.ok(datasetService.renameFolder(id, name));
+    }
+
+    @DeleteMapping("/folders/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<Void> deleteFolder(@PathVariable Long id) {
+        datasetService.deleteFolder(id);
         return ApiResponse.ok(null);
     }
 }

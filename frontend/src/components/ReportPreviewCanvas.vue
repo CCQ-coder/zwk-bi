@@ -1,61 +1,46 @@
 <template>
   <div class="preview-shell" v-loading="loading || chartLoading">
-    <div v-if="dashboard" class="preview-head">
-      <div>
-        <div class="preview-title">{{ dashboard.name }}</div>
-        <div class="preview-subtitle">
-          {{ scene === 'screen' ? '数据大屏只读预览' : '仪表板只读预览' }}
+    <!-- 筛选条件 — 可折叠，仅在有筛选定义时显示 -->
+    <div v-if="filterDefinitions.length" class="filter-panel" :class="{ 'filter-panel--collapsed': filterCollapsed }">
+      <div class="filter-head" @click="filterCollapsed = !filterCollapsed">
+        <div class="filter-head-left">
+          <span class="filter-toggle-icon">{{ filterCollapsed ? '▶' : '▼' }}</span>
+          <span class="filter-title">筛选条件</span>
+          <span v-if="activeFilterEntries.length" class="filter-active-badge">{{ activeFilterEntries.length }}</span>
         </div>
+        <el-button v-if="!filterCollapsed && activeFilterEntries.length" link type="primary" size="small" @click.stop="clearFilters">清空</el-button>
       </div>
-      <div class="preview-kpis">
-        <div class="preview-kpi">
-          <span>组件</span>
-          <strong>{{ components.length }}</strong>
+      <div v-show="!filterCollapsed" class="filter-body">
+        <div class="filter-grid">
+          <div v-for="definition in filterDefinitions" :key="definition.field" class="filter-item">
+            <div class="filter-item-label">{{ definition.field }}</div>
+            <el-select
+              :model-value="activeFilters[definition.field] || ''"
+              placeholder="全部"
+              clearable
+              filterable
+              @change="updateFilter(definition.field, $event)"
+            >
+              <el-option
+                v-for="value in definition.values"
+                :key="`${definition.field}-${value}`"
+                :label="String(value)"
+                :value="String(value)"
+              />
+            </el-select>
+          </div>
         </div>
-        <div class="preview-kpi">
-          <span>图表</span>
-          <strong>{{ renderedChartCount }}</strong>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="filterDefinitions.length" class="filter-panel">
-      <div class="filter-head">
-        <div>
-          <div class="filter-title">查询组件</div>
-          <div class="filter-note">筛选器会联动刷新整张报告；点击图表数据点也会自动生成联动条件。</div>
-        </div>
-        <el-button link type="primary" @click="clearFilters">清空筛选</el-button>
-      </div>
-      <div class="filter-grid">
-        <div v-for="definition in filterDefinitions" :key="definition.field" class="filter-item">
-          <div class="filter-item-label">{{ definition.field }}</div>
-          <el-select
-            :model-value="activeFilters[definition.field] || ''"
-            placeholder="全部"
-            clearable
-            filterable
-            @change="updateFilter(definition.field, $event)"
+        <div v-if="activeFilterEntries.length" class="filter-tags">
+          <el-tag
+            v-for="entry in activeFilterEntries"
+            :key="entry.field"
+            closable
+            effect="plain"
+            @close="clearSingleFilter(entry.field)"
           >
-            <el-option
-              v-for="value in definition.values"
-              :key="`${definition.field}-${value}`"
-              :label="String(value)"
-              :value="String(value)"
-            />
-          </el-select>
+            {{ entry.field }}: {{ entry.value }}
+          </el-tag>
         </div>
-      </div>
-      <div v-if="activeFilterEntries.length" class="filter-tags">
-        <el-tag
-          v-for="entry in activeFilterEntries"
-          :key="entry.field"
-          closable
-          effect="plain"
-          @close="clearSingleFilter(entry.field)"
-        >
-          {{ entry.field }}: {{ entry.value }}
-        </el-tag>
       </div>
     </div>
 
@@ -157,6 +142,7 @@ const props = defineProps<{
 
 const loading = ref(false)
 const chartLoading = ref(false)
+const filterCollapsed = ref(false)
 const dashboard = ref<Dashboard | null>(null)
 const components = ref<DashboardComponent[]>([])
 const charts = ref<Chart[]>([])
@@ -389,98 +375,89 @@ onBeforeUnmount(() => {
   min-height: 100%;
 }
 
-.preview-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.preview-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #163050;
-}
-
-.preview-subtitle {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #6e8098;
-}
-
-.preview-kpis {
-  display: flex;
-  gap: 10px;
-}
-
-.preview-kpi {
-  min-width: 92px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #f4f8fd 0%, #ffffff 100%);
-  border: 1px solid #dce8f5;
-}
-
-.preview-kpi span {
-  display: block;
-  font-size: 12px;
-  color: #6e8098;
-}
-
-.preview-kpi strong {
-  display: block;
-  margin-top: 6px;
-  font-size: 20px;
-  color: #163050;
-}
-
+/* ─── 筛选条件栏 ─────────────────────────── */
 .filter-panel {
-  margin-bottom: 18px;
-  padding: 16px 18px;
-  border-radius: 18px;
+  margin-bottom: 12px;
+  border-radius: 14px;
   border: 1px solid #dce8f5;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 12px 28px rgba(21, 61, 112, 0.06);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(21, 61, 112, 0.06);
+  overflow: hidden;
+  transition: all 0.2s ease;
 }
 
 .filter-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.filter-panel:not(.filter-panel--collapsed) .filter-head {
+  border-bottom-color: #dce8f5;
+}
+
+.filter-head:hover {
+  background: rgba(68, 141, 217, 0.05);
+}
+
+.filter-head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-toggle-icon {
+  font-size: 10px;
+  color: #6e8098;
+  width: 14px;
+  text-align: center;
 }
 
 .filter-title {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   color: #183153;
 }
 
-.filter-note {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #71829b;
+.filter-active-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: #2a6fba;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.filter-body {
+  padding: 12px 14px;
 }
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
 }
 
 .filter-item-label {
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   font-size: 12px;
   color: #50637b;
 }
 
 .filter-tags {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .preview-stage {

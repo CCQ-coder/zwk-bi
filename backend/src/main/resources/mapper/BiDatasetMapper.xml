@@ -8,29 +8,30 @@
         <result column="name" property="name"/>
         <result column="datasource_id" property="datasourceId"/>
         <result column="sql_text" property="sqlText"/>
+        <result column="folder_id" property="folderId"/>
         <result column="created_at" property="createdAt"/>
     </resultMap>
 
     <select id="listAll" resultMap="BiDatasetMap">
-        SELECT id, name, datasource_id, sql_text, created_at
+        SELECT id, name, datasource_id, sql_text, folder_id, created_at
         FROM bi_dataset
         ORDER BY id DESC
     </select>
 
     <select id="findById" resultMap="BiDatasetMap" parameterType="long">
-        SELECT id, name, datasource_id, sql_text, created_at
+        SELECT id, name, datasource_id, sql_text, folder_id, created_at
         FROM bi_dataset
         WHERE id = #{id}
     </select>
 
     <insert id="insert" parameterType="com.aibi.bi.domain.BiDataset" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO bi_dataset (name, datasource_id, sql_text)
-        VALUES (#{name}, #{datasourceId}, #{sqlText})
+        INSERT INTO bi_dataset (name, datasource_id, sql_text, folder_id)
+        VALUES (#{name}, #{datasourceId}, #{sqlText}, #{folderId})
     </insert>
 
     <update id="update" parameterType="com.aibi.bi.domain.BiDataset">
         UPDATE bi_dataset
-        SET name = #{name}, datasource_id = #{datasourceId}, sql_text = #{sqlText}
+        SET name = #{name}, datasource_id = #{datasourceId}, sql_text = #{sqlText}, folder_id = #{folderId}
         WHERE id = #{id}
     </update>
 

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.BiDatasetFolderMapper">
+
+    <resultMap id="FolderMap" type="com.aibi.bi.domain.BiDatasetFolder">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="FolderMap">
+        SELECT id, name, parent_id, sort_order, created_at
+        FROM bi_dataset_folder
+        ORDER BY sort_order, id
+    </select>
+
+    <select id="findById" resultMap="FolderMap" parameterType="long">
+        SELECT id, name, parent_id, sort_order, created_at
+        FROM bi_dataset_folder
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.aibi.bi.domain.BiDatasetFolder" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bi_dataset_folder (name, parent_id, sort_order)
+        VALUES (#{name}, #{parentId}, #{sortOrder})
+    </insert>
+
+    <update id="update" parameterType="com.aibi.bi.domain.BiDatasetFolder">
+        UPDATE bi_dataset_folder
+        SET name = #{name}, parent_id = #{parentId}, sort_order = #{sortOrder}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM bi_dataset_folder WHERE id = #{id}
+    </delete>
+
+</mapper>

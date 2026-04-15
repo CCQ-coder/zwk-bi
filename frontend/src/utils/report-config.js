@@ -24,7 +24,7 @@ export const normalizeCanvasConfig = (canvas, scene = 'dashboard') => {
     const parsedHeight = Number(canvas?.height ?? defaults.height);
     const width = Number.isFinite(parsedWidth) ? Math.max(960, Math.round(parsedWidth)) : defaults.width;
     const height = Number.isFinite(parsedHeight) ? Math.max(540, Math.round(parsedHeight)) : defaults.height;
-    return { width, height };
+    return { width, height, overlay: canvas?.overlay };
 };
 export const buildReportConfig = (originalConfigJson, scene, publishPatch, canvasPatch) => {
     const config = parseReportConfig(originalConfigJson);

@@ -7,45 +7,19 @@ public class BiDataset {
     private String name;
     private Long datasourceId;
     private String sqlText;
+    private Long folderId;
     private LocalDateTime createdAt;
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public Long getDatasourceId() {
-        return datasourceId;
-    }
-
-    public void setDatasourceId(Long datasourceId) {
-        this.datasourceId = datasourceId;
-    }
-
-    public String getSqlText() {
-        return sqlText;
-    }
-
-    public void setSqlText(String sqlText) {
-        this.sqlText = sqlText;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public Long getDatasourceId() { return datasourceId; }
+    public void setDatasourceId(Long datasourceId) { this.datasourceId = datasourceId; }
+    public String getSqlText() { return sqlText; }
+    public void setSqlText(String sqlText) { this.sqlText = sqlText; }
+    public Long getFolderId() { return folderId; }
+    public void setFolderId(Long folderId) { this.folderId = folderId; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

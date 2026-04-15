@@ -165,69 +165,291 @@
         </el-tab-pane>
 
         <el-tab-pane label="样式" name="style">
-          <section class="inspector-section">
-            <div class="section-title">样式配置</div>
-            <div class="layout-grid">
-              <label class="field-item field-item--full">
-                <span>配色主题</span>
-                <el-select v-model="configForm.style.theme" style="width: 100%">
+          <div class="style-sections">
+
+            <!-- 基础样式 -->
+            <div class="ss-block">
+              <div class="ss-row">
+                <span class="ss-key">配色主题</span>
+                <el-select v-model="configForm.style.theme" size="small">
                   <el-option v-for="name in themeNames" :key="name" :label="name" :value="name" />
                 </el-select>
-              </label>
-              <label class="field-item field-item--full">
-                <span>背景色</span>
-                <el-color-picker v-model="configForm.style.bgColor" show-alpha />
-              </label>
-              <label v-if="currentChartMeta.supportsLegend" class="field-item">
-                <span>显示图例</span>
-                <el-switch v-model="configForm.style.showLegend" />
-              </label>
-              <label class="field-item">
-                <span>显示标签</span>
-                <el-switch v-model="configForm.style.showLabel" />
-              </label>
-              <label class="field-item">
-                <span>标签字号</span>
-                <el-input-number v-model="configForm.style.labelSize" :min="8" :max="24" controls-position="right" />
-              </label>
-              <label v-if="currentChartMeta.supportsAxisNames" class="field-item">
-                <span>显示 X 轴名</span>
-                <el-switch v-model="configForm.style.showXName" />
-              </label>
-              <label v-if="currentChartMeta.supportsAxisNames" class="field-item">
-                <span>显示 Y 轴名</span>
-                <el-switch v-model="configForm.style.showYName" />
-              </label>
-              <label v-if="currentChartMeta.supportsGrid" class="field-item">
-                <span>显示网格线</span>
-                <el-switch v-model="configForm.style.showGrid" />
-              </label>
-              <label v-if="currentChartMeta.supportsLegend" class="field-item">
-                <span>图例位置</span>
-                <el-select v-model="configForm.style.legendPos" style="width: 100%" :disabled="!configForm.style.showLegend">
-                  <el-option label="底部" value="bottom" />
-                  <el-option label="顶部" value="top" />
-                  <el-option label="右侧" value="right" />
-                </el-select>
-              </label>
-              <label v-if="currentChartMeta.supportsSmooth" class="field-item">
-                <span>平滑曲线</span>
-                <el-switch v-model="configForm.style.smooth" />
-              </label>
-              <label v-if="currentChartMeta.supportsAreaFill" class="field-item">
-                <span>面积填充</span>
-                <el-switch v-model="configForm.style.areaFill" />
-              </label>
-              <label v-if="currentChartMeta.supportsBarStyle" class="field-item">
-                <span>柱圆角</span>
-                <el-input-number v-model="configForm.style.barRadius" :min="0" :max="20" controls-position="right" />
-              </label>
-              <label v-if="currentChartMeta.supportsBarStyle" class="field-item">
-                <span>柱宽上限</span>
-                <el-input-number v-model="configForm.style.barMaxWidth" :min="10" :max="80" controls-position="right" />
-              </label>
+              </div>
+              <div class="ss-row">
+                <span class="ss-key">图表背景</span>
+                <el-color-picker v-model="configForm.style.bgColor" show-alpha size="small" />
+              </div>
             </div>
-          </section>
+
+            <!-- 标题 -->
+            <div class="ss-section">
+              <div class="ss-hd" @click="toggleSection('title')">
+                <span class="ss-chevron" :class="{ open: openSections.has('title') }">&#9654;</span>
+                <span class="ss-hd-label">标题</span>
+                <el-switch v-model="configForm.style.showTitle" size="small" @click.stop />
+              </div>
+              <div v-show="openSections.has('title') && configForm.style.showTitle" class="ss-body">
+                <div class="ss-row">
+                  <span class="ss-key">标题内容</span>
+                  <el-input v-model="configForm.style.titleText" size="small" placeholder="默认用组件名" />
+                </div>
+                <div class="ss-row">
+                  <span class="ss-key">字号</span>
+                  <el-input-number v-model="configForm.style.titleFontSize" :min="10" :max="32" size="small" controls-position="right" style="width:90px" />
+                </div>
+                <div class="ss-row">
+                  <span class="ss-key">颜色</span>
+                  <el-color-picker v-model="configForm.style.titleColor" size="small" />
+                </div>
+              </div>
+            </div>
+
+            <!-- 图例 -->
+            <div v-if="currentChartMeta.supportsLegend" class="ss-section">
+              <div class="ss-hd" @click="toggleSection('legend')">
+                <span class="ss-chevron" :class="{ open: openSections.has('legend') }">&#9654;</span>
+                <span class="ss-hd-label">图例</span>
+                <el-switch v-model="configForm.style.showLegend" size="small" @click.stop />
+              </div>
+              <div v-show="openSections.has('legend') && configForm.style.showLegend" class="ss-body">
+                <div class="ss-row">
+                  <span class="ss-key">位置</span>
+                  <el-select v-model="configForm.style.legendPos" size="small" style="width:90px">
+                    <el-option label="底部" value="bottom" />
+                    <el-option label="顶部" value="top" />
+                    <el-option label="右侧" value="right" />
+                  </el-select>
+                </div>
+              </div>
+            </div>
+
+            <!-- 边框 -->
+            <div class="ss-section">
+              <div class="ss-hd" @click="toggleSection('border')">
+                <span class="ss-chevron" :class="{ open: openSections.has('border') }">&#9654;</span>
+                <span class="ss-hd-label">边框</span>
+                <el-switch v-model="configForm.style.borderShow" size="small" @click.stop />
+              </div>
+              <div v-show="openSections.has('border') && configForm.style.borderShow" class="ss-body">
+                <div class="ss-row">
+                  <span class="ss-key">颜色</span>
+                  <el-color-picker v-model="configForm.style.borderColor" show-alpha size="small" />
+                </div>
+                <div class="ss-row">
+                  <span class="ss-key">宽度 (px)</span>
+                  <el-input-number v-model="configForm.style.borderWidth" :min="1" :max="8" size="small" controls-position="right" style="width:90px" />
+                </div>
+                <div class="ss-row">
+                  <span class="ss-key">圆角 (px)</span>
+                  <el-input-number v-model="configForm.style.cardRadius" :min="0" :max="40" size="small" controls-position="right" style="width:90px" />
+                </div>
+              </div>
+            </div>
+
+            <!-- 标签 -->
+            <div class="ss-section">
+              <div class="ss-hd" @click="toggleSection('label')">
+                <span class="ss-chevron" :class="{ open: openSections.has('label') }">&#9654;</span>
+                <span class="ss-hd-label">数据标签</span>
+                <el-switch v-model="configForm.style.showLabel" size="small" @click.stop />
+              </div>
+              <div v-show="openSections.has('label') && configForm.style.showLabel" class="ss-body">
+                <div class="ss-row">
+                  <span class="ss-key">字号</span>
+                  <el-input-number v-model="configForm.style.labelSize" :min="8" :max="24" size="small" controls-position="right" style="width:90px" />
+                </div>
+              </div>
+            </div>
+
+            <!-- 提示框 -->
+            <div class="ss-section">
+              <div class="ss-hd">
+                <span class="ss-chevron" style="opacity:0">&#9654;</span>
+                <span class="ss-hd-label">提示框</span>
+                <el-switch v-model="configForm.style.showTooltip" size="small" />
+              </div>
+            </div>
+
+            <!-- 横轴 -->
+            <div v-if="currentChartMeta.supportsAxisNames" class="ss-section">
+              <div class="ss-hd" @click="toggleSection('xaxis')">
+                <span class="ss-chevron" :class="{ open: openSections.has('xaxis') }">&#9654;</span>
+                <span class="ss-hd-label">横轴</span>
+                <el-switch v-model="configForm.style.showXName" size="small" @click.stop />
+              </div>
+              <div v-show="openSections.has('xaxis')" class="ss-body">
+                <div class="ss-row">
+                  <span class="ss-key">网格线</span>
+                  <el-switch v-model="configForm.style.showGrid" size="small" />
+                </div>
+              </div>
+            </div>
+
+            <!-- 纵轴 -->
+            <div v-if="currentChartMeta.supportsAxisNames" class="ss-section">
+              <div class="ss-hd">
+                <span class="ss-chevron" style="opacity:0">&#9654;</span>
+                <span class="ss-hd-label">纵轴</span>
+                <el-switch v-model="configForm.style.showYName" size="small" />
+              </div>
+            </div>
+
+            <!-- 高级 -->
+            <div v-if="currentChartMeta.supportsSmooth || currentChartMeta.supportsAreaFill || currentChartMeta.supportsBarStyle" class="ss-section">
+              <div class="ss-hd" @click="toggleSection('adv')">
+                <span class="ss-chevron" :class="{ open: openSections.has('adv') }">&#9654;</span>
+                <span class="ss-hd-label">高级</span>
+              </div>
+              <div v-show="openSections.has('adv')" class="ss-body">
+                <div v-if="currentChartMeta.supportsSmooth" class="ss-row">
+                  <span class="ss-key">平滑曲线</span>
+                  <el-switch v-model="configForm.style.smooth" size="small" />
+                </div>
+                <div v-if="currentChartMeta.supportsAreaFill" class="ss-row">
+                  <span class="ss-key">面积填充</span>
+                  <el-switch v-model="configForm.style.areaFill" size="small" />
+                </div>
+                <div v-if="currentChartMeta.supportsBarStyle" class="ss-row">
+                  <span class="ss-key">柱圆角 (px)</span>
+                  <el-input-number v-model="configForm.style.barRadius" :min="0" :max="20" size="small" controls-position="right" style="width:90px" />
+                </div>
+                <div v-if="currentChartMeta.supportsBarStyle" class="ss-row">
+                  <span class="ss-key">柱宽上限</span>
+                  <el-input-number v-model="configForm.style.barMaxWidth" :min="10" :max="80" size="small" controls-position="right" style="width:90px" />
+                </div>
+              </div>
+            </div>
+
+            <!-- 表格样式（仅表格类型） -->
+            <template v-if="configForm.chart.chartType === 'table'">
+              <div class="ss-section-divider">表格样式</div>
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('table-header')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('table-header') }">&#9654;</span>
+                  <span class="ss-hd-label">表头样式</span>
+                </div>
+                <div v-show="openSections.has('table-header')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">表头背景</span>
+                    <el-color-picker v-model="configForm.style.tableHeaderBg" show-alpha size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">表头字色</span>
+                    <el-color-picker v-model="configForm.style.tableHeaderColor" size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">表头字号</span>
+                    <el-input-number v-model="configForm.style.tableHeaderFontSize" :min="10" :max="24" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('table-rows')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('table-rows') }">&#9654;</span>
+                  <span class="ss-hd-label">行样式</span>
+                </div>
+                <div v-show="openSections.has('table-rows')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">斑马纹</span>
+                    <el-switch v-model="configForm.style.tableStriped" size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">奇数行背景</span>
+                    <el-color-picker v-model="configForm.style.tableOddRowBg" show-alpha size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">偶数行背景</span>
+                    <el-color-picker v-model="configForm.style.tableEvenRowBg" show-alpha size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">悬浮行背景</span>
+                    <el-color-picker v-model="configForm.style.tableRowHoverBg" show-alpha size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">行高 (px)</span>
+                    <el-input-number v-model="configForm.style.tableRowHeight" :min="24" :max="80" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">字色</span>
+                    <el-color-picker v-model="configForm.style.tableFontColor" size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">字号</span>
+                    <el-input-number v-model="configForm.style.tableFontSize" :min="10" :max="20" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('table-border')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('table-border') }">&#9654;</span>
+                  <span class="ss-hd-label">表格边框</span>
+                </div>
+                <div v-show="openSections.has('table-border')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">边框颜色</span>
+                    <el-color-picker v-model="configForm.style.tableBorderColor" show-alpha size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">边框宽度</span>
+                    <el-input-number v-model="configForm.style.tableBorderWidth" :min="0" :max="4" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('table-func')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('table-func') }">&#9654;</span>
+                  <span class="ss-hd-label">功能设置</span>
+                </div>
+                <div v-show="openSections.has('table-func')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">显示行号</span>
+                    <el-switch v-model="configForm.style.tableShowIndex" size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">列排序</span>
+                    <el-switch v-model="configForm.style.tableEnableSort" size="small" />
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 组件高级设置（通用） -->
+            <div class="ss-section-divider">组件高级</div>
+            <div class="ss-section">
+              <div class="ss-hd" @click="toggleSection('comp-adv')">
+                <span class="ss-chevron" :class="{ open: openSections.has('comp-adv') }">&#9654;</span>
+                <span class="ss-hd-label">高级设置</span>
+              </div>
+              <div v-show="openSections.has('comp-adv')" class="ss-body">
+                <div class="ss-row">
+                  <span class="ss-key">内边距</span>
+                  <el-input-number v-model="configForm.style.padding" :min="0" :max="40" size="small" controls-position="right" style="width:90px" />
+                </div>
+                <div class="ss-row">
+                  <span class="ss-key">透明度</span>
+                  <el-slider v-model="configForm.style.componentOpacity" :min="0.1" :max="1" :step="0.05" style="width:100px" />
+                </div>
+                <div class="ss-row">
+                  <span class="ss-key">阴影</span>
+                  <el-switch v-model="configForm.style.shadowShow" size="small" />
+                </div>
+                <template v-if="configForm.style.shadowShow">
+                  <div class="ss-row">
+                    <span class="ss-key">阴影颜色</span>
+                    <el-color-picker v-model="configForm.style.shadowColor" show-alpha size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">模糊半径</span>
+                    <el-input-number v-model="configForm.style.shadowBlur" :min="0" :max="40" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                </template>
+              </div>
+            </div>
+
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="交互" name="interaction">
@@ -368,6 +590,13 @@ const themeNames = Object.keys(COLOR_THEMES)
 const activeTab = ref('summary')
 const syncingFromProps = ref(false)
 const componentPresets = COMPONENT_PRESETS
+const openSections = ref(new Set(['legend', 'label']))
+const toggleSection = (name: string) => {
+  const next = new Set(openSections.value)
+  if (next.has(name)) next.delete(name)
+  else next.add(name)
+  openSections.value = next
+}
 
 let previewTimer: number | null = null
 
@@ -873,5 +1102,105 @@ onBeforeUnmount(() => {
     overflow: visible;
     padding-right: 0;
   }
+}
+
+/* ─── 样式手风琴 ──────────────────────────────────────────────────────────── */
+.style-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 8px;
+}
+
+.ss-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid #e6eef8;
+  margin-bottom: 4px;
+}
+
+.ss-section {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e8f0f8;
+  background: #fafcff;
+}
+
+.ss-section-divider {
+  font-size: 11px;
+  color: #7ba7c8;
+  padding: 10px 4px 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-top: 1px solid #dde8f5;
+  margin-top: 6px;
+}
+
+.ss-hd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+
+.ss-hd:hover {
+  background: #f0f6ff;
+}
+
+.ss-chevron {
+  font-size: 8px;
+  color: #91aac8;
+  transition: transform 0.18s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.ss-chevron.open {
+  transform: rotate(90deg);
+  color: #409eff;
+}
+
+.ss-hd-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c3e5a;
+}
+
+.ss-body {
+  padding: 4px 10px 8px;
+  border-top: 1px solid #e8f0f8;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ss-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.ss-key {
+  font-size: 12px;
+  color: #50637b;
+  flex-shrink: 0;
+}
+
+.ss-row :deep(.el-select) {
+  flex: 1;
+}
+
+.ss-row :deep(.el-input) {
+  flex: 1;
 }
 </style>

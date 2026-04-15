@@ -8,9 +8,25 @@ export interface ReportPublishConfig {
   publishedAt?: string
 }
 
+export interface CanvasOverlay {
+  show: boolean
+  bgColor: string
+  opacity: number
+  x: number
+  y: number
+  w: number
+  h: number
+  bgType?: 'solid' | 'gradient' | 'image'
+  gradientStart?: string
+  gradientEnd?: string
+  gradientAngle?: number
+  bgImage?: string
+}
+
 export interface ReportCanvasConfig {
   width: number
   height: number
+  overlay?: CanvasOverlay
 }
 
 export interface ReportCanvasPreset extends ReportCanvasConfig {
@@ -56,7 +72,7 @@ export const normalizeCanvasConfig = (
   const parsedHeight = Number(canvas?.height ?? defaults.height)
   const width = Number.isFinite(parsedWidth) ? Math.max(960, Math.round(parsedWidth)) : defaults.width
   const height = Number.isFinite(parsedHeight) ? Math.max(540, Math.round(parsedHeight)) : defaults.height
-  return { width, height }
+  return { width, height, overlay: canvas?.overlay }
 }
 
 export const buildReportConfig = (

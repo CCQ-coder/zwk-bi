@@ -14,6 +14,8 @@ public class UpdateDatasetRequest {
     @NotBlank(message = "sqlText is required")
     private String sqlText;
 
+    private Long folderId;
+
     public String getName() {
         return name;
     }
@@ -36,5 +38,13 @@ public class UpdateDatasetRequest {
 
     public void setSqlText(String sqlText) {
         this.sqlText = sqlText;
+    }
+
+    public Long getFolderId() {
+        return folderId;
+    }
+
+    public void setFolderId(Long folderId) {
+        this.folderId = folderId;
     }
 }

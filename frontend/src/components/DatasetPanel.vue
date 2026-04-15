@@ -1,27 +1,96 @@
-<template>
-  <el-card class="bi-page">
-    <div class="bi-toolbar">
-      <h3 class="bi-card-title">数据集 SQL</h3>
-      <el-button type="primary" @click="openCreate">新建数据集</el-button>
+﻿<template>
+  <el-card class="bi-page dataset-panel">
+    <div class="panel-layout">
+      <!-- 左侧文件夹树 -->
+      <div class="folder-tree-panel">
+        <div class="tree-header">
+          <span class="tree-title">数据集</span>
+          <div class="tree-actions">
+            <el-tooltip content="新建文件夹">
+              <el-button :icon="FolderAdd" circle size="small" @click="openCreateFolder(null)" />
+            </el-tooltip>
+            <el-tooltip content="新建数据集">
+              <el-button :icon="Plus" circle size="small" type="primary" @click="openCreate(null)" />
+            </el-tooltip>
+          </div>
+        </div>
+
+        <div v-if="treeLoading" class="tree-loading">
+          <el-icon class="is-loading"><Loading /></el-icon>
+        </div>
+        <div v-else-if="!folderTree.length" class="tree-empty">暂无数据集</div>
+        <div v-else class="tree-body">
+          <TreeNode
+            v-for="folder in folderTree"
+            :key="folder.id"
+            :node="folder"
+            :selected-id="selectedDatasetId"
+            @select="handleSelectDataset"
+            @add-dataset="openCreate"
+            @add-folder="openCreateFolder"
+            @rename-folder="openRenameFolder"
+            @delete-folder="handleDeleteFolder"
+            @delete-dataset="handleDeleteDataset"
+          />
+        </div>
+      </div>
+
+      <!-- 右侧内容区 -->
+      <div class="main-content">
+        <template v-if="selectedDataset">
+          <div class="content-header">
+            <span class="content-title">{{ selectedDataset.name }}</span>
+            <div class="content-actions">
+              <el-button v-if="selectedDataset.datasourceId !== 0" type="primary" size="small" @click="openEdit(selectedDataset)">编辑</el-button>
+              <el-popconfirm v-if="selectedDataset.datasourceId !== 0" title="确认删除？" @confirm="handleDeleteDataset(selectedDataset.id)">
+                <template #reference>
+                  <el-button type="danger" size="small">删除</el-button>
+                </template>
+              </el-popconfirm>
+              <el-tag v-if="selectedDataset.datasourceId === 0" type="success" size="small">演示数据集</el-tag>
+            </div>
+          </div>
+          <div class="content-info">
+            <div class="info-row">
+              <span class="info-label">数据源ID</span>
+              <span class="info-val">{{ selectedDataset.datasourceId === 0 ? '内置演示' : selectedDataset.datasourceId }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">SQL</span>
+              <pre class="info-sql">{{ selectedDataset.sqlText }}</pre>
+            </div>
+            <div class="info-row">
+              <span class="info-label">创建时间</span>
+              <span class="info-val">{{ selectedDataset.createdAt }}</span>
+            </div>
+          </div>
+          <!-- 数据预览 -->
+          <div class="preview-section">
+            <div class="preview-hd">
+              <span>数据预览</span>
+              <el-button size="small" :loading="previewLoading" @click="loadPreview">刷新预览</el-button>
+            </div>
+            <el-table v-if="preview.columns.length" :data="preview.rows" border max-height="320" size="small">
+              <el-table-column
+                v-for="col in preview.columns"
+                :key="col"
+                :prop="col"
+                :label="col"
+                min-width="120"
+                show-overflow-tooltip
+              />
+            </el-table>
+            <div v-else class="preview-empty">点击「刷新预览」查看数据</div>
+          </div>
+        </template>
+
+        <div v-else class="content-empty">
+          <el-empty description="请在左侧选择数据集" />
+        </div>
+      </div>
     </div>
 
-    <el-table v-loading="loading" :data="rows" border style="margin-top: 12px">
-      <el-table-column prop="name" label="数据集名称" min-width="160" />
-      <el-table-column prop="datasourceId" label="数据源ID" width="100" />
-      <el-table-column prop="sqlText" label="SQL" show-overflow-tooltip min-width="280" />
-      <el-table-column prop="createdAt" label="创建时间" min-width="170" />
-      <el-table-column label="操作" width="140" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-          <el-popconfirm title="确认删除？" @confirm="handleDelete(row.id)">
-            <template #reference>
-              <el-button link type="danger">删除</el-button>
-            </template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
-
+    <!-- 新建/编辑数据集弹窗 -->
     <el-dialog
       v-model="dialogVisible"
       :title="editId ? '编辑数据集' : '新建数据集'"
@@ -61,16 +130,10 @@
             </div>
           </div>
 
-          <!-- 列信息面板 -->
           <template v-if="selectedTable">
             <div class="column-header">
               <span>{{ selectedTable }} 的字段</span>
-              <el-button
-                link
-                type="primary"
-                size="small"
-                @click="generateSql"
-              >生成 SELECT SQL</el-button>
+              <el-button link type="primary" size="small" @click="generateSql">生成 SELECT SQL</el-button>
             </div>
             <div v-if="columnsLoading" class="browser-tip">加载列信息...</div>
             <div v-else class="column-list">
@@ -88,6 +151,16 @@
           <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
             <el-form-item label="名称" prop="name">
               <el-input v-model="form.name" placeholder="请输入数据集名称" />
+            </el-form-item>
+            <el-form-item label="所属文件夹">
+              <el-select v-model="form.folderId" placeholder="根目录（不选文件夹）" clearable style="width:100%">
+                <el-option
+                  v-for="f in allFoldersFlat"
+                  :key="f.id"
+                  :label="f.name"
+                  :value="f.id"
+                />
+              </el-select>
             </el-form-item>
             <el-form-item label="数据源" prop="datasourceId">
               <el-select
@@ -114,14 +187,14 @@
             </el-form-item>
           </el-form>
 
-          <div v-if="preview.columns.length" class="preview-panel">
+          <div v-if="formPreview.columns.length" class="preview-panel">
             <div class="preview-header">
               <span>预览结果</span>
-              <span>最多展示 {{ preview.rowCount }} 行</span>
+              <span>最多展示 {{ formPreview.rowCount }} 行</span>
             </div>
-            <el-table :data="preview.rows" border max-height="240">
+            <el-table :data="formPreview.rows" border max-height="240">
               <el-table-column
-                v-for="column in preview.columns"
+                v-for="column in formPreview.columns"
                 :key="column"
                 :prop="column"
                 :label="column"
@@ -134,26 +207,44 @@
       </div>
 
       <template #footer>
-        <el-button :loading="previewLoading" @click="handlePreview">预览 SQL</el-button>
+        <el-button :loading="previewBtnLoading" @click="handlePreview">预览 SQL</el-button>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 创建文件夹弹窗 -->
+    <el-dialog v-model="folderDialogVisible" :title="folderEditId ? '重命名文件夹' : '新建文件夹'" width="400px" destroy-on-close>
+      <el-form label-width="80px">
+        <el-form-item label="名称">
+          <el-input v-model="folderName" placeholder="请输入文件夹名称" @keyup.enter="handleFolderSubmit" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="folderDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="folderSaving" @click="handleFolderSubmit">确定</el-button>
       </template>
     </el-dialog>
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Grid } from '@element-plus/icons-vue'
+import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowRight, DataLine, Delete, Edit, Folder, FolderAdd, Grid, Loading, Plus } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
   createDataset,
+  createDatasetFolder,
   deleteDataset,
-  getDatasetList,
+  deleteDatasetFolder,
+  getDatasetFolderTree,
+  getDatasetPreviewData,
   previewDatasetSql,
+  renameDatasetFolder,
   updateDataset,
   type Dataset,
+  type DatasetFolder,
   type DatasetForm,
   type DatasetPreviewResult
 } from '../api/dataset'
@@ -166,15 +257,84 @@ import {
   type TableInfo
 } from '../api/datasource'
 
-const rows = ref<Dataset[]>([])
+// ---- Tree Node Component ----
+const TreeNode = defineComponent({
+  name: 'TreeNode',
+  components: { ArrowRight, DataLine, Delete, Edit, Folder, FolderAdd, Plus },
+  props: {
+    node: { type: Object as () => DatasetFolder, required: true },
+    selectedId: { type: Number as unknown as () => number | null, default: null }
+  },
+  emits: ['select', 'add-dataset', 'add-folder', 'rename-folder', 'delete-folder', 'delete-dataset'],
+  setup(props, { emit }) {
+    const expanded = ref(true)
+    const hover = ref(false)
+    const hoverDataset = ref<number | null>(null)
+    return { expanded, hover, hoverDataset, emit }
+  },
+  template: `
+    <div class="tree-folder">
+      <div class="folder-row" @mouseenter="hover=true" @mouseleave="hover=false" @click="expanded=!expanded">
+        <el-icon class="expand-icon" :style="{transform: expanded ? 'rotate(90deg)' : ''}"><ArrowRight /></el-icon>
+        <el-icon class="folder-icon" style="color:#e6a43c;margin-right:4px"><Folder /></el-icon>
+        <span class="folder-name">{{ node.name }}</span>
+        <div v-show="hover" class="node-actions" @click.stop>
+          <el-tooltip content="在此文件夹新建数据集"><el-button link :icon="Plus" @click="emit('add-dataset', node.id)" /></el-tooltip>
+          <el-tooltip content="新建子文件夹"><el-button link :icon="FolderAdd" @click="emit('add-folder', node.id)" /></el-tooltip>
+          <el-tooltip content="重命名"><el-button link :icon="Edit" @click="emit('rename-folder', node)" /></el-tooltip>
+          <el-tooltip v-if="node.id > 0" content="删除文件夹"><el-button link :icon="Delete" style="color:#f56c6c" @click="emit('delete-folder', node.id)" /></el-tooltip>
+        </div>
+      </div>
+      <div v-show="expanded" class="folder-children">
+        <TreeNode
+          v-for="child in node.children"
+          :key="child.id"
+          :node="child"
+          :selected-id="selectedId"
+          @select="(id) => emit('select', id)"
+          @add-dataset="(id) => emit('add-dataset', id)"
+          @add-folder="(id) => emit('add-folder', id)"
+          @rename-folder="(n) => emit('rename-folder', n)"
+          @delete-folder="(id) => emit('delete-folder', id)"
+          @delete-dataset="(id) => emit('delete-dataset', id)"
+        />
+        <div
+          v-for="ds in node.datasets"
+          :key="'ds-' + ds.id"
+          class="dataset-row"
+          :class="{ selected: selectedId === ds.id }"
+          @mouseenter="hoverDataset = ds.id"
+          @mouseleave="hoverDataset = null"
+          @click="emit('select', ds.id)"
+        >
+          <el-icon style="color:#409eff;margin-right:4px;font-size:12px"><DataLine /></el-icon>
+          <span class="dataset-name">{{ ds.name }}</span>
+          <div v-show="hoverDataset === ds.id && ds.datasourceId !== 0" class="node-actions" @click.stop>
+            <el-tooltip content="删除"><el-button link :icon="Delete" style="color:#f56c6c" @click="emit('delete-dataset', ds.id)" /></el-tooltip>
+          </div>
+        </div>
+        <div v-if="!node.children.length && !node.datasets.length" class="empty-folder">空文件夹</div>
+      </div>
+    </div>
+  `
+})
+
+const folderTree = ref<DatasetFolder[]>([])
+const treeLoading = ref(false)
 const datasources = ref<Datasource[]>([])
-const loading = ref(false)
+const selectedDatasetId = ref<number | null>(null)
+const selectedDataset = ref<Dataset | null>(null)
+const preview = reactive<DatasetPreviewResult>({ columns: [], rows: [], rowCount: 0 })
+const previewLoading = ref(false)
+
+// Dialog state
 const dialogVisible = ref(false)
 const saving = ref(false)
-const previewLoading = ref(false)
+const previewBtnLoading = ref(false)
 const editId = ref<number | null>(null)
+const pendingFolderId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
-const preview = reactive<DatasetPreviewResult>({ columns: [], rows: [], rowCount: 0 })
+const formPreview = reactive<DatasetPreviewResult>({ columns: [], rows: [], rowCount: 0 })
 
 // Table browser state
 const tables = ref<TableInfo[]>([])
@@ -184,6 +344,13 @@ const selectedTable = ref('')
 const tableColumns = ref<ColumnMeta[]>([])
 const columnsLoading = ref(false)
 
+// Folder dialog state
+const folderDialogVisible = ref(false)
+const folderName = ref('')
+const folderSaving = ref(false)
+const folderEditId = ref<number | null>(null)
+const folderParentId = ref<number | null>(null)
+
 const filteredTables = computed(() =>
   tableSearch.value
     ? tables.value.filter(t =>
@@ -192,10 +359,37 @@ const filteredTables = computed(() =>
     : tables.value
 )
 
+// Flatten all folders for the folder selector
+const allFoldersFlat = computed(() => {
+  const result: DatasetFolder[] = []
+  const flatten = (nodes: DatasetFolder[]) => {
+    for (const n of nodes) {
+      result.push(n)
+      if (n.children?.length) flatten(n.children)
+    }
+  }
+  flatten(folderTree.value)
+  return result
+})
+
+// All datasets flat (for selection lookup)
+const allDatasetsFlat = computed(() => {
+  const result: Dataset[] = []
+  const collect = (nodes: DatasetFolder[]) => {
+    for (const n of nodes) {
+      if (n.datasets) result.push(...n.datasets)
+      if (n.children) collect(n.children)
+    }
+  }
+  collect(folderTree.value)
+  return result
+})
+
 const emptyForm = (): DatasetForm => ({
   name: '',
   datasourceId: '',
-  sqlText: ''
+  sqlText: '',
+  folderId: null
 })
 
 const form = reactive<DatasetForm>(emptyForm())
@@ -206,12 +400,35 @@ const rules: FormRules = {
   sqlText: [{ required: true, message: '请输入 SQL', trigger: 'blur' }]
 }
 
-const loadList = async () => {
-  loading.value = true
+const loadTree = async () => {
+  treeLoading.value = true
   try {
-    ;[rows.value, datasources.value] = await Promise.all([getDatasetList(), getDatasourceList()])
+    ;[folderTree.value, datasources.value] = await Promise.all([
+      getDatasetFolderTree(),
+      getDatasourceList()
+    ])
   } finally {
-    loading.value = false
+    treeLoading.value = false
+  }
+}
+
+const handleSelectDataset = async (id: number) => {
+  selectedDatasetId.value = id
+  const ds = allDatasetsFlat.value.find(d => d.id === id)
+  selectedDataset.value = ds ?? null
+  Object.assign(preview, { columns: [], rows: [], rowCount: 0 })
+}
+
+const loadPreview = async () => {
+  if (!selectedDataset.value) return
+  previewLoading.value = true
+  try {
+    const result = await getDatasetPreviewData(selectedDataset.value.id)
+    Object.assign(preview, result)
+  } catch {
+    ElMessage.error('预览失败')
+  } finally {
+    previewLoading.value = false
   }
 }
 
@@ -258,10 +475,11 @@ const generateSql = () => {
   form.sqlText = `SELECT ${cols}\nFROM ${selectedTable.value}`
 }
 
-const openCreate = () => {
+const openCreate = (folderId: number | null) => {
   editId.value = null
   Object.assign(form, emptyForm())
-  Object.assign(preview, { columns: [], rows: [], rowCount: 0 })
+  form.folderId = folderId
+  Object.assign(formPreview, { columns: [], rows: [], rowCount: 0 })
   tables.value = []
   selectedTable.value = ''
   tableColumns.value = []
@@ -274,12 +492,12 @@ const openEdit = (row: Dataset) => {
   form.name = row.name
   form.datasourceId = row.datasourceId
   form.sqlText = row.sqlText
-  Object.assign(preview, { columns: [], rows: [], rowCount: 0 })
+  form.folderId = row.folderId
+  Object.assign(formPreview, { columns: [], rows: [], rowCount: 0 })
   selectedTable.value = ''
   tableColumns.value = []
   tableSearch.value = ''
   dialogVisible.value = true
-  // Load tables for the selected datasource
   if (row.datasourceId) loadTables(Number(row.datasourceId))
 }
 
@@ -295,43 +513,327 @@ const handleSubmit = async () => {
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false
-    await loadList()
+    await loadTree()
   } finally {
     saving.value = false
   }
 }
 
-const handleDelete = async (id: number) => {
+const handleDeleteDataset = async (id: number) => {
+  await ElMessageBox.confirm('确认删除该数据集？', '提示', { type: 'warning' })
   await deleteDataset(id)
   ElMessage.success('删除成功')
-  await loadList()
+  if (selectedDatasetId.value === id) {
+    selectedDatasetId.value = null
+    selectedDataset.value = null
+  }
+  await loadTree()
 }
 
 const handlePreview = async () => {
   await formRef.value?.validateField(['datasourceId', 'sqlText'])
-  previewLoading.value = true
+  previewBtnLoading.value = true
   try {
     const result = await previewDatasetSql({
       datasourceId: Number(form.datasourceId),
       sqlText: form.sqlText
     })
-    Object.assign(preview, result)
+    Object.assign(formPreview, result)
     ElMessage.success('SQL 预览成功')
   } finally {
-    previewLoading.value = false
+    previewBtnLoading.value = false
   }
 }
 
-onMounted(loadList)
+// Folder operations
+const openCreateFolder = (parentId: number | null) => {
+  folderEditId.value = null
+  folderParentId.value = parentId
+  folderName.value = ''
+  folderDialogVisible.value = true
+}
+
+const openRenameFolder = (node: DatasetFolder) => {
+  folderEditId.value = node.id
+  folderName.value = node.name
+  folderDialogVisible.value = true
+}
+
+const handleFolderSubmit = async () => {
+  if (!folderName.value.trim()) {
+    ElMessage.warning('请输入文件夹名称')
+    return
+  }
+  folderSaving.value = true
+  try {
+    if (folderEditId.value) {
+      await renameDatasetFolder(folderEditId.value, folderName.value.trim())
+      ElMessage.success('重命名成功')
+    } else {
+      await createDatasetFolder(folderName.value.trim(), folderParentId.value)
+      ElMessage.success('创建成功')
+    }
+    folderDialogVisible.value = false
+    await loadTree()
+  } finally {
+    folderSaving.value = false
+  }
+}
+
+const handleDeleteFolder = async (id: number) => {
+  await ElMessageBox.confirm('删除文件夹将同时删除其中所有子文件夹，数据集将被保留至未分类。确认删除？', '提示', { type: 'warning' })
+  await deleteDatasetFolder(id)
+  ElMessage.success('已删除')
+  await loadTree()
+}
+
+onMounted(loadTree)
 </script>
 
 <style scoped>
-.bi-toolbar {
+.dataset-panel :deep(.el-card__body) {
+  padding: 0;
+  height: 100%;
+}
+
+.panel-layout {
+  display: flex;
+  height: calc(100vh - 100px);
+  min-height: 500px;
+}
+
+/* ---- 左侧树 ---- */
+.folder-tree-panel {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid #ebeef5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tree-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid #ebeef5;
+  flex-shrink: 0;
 }
 
+.tree-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
+}
+
+.tree-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tree-loading {
+  display: flex;
+  justify-content: center;
+  padding: 32px;
+  color: #909399;
+  font-size: 20px;
+}
+
+.tree-empty {
+  text-align: center;
+  padding: 32px;
+  color: #909399;
+  font-size: 13px;
+}
+
+.tree-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+/* ---- 树节点样式 ---- */
+:deep(.tree-folder) {
+  user-select: none;
+}
+
+:deep(.folder-row) {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 1px 4px;
+  font-size: 13px;
+  color: #303133;
+  transition: background 0.15s;
+  position: relative;
+}
+
+:deep(.folder-row:hover) {
+  background: #f5f7fa;
+}
+
+:deep(.expand-icon) {
+  font-size: 10px;
+  color: #909399;
+  margin-right: 4px;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+:deep(.folder-name) {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.folder-children) {
+  padding-left: 16px;
+}
+
+:deep(.dataset-row) {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 1px 4px;
+  font-size: 12px;
+  color: #606266;
+  transition: background 0.15s;
+}
+
+:deep(.dataset-row:hover) {
+  background: #f0f2f5;
+}
+
+:deep(.dataset-row.selected) {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+:deep(.dataset-name) {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.node-actions) {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+:deep(.node-actions .el-button) {
+  padding: 2px;
+  font-size: 12px;
+}
+
+:deep(.empty-folder) {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #c0c4cc;
+}
+
+/* ---- 右侧内容 ---- */
+.main-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.content-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.content-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.content-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+}
+
+.content-info {
+  background: #f8f9fc;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.info-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.info-label {
+  color: #909399;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.info-val {
+  color: #303133;
+}
+
+.info-sql {
+  color: #303133;
+  font-family: monospace;
+  font-size: 12px;
+  margin: 0;
+  background: #eef0f5;
+  padding: 6px 8px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  flex: 1;
+}
+
+.preview-section {
+  border-top: 1px solid #ebeef5;
+  padding-top: 12px;
+}
+
+.preview-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+}
+
+.preview-empty {
+  text-align: center;
+  padding: 32px;
+  color: #c0c4cc;
+  font-size: 13px;
+}
+
+/* ---- dialog styles ---- */
 .dialog-body {
   display: flex;
   gap: 16px;

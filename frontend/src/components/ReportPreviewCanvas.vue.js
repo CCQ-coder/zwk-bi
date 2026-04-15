@@ -8,6 +8,7 @@ import { normalizeCanvasConfig, parseReportConfig } from '../utils/report-config
 const props = defineProps();
 const loading = ref(false);
 const chartLoading = ref(false);
+const filterCollapsed = ref(false);
 const dashboard = ref(null);
 const components = ref([]);
 const charts = ref([]);
@@ -234,8 +235,9 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['preview-kpi']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-kpi']} */ ;
+/** @type {__VLS_StyleScopedClasses['filter-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['filter-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['filter-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-stage--dashboard']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-stage--screen']} */ ;
@@ -257,7 +259,6 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['preview-stage--screen']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-placeholder']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-placeholder']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-head']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
@@ -265,70 +266,64 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "preview-shell" },
 });
 __VLS_asFunctionalDirective(__VLS_directives.vLoading)(null, { ...__VLS_directiveBindingRestFields, value: (__VLS_ctx.loading || __VLS_ctx.chartLoading) }, null, null);
-if (__VLS_ctx.dashboard) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "preview-head" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "preview-title" },
-    });
-    (__VLS_ctx.dashboard.name);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "preview-subtitle" },
-    });
-    (__VLS_ctx.scene === 'screen' ? '数据大屏只读预览' : '仪表板只读预览');
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "preview-kpis" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "preview-kpi" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
-    (__VLS_ctx.components.length);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "preview-kpi" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
-    (__VLS_ctx.renderedChartCount);
-}
 if (__VLS_ctx.filterDefinitions.length) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "filter-panel" },
+        ...{ class: ({ 'filter-panel--collapsed': __VLS_ctx.filterCollapsed }) },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.filterDefinitions.length))
+                    return;
+                __VLS_ctx.filterCollapsed = !__VLS_ctx.filterCollapsed;
+            } },
         ...{ class: "filter-head" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "filter-head-left" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "filter-toggle-icon" },
+    });
+    (__VLS_ctx.filterCollapsed ? '▶' : '▼');
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "filter-title" },
     });
+    if (__VLS_ctx.activeFilterEntries.length) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "filter-active-badge" },
+        });
+        (__VLS_ctx.activeFilterEntries.length);
+    }
+    if (!__VLS_ctx.filterCollapsed && __VLS_ctx.activeFilterEntries.length) {
+        const __VLS_0 = {}.ElButton;
+        /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+        // @ts-ignore
+        const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
+            ...{ 'onClick': {} },
+            link: true,
+            type: "primary",
+            size: "small",
+        }));
+        const __VLS_2 = __VLS_1({
+            ...{ 'onClick': {} },
+            link: true,
+            type: "primary",
+            size: "small",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_1));
+        let __VLS_4;
+        let __VLS_5;
+        let __VLS_6;
+        const __VLS_7 = {
+            onClick: (__VLS_ctx.clearFilters)
+        };
+        __VLS_3.slots.default;
+        var __VLS_3;
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "filter-note" },
+        ...{ class: "filter-body" },
     });
-    const __VLS_0 = {}.ElButton;
-    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-    // @ts-ignore
-    const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-        ...{ 'onClick': {} },
-        link: true,
-        type: "primary",
-    }));
-    const __VLS_2 = __VLS_1({
-        ...{ 'onClick': {} },
-        link: true,
-        type: "primary",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_1));
-    let __VLS_4;
-    let __VLS_5;
-    let __VLS_6;
-    const __VLS_7 = {
-        onClick: (__VLS_ctx.clearFilters)
-    };
-    __VLS_3.slots.default;
-    var __VLS_3;
+    __VLS_asFunctionalDirective(__VLS_directives.vShow)(null, { ...__VLS_directiveBindingRestFields, value: (!__VLS_ctx.filterCollapsed) }, null, null);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "filter-grid" },
     });
@@ -563,16 +558,13 @@ else {
     }
 }
 /** @type {__VLS_StyleScopedClasses['preview-shell']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-subtitle']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-kpis']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-kpi']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-kpi']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['filter-head-left']} */ ;
+/** @type {__VLS_StyleScopedClasses['filter-toggle-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['filter-note']} */ ;
+/** @type {__VLS_StyleScopedClasses['filter-active-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['filter-body']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-item-label']} */ ;
@@ -597,11 +589,11 @@ const __VLS_self = (await import('vue')).defineComponent({
             chartTypeLabel: chartTypeLabel,
             loading: loading,
             chartLoading: chartLoading,
+            filterCollapsed: filterCollapsed,
             dashboard: dashboard,
             components: components,
             activeFilters: activeFilters,
             canvasRef: canvasRef,
-            renderedChartCount: renderedChartCount,
             getComponentChartConfig: getComponentChartConfig,
             canvasConfig: canvasConfig,
             activeFilterEntries: activeFilterEntries,

@@ -1,112 +1,141 @@
 <template>
   <div class="screen-root" :class="{ 'screen-root--editor': screenId }">
-    <!-- 编辑器模式：可拖拽缩放的左侧综合面板 -->
-    <aside v-if="screenId" class="screen-left-panel" :style="{ width: leftPanelWidth + 'px' }">
+    <!-- 编辑器模式：可折叠左侧综合面板 -->
+    <aside
+      v-if="screenId"
+      class="screen-left-panel"
+      :class="{ 'screen-left-panel--collapsed': sidebarCollapsed }"
+      :style="sidebarCollapsed ? {} : { width: leftPanelWidth + 'px' }"
+      @mouseenter="hoverExpandSidebar"
+      @mouseleave="hoverCollapseSidebar"
+    >
       <!-- 头部 -->
       <div class="lp-head">
-        <el-button size="small" :icon="ArrowLeft" @click="$emit('back')" class="lp-back-btn">返回</el-button>
-        <span class="lp-title" :title="currentDashboard?.name ?? '编辑大屏'">{{ currentDashboard?.name ?? '编辑大屏' }}</span>
+        <button class="lp-toggle-btn" @click.stop="toggleSidebar" :title="sidebarCollapsed ? '展开面板' : '收起面板'">
+          <span class="lp-toggle-icon">☰</span>
+        </button>
+        <span v-if="!sidebarCollapsed" class="lp-title" :title="currentDashboard?.name ?? '编辑大屏'">{{ currentDashboard?.name ?? '编辑大屏' }}</span>
       </div>
 
-      <!-- 搜索栏 -->
-      <div class="lp-search">
-        <el-input v-model="assetSearch" placeholder="搜索组件名称..." clearable size="small" :prefix-icon="Search" />
-      </div>
-
-      <!-- 分类折叠列表 -->
-      <div class="lp-cat-scroll">
-        <div v-for="cat in CHART_CATEGORIES" :key="cat.label" class="lp-cat-section">
-          <div
-            class="lp-cat-header"
-            :class="{ 'lp-cat-header--open': expandedCats.has(cat.label) }"
-            @click="toggleCategory(cat.label)"
-          >
-            <span class="lp-cat-label">{{ cat.label }}</span>
-            <el-icon class="lp-cat-arrow" :class="{ 'lp-cat-arrow--open': expandedCats.has(cat.label) }">
-              <ArrowRight />
-            </el-icon>
+      <!-- 折叠状态下的图标快捷菜单 -->
+      <div v-if="sidebarCollapsed" class="lp-icon-menu">
+        <el-tooltip content="模板库" placement="right">
+          <div class="lp-icon-item" :class="{ active: libraryTab === 'templates' }" @click="libraryTab = 'templates'; sidebarCollapsed = false">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
           </div>
-          <div v-if="expandedCats.has(cat.label)" class="lp-type-grid">
+        </el-tooltip>
+        <el-tooltip content="图表源" placement="right">
+          <div class="lp-icon-item" :class="{ active: libraryTab === 'charts' }" @click="libraryTab = 'charts'; sidebarCollapsed = false">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+        </el-tooltip>
+        <el-tooltip v-for="cat in CHART_CATEGORIES" :key="cat.label" :content="cat.label" placement="right">
+          <div class="lp-icon-item" @click="sidebarCollapsed = false" v-html="cat.types[0]?.svgIcon ?? '⬛'" />
+        </el-tooltip>
+      </div>
+
+      <!-- 展开状态下的完整内容 -->
+      <template v-if="!sidebarCollapsed">
+        <!-- 搜索栏 -->
+        <div class="lp-search">
+          <el-input v-model="assetSearch" placeholder="搜索组件名称..." clearable size="small" :prefix-icon="Search" />
+        </div>
+
+        <!-- 分类折叠列表 -->
+        <div class="lp-cat-scroll">
+          <div v-for="cat in CHART_CATEGORIES" :key="cat.label" class="lp-cat-section">
             <div
-              v-for="item in cat.types"
-              :key="item.type"
-              class="lp-type-chip"
-              :class="{ 'lp-type-chip--active': assetType === item.type }"
-              :title="item.label"
-              @click="assetType = item.type"
+              class="lp-cat-header"
+              :class="{ 'lp-cat-header--open': expandedCats.has(cat.label) }"
+              @click="toggleCategory(cat.label)"
             >
-              <span class="lp-type-icon" v-html="item.svgIcon" />
-              <span class="lp-type-label">{{ item.label }}</span>
+              <span class="lp-cat-label">{{ cat.label }}</span>
+              <el-icon class="lp-cat-arrow" :class="{ 'lp-cat-arrow--open': expandedCats.has(cat.label) }">
+                <ArrowRight />
+              </el-icon>
+            </div>
+            <div v-if="expandedCats.has(cat.label)" class="lp-type-grid">
+              <div
+                v-for="item in cat.types"
+                :key="item.type"
+                class="lp-type-chip"
+                :class="{ 'lp-type-chip--active': assetType === item.type }"
+                :title="item.label"
+                @click="assetType = item.type"
+              >
+                <span class="lp-type-icon" v-html="item.svgIcon" />
+                <span class="lp-type-label">{{ item.label }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- 分隔行 -->
-      <div class="lp-divider">
-        <span class="lp-divider-text">{{ assetType ? chartTypeLabel(assetType) : '全部组件' }}</span>
-        <el-button v-if="assetType" link size="small" style="font-size:11px;color:#4db3ff" @click="assetType = ''">清除</el-button>
-      </div>
+        <!-- 分隔行 -->
+        <div class="lp-divider">
+          <span class="lp-divider-text">{{ assetType ? chartTypeLabel(assetType) : '全部组件' }}</span>
+          <el-button v-if="assetType" link size="small" style="font-size:11px;color:#4db3ff" @click="assetType = ''">清除</el-button>
+        </div>
 
-      <!-- 组件列表 Tabs -->
-      <el-tabs v-model="libraryTab" class="lp-tabs">
-        <el-tab-pane label="模板库" name="templates">
-          <div class="lp-asset-scroll">
-            <div
-              v-for="template in filteredTemplates"
-              :key="template.id"
-              class="lp-asset-card"
-              :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
-              draggable="true"
-              @click="selectedTemplateId = template.id"
-              @dblclick="quickAddTemplate(template)"
-              @dragstart="onTemplateDragStart($event, template)"
-              @dragend="onTemplateDragEnd"
-            >
-              <div class="lp-ac-row">
-                <span class="lp-ac-name">{{ template.name }}</span>
-                <div class="lp-ac-tags">
-                  <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
-                  <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
+        <!-- 组件列表 Tabs -->
+        <el-tabs v-model="libraryTab" class="lp-tabs">
+          <el-tab-pane label="模板库" name="templates">
+            <div class="lp-asset-scroll">
+              <div
+                v-for="template in filteredTemplates"
+                :key="template.id"
+                class="lp-asset-card"
+                :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
+                draggable="true"
+                @click="selectedTemplateId = template.id"
+                @dblclick="quickAddTemplate(template)"
+                @dragstart="onTemplateDragStart($event, template)"
+                @dragend="onTemplateDragEnd"
+              >
+                <div class="lp-ac-row">
+                  <span class="lp-ac-name">{{ template.name }}</span>
+                  <div class="lp-ac-tags">
+                    <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
+                    <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
+                  </div>
+                </div>
+                <div class="lp-ac-foot">
+                  <span class="lp-ac-hint">拖入画布 · {{ getTemplateDatasetName(template) }}</span>
+                  <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddTemplate(template)">加入</el-button>
                 </div>
               </div>
-              <div class="lp-ac-foot">
-                <span class="lp-ac-hint">拖入画布 · {{ getTemplateDatasetName(template) }}</span>
-                <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddTemplate(template)">加入</el-button>
-              </div>
+              <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
             </div>
-            <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
-          </div>
-        </el-tab-pane>
-        <el-tab-pane label="图表源" name="charts">
-          <div class="lp-asset-scroll">
-            <div
-              v-for="chart in filteredCharts"
-              :key="chart.id"
-              class="lp-asset-card"
-              :class="{ 'lp-asset-card--selected': selectedChartId === chart.id }"
-              draggable="true"
-              @click="selectedChartId = chart.id"
-              @dblclick="quickAddChart(chart)"
-              @dragstart="onChartDragStart($event, chart)"
-              @dragend="onChartDragEnd"
-            >
-              <div class="lp-ac-row">
-                <span class="lp-ac-name">{{ chart.name }}</span>
-                <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(chart.chartType) }}</el-tag>
+          </el-tab-pane>
+          <el-tab-pane label="图表源" name="charts">
+            <div class="lp-asset-scroll">
+              <div
+                v-for="chart in filteredCharts"
+                :key="chart.id"
+                class="lp-asset-card"
+                :class="{ 'lp-asset-card--selected': selectedChartId === chart.id }"
+                draggable="true"
+                @click="selectedChartId = chart.id"
+                @dblclick="quickAddChart(chart)"
+                @dragstart="onChartDragStart($event, chart)"
+                @dragend="onChartDragEnd"
+              >
+                <div class="lp-ac-row">
+                  <span class="lp-ac-name">{{ chart.name }}</span>
+                  <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(chart.chartType) }}</el-tag>
+                </div>
+                <div class="lp-ac-foot">
+                  <span class="lp-ac-hint">拖入画布 · {{ datasetMap.get(chart.datasetId)?.name ?? '未关联数据集' }}</span>
+                  <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddChart(chart)">加入</el-button>
+                </div>
               </div>
-              <div class="lp-ac-foot">
-                <span class="lp-ac-hint">拖入画布 · {{ datasetMap.get(chart.datasetId)?.name ?? '未关联数据集' }}</span>
-                <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddChart(chart)">加入</el-button>
-              </div>
+              <el-empty v-if="!filteredCharts.length && !loading" description="暂无匹配图表" :image-size="42" />
             </div>
-            <el-empty v-if="!filteredCharts.length && !loading" description="暂无匹配图表" :image-size="42" />
-          </div>
-        </el-tab-pane>
-      </el-tabs>
+          </el-tab-pane>
+        </el-tabs>
+      </template>
 
-      <!-- 拖拽缩放手柄 -->
-      <div class="lp-resize-handle" @mousedown.prevent="startPanelResize" />
+      <!-- 拖拽缩放手柄 (仅展开时可用) -->
+      <div v-if="!sidebarCollapsed" class="lp-resize-handle" @mousedown.prevent="startPanelResize" />
     </aside>
 
     <!-- 列表模式：侧边栏 -->
@@ -268,68 +297,105 @@
             <el-button size="small" :icon="Promotion" @click="openPublishDialog">{{ isPublished ? '发布管理' : '发布' }}</el-button>
             <el-button size="small" :icon="Share" @click="openShareDialog">分享</el-button>
             <el-button size="small" type="primary" :icon="CirclePlus" :disabled="!selectedLibraryAsset" @click="handleAddSelectedAsset">放入</el-button>
+            <el-divider direction="vertical" />
+            <el-button size="small" :icon="ArrowLeft" @click="$emit('back')">退出</el-button>
           </div>
         </div>
 
-        <div class="stage-panel">
-          <div class="stage-head">
-            <div>
-              <div class="stage-title">大屏画布</div>
-              <div class="stage-note">双击左侧组件可快速加入，拖动标题移动，拖动组件边框或四角可直接调整大小</div>
+        <div class="canvas-editor">
+          <!-- 画布顶部栏 -->
+          <div class="canvas-topbar">
+            <span class="canvas-tb-label">背景版</span>
+            <div class="canvas-tb-controls">
+              <el-select
+                :model-value="matchedBgPreset"
+                size="small"
+                style="width: 130px"
+                :disabled="canvasSaving"
+                @change="applyBgPreset"
+              >
+                <el-option
+                  v-for="item in SCREEN_CANVAS_PRESETS"
+                  :key="item.id"
+                  :label="item.label"
+                  :value="item.id"
+                />
+                <el-option label="自定义" value="custom" />
+              </el-select>
+              <el-input-number
+                :model-value="overlayConfig.w"
+                :min="640" :max="7680" :step="10"
+                size="small" controls-position="right" :disabled="canvasSaving"
+                @change="onBgWidthChange"
+              />
+              <span class="canvas-tb-sep">×</span>
+              <el-input-number
+                :model-value="overlayConfig.h"
+                :min="360" :max="4320" :step="10"
+                size="small" controls-position="right" :disabled="canvasSaving"
+                @change="onBgHeightChange"
+              />
             </div>
-            <div class="stage-head-actions">
-              <div class="stage-canvas-controls">
-                <el-select
-                  :model-value="matchedCanvasPreset"
-                  size="small"
-                  style="width: 150px"
-                  :disabled="canvasSaving"
-                  @change="applyCanvasPreset"
-                >
-                  <el-option
-                    v-for="item in SCREEN_CANVAS_PRESETS"
-                    :key="item.id"
-                    :label="item.label"
-                    :value="item.id"
-                  />
-                  <el-option label="自定义" value="custom" />
-                </el-select>
+            <span class="canvas-tb-tip">{{ components.length }} 组件 · 双击左侧加入 · 拖标题移动 · 点击背景版编辑样式</span>
+            <!-- 背景版快速颜色控制 -->
+            <div class="canvas-tb-overlay-ctrl">
+              <span style="color:#8899aa;font-size:12px;margin-right:4px">背景:</span>
+              <el-color-picker v-model="overlayConfig.bgColor" show-alpha size="small" @change="saveOverlay" />
+              <el-tooltip content="不透明度" placement="bottom">
                 <el-input-number
-                  :model-value="currentCanvasConfig.width"
-                  :min="640"
-                  :max="7680"
-                  :step="10"
-                  size="small"
-                  controls-position="right"
-                  :disabled="canvasSaving"
-                  @change="onCanvasWidthChange"
+                  v-model="overlayConfig.opacity"
+                  :min="0.05" :max="1" :step="0.05" :precision="2"
+                  size="small" controls-position="right"
+                  style="width:76px"
+                  @change="saveOverlay"
                 />
-                <span class="stage-canvas-separator">×</span>
-                <el-input-number
-                  :model-value="currentCanvasConfig.height"
-                  :min="360"
-                  :max="4320"
-                  :step="10"
-                  size="small"
-                  controls-position="right"
-                  :disabled="canvasSaving"
-                  @change="onCanvasHeightChange"
-                />
-              </div>
-              <div class="stage-stats">{{ components.length }} 个已选组件</div>
+              </el-tooltip>
             </div>
           </div>
 
-          <div class="screen-stage-shell">
+          <!-- 标尺 + 画布工作区 -->
+          <div class="canvas-work-area">
+            <div class="canvas-ruler-row">
+              <div class="ruler-corner"></div>
+              <div class="ruler-h-strip">
+                <span v-for="m in hRulerMarks" :key="m" class="ruler-h-mark" :style="{ left: m + 'px' }">{{ m }}</span>
+              </div>
+            </div>
+            <div class="canvas-main-row">
+              <div class="ruler-v-strip">
+                <span v-for="m in vRulerMarks" :key="m" class="ruler-v-mark" :style="{ top: m + 'px' }">{{ m }}</span>
+              </div>
+              <div class="screen-stage-scroll">
+
             <div
               ref="canvasRef"
               class="screen-stage"
               :class="{ 'screen-stage--drop': stageDropActive }"
-              :style="{ width: `${currentCanvasConfig.width}px`, minHeight: `${canvasMinHeight}px`, height: `${canvasMinHeight}px` }"
+              :style="{ width: `${canvasWorkWidth}px`, minHeight: `${canvasMinHeight}px`, height: `${canvasMinHeight}px` }"
               @dragover.prevent="onStageDragOver"
               @dragleave="onStageDragLeave"
               @drop.prevent="onStageDrop"
+              @click.self="overlaySelected = false"
             >
+              <!-- 幕布层 (z-index:1, 永远在组件下方) -->
+              <div
+                v-if="overlayConfig.show"
+                class="canvas-curtain"
+                :class="{ 'canvas-curtain--selected': overlaySelected }"
+                :style="curtainStyle"
+                @mousedown.stop="startCurtainDrag($event)"
+                @click.stop="overlaySelected = true; activeCompId = null"
+              >
+                <span v-if="overlaySelected" class="curtain-badge">背景版</span>
+                <span class="resize-handle resize-handle--n"  @mousedown.stop.prevent="startCurtainResize($event, 'n')" />
+                <span class="resize-handle resize-handle--s"  @mousedown.stop.prevent="startCurtainResize($event, 's')" />
+                <span class="resize-handle resize-handle--e"  @mousedown.stop.prevent="startCurtainResize($event, 'e')" />
+                <span class="resize-handle resize-handle--w"  @mousedown.stop.prevent="startCurtainResize($event, 'w')" />
+                <span class="resize-handle resize-handle--ne" @mousedown.stop.prevent="startCurtainResize($event, 'ne')" />
+                <span class="resize-handle resize-handle--nw" @mousedown.stop.prevent="startCurtainResize($event, 'nw')" />
+                <span class="resize-handle resize-handle--se" @mousedown.stop.prevent="startCurtainResize($event, 'se')" />
+                <span class="resize-handle resize-handle--sw" @mousedown.stop.prevent="startCurtainResize($event, 'sw')" />
+              </div>
               <div
                 v-for="component in components"
                 :key="component.id"
@@ -392,13 +458,105 @@
                 <el-empty description="请从左侧双击或拖入一个组件资产" :image-size="80" />
               </div>
             </div>
+              </div>
+            </div>
           </div>
         </div>
       </template>
     </main>
 
     <aside class="screen-inspector">
+      <!-- 背景版属性面板 (当背景版被选中时显示) -->
+      <div v-if="overlaySelected" class="bg-inspector">
+        <div class="bg-insp-head">
+          <span class="bg-insp-title">背景版 属性</span>
+          <el-button size="small" link @click="overlaySelected = false">✕</el-button>
+        </div>
+
+        <div class="bg-insp-section">
+          <div class="bg-insp-section-title">尺寸与位置</div>
+          <div class="bg-insp-grid">
+            <label class="bg-insp-field">
+              <span>宽度</span>
+              <el-input-number v-model="overlayConfig.w" :min="640" :max="7680" :step="10" size="small" controls-position="right" @change="saveOverlay" />
+            </label>
+            <label class="bg-insp-field">
+              <span>高度</span>
+              <el-input-number v-model="overlayConfig.h" :min="360" :max="4320" :step="10" size="small" controls-position="right" @change="saveOverlay" />
+            </label>
+            <label class="bg-insp-field">
+              <span>X 位置</span>
+              <el-input-number v-model="overlayConfig.x" :min="0" size="small" controls-position="right" @change="saveOverlay" />
+            </label>
+            <label class="bg-insp-field">
+              <span>Y 位置</span>
+              <el-input-number v-model="overlayConfig.y" :min="0" size="small" controls-position="right" @change="saveOverlay" />
+            </label>
+          </div>
+        </div>
+
+        <div class="bg-insp-section">
+          <div class="bg-insp-section-title">背景样式</div>
+          <el-radio-group v-model="overlayConfig.bgType" size="small" @change="saveOverlay" style="margin-bottom:12px">
+            <el-radio-button value="solid">纯色</el-radio-button>
+            <el-radio-button value="gradient">渐变</el-radio-button>
+            <el-radio-button value="image">图片</el-radio-button>
+          </el-radio-group>
+
+          <!-- 纯色 -->
+          <template v-if="overlayConfig.bgType === 'solid'">
+            <div class="bg-insp-color-row">
+              <span>背景颜色</span>
+              <el-color-picker v-model="overlayConfig.bgColor" show-alpha @change="saveOverlay" />
+            </div>
+          </template>
+
+          <!-- 渐变 -->
+          <template v-else-if="overlayConfig.bgType === 'gradient'">
+            <div class="bg-gradient-preview" :style="{ background: `linear-gradient(${overlayConfig.gradientAngle}deg, ${overlayConfig.gradientStart}, ${overlayConfig.gradientEnd})` }"></div>
+            <div class="bg-insp-color-row">
+              <span>起始色</span>
+              <el-color-picker v-model="overlayConfig.gradientStart" show-alpha @change="saveOverlay" />
+            </div>
+            <div class="bg-insp-color-row">
+              <span>结束色</span>
+              <el-color-picker v-model="overlayConfig.gradientEnd" show-alpha @change="saveOverlay" />
+            </div>
+            <div class="bg-insp-slider-row">
+              <span>角度 {{ overlayConfig.gradientAngle }}°</span>
+              <el-slider v-model="overlayConfig.gradientAngle" :min="0" :max="360" style="flex:1" @change="saveOverlay" />
+            </div>
+          </template>
+
+          <!-- 图片 -->
+          <template v-else-if="overlayConfig.bgType === 'image'">
+            <div v-if="overlayConfig.bgImage" class="bg-image-thumb" :style="{ backgroundImage: `url(${overlayConfig.bgImage})` }"></div>
+            <div class="bg-insp-btn-row">
+              <el-button size="small" @click="triggerBgImageUpload" :loading="bgImgUploading">上传背景图片</el-button>
+              <el-button v-if="overlayConfig.bgImage" size="small" type="danger" plain @click="overlayConfig.bgImage = ''; saveOverlay()">移除</el-button>
+            </div>
+            <input ref="bgImgInputRef" type="file" accept="image/*" style="display:none" @change="handleBgImageUpload" />
+            <div class="bg-insp-color-row" style="margin-top:8px">
+              <span>叠底颜色</span>
+              <el-color-picker v-model="overlayConfig.bgColor" show-alpha @change="saveOverlay" />
+            </div>
+          </template>
+
+          <div class="bg-insp-slider-row" style="margin-top:12px">
+            <span>透明度 {{ Math.round(overlayConfig.opacity * 100) }}%</span>
+            <el-slider v-model="overlayConfig.opacity" :min="0.05" :max="1" :step="0.05" style="flex:1" @change="saveOverlay" />
+          </div>
+        </div>
+
+        <div class="bg-insp-section">
+          <div class="bg-insp-section-title">说明</div>
+          <p class="bg-insp-tip">背景版是大屏发布后的展示区域。组件在背景版内的部分将出现在最终大屏中，背景版外的区域仅在设计时可见。</p>
+        </div>
+      </div>
+
+      <!-- 组件属性面板 -->
       <EditorComponentInspector
+        v-else
         scene="screen"
         :component="activeComponent"
         :chart="activeChart"
@@ -519,6 +677,7 @@ import {
   mergeComponentRequestFilters,
   normalizeComponentAssetConfig,
   normalizeComponentConfig,
+  postProcessChartOption,
 } from '../utils/component-config'
 import {
   buildPublishedLink,
@@ -658,6 +817,24 @@ const toggleCategory = (label: string) => {
 }
 const selectTypeFilter = (type: string) => { assetType.value = type }
 
+const sidebarCollapsed = ref(false)
+let sidebarHoverTimer: number | null = null
+
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+const hoverExpandSidebar = () => {
+  if (!sidebarCollapsed.value) return
+  if (sidebarHoverTimer !== null) { clearTimeout(sidebarHoverTimer); sidebarHoverTimer = null }
+  sidebarHoverTimer = window.setTimeout(() => { sidebarCollapsed.value = false }, 200)
+}
+
+const hoverCollapseSidebar = () => {
+  if (sidebarHoverTimer !== null) { clearTimeout(sidebarHoverTimer); sidebarHoverTimer = null }
+  // Don't auto-collapse after hover-expand; user must click toggle or move away
+}
+
 const leftPanelWidth = ref(280)
 const startPanelResize = (e: MouseEvent) => {
   const startX = e.clientX
@@ -692,6 +869,8 @@ const shareVisible = ref(false)
 const publishVisible = ref(false)
 const publishSaving = ref(false)
 const canvasSaving = ref(false)
+const bgImgInputRef = ref<HTMLInputElement | null>(null)
+const bgImgUploading = ref(false)
 
 const libraryTab = ref('templates')
 const assetSearch = ref('')
@@ -719,6 +898,150 @@ const chartRefs = new Map<number, HTMLElement>()
 const chartInstances = new Map<number, echarts.ECharts>()
 let interactionFrame: number | null = null
 let pendingPointer: { x: number; y: number } | null = null
+
+// ─── 背景版 (Background Board) ───────────────────────────────────────────────
+const overlaySelected = ref(false)
+const overlayConfig = reactive({
+  show: true,
+  bgColor: '#081b32',
+  opacity: 1,
+  x: 0,
+  y: 0,
+  w: 1920,
+  h: 1080,
+  bgType: 'solid' as 'solid' | 'gradient' | 'image',
+  gradientStart: '#0d1b2a',
+  gradientEnd: '#1b3a5c',
+  gradientAngle: 135,
+  bgImage: '',
+})
+
+const curtainStyle = computed(() => {
+  let background: string
+  if (overlayConfig.bgType === 'gradient') {
+    background = `linear-gradient(${overlayConfig.gradientAngle}deg, ${overlayConfig.gradientStart}, ${overlayConfig.gradientEnd})`
+  } else if (overlayConfig.bgType === 'image' && overlayConfig.bgImage) {
+    background = `url(${overlayConfig.bgImage}) center/cover no-repeat, ${overlayConfig.bgColor}`
+  } else {
+    background = overlayConfig.bgColor
+  }
+  return {
+    position: 'absolute' as const,
+    left: `${overlayConfig.x}px`,
+    top: `${overlayConfig.y}px`,
+    width: `${overlayConfig.w}px`,
+    height: `${overlayConfig.h}px`,
+    background,
+    opacity: String(overlayConfig.opacity),
+    zIndex: '1',
+    pointerEvents: 'all' as const,
+    overflow: 'hidden' as const,
+  }
+})
+
+const loadOverlayFromConfig = () => {
+  const saved = currentCanvasConfig.value.overlay
+  if (saved) {
+    overlayConfig.show = true // 背景版 always visible
+    overlayConfig.bgColor = saved.bgColor ?? '#081b32'
+    overlayConfig.opacity = saved.opacity ?? 1
+    overlayConfig.x = saved.x ?? 0
+    overlayConfig.y = saved.y ?? 0
+    overlayConfig.w = saved.w ?? currentCanvasConfig.value.width
+    overlayConfig.h = saved.h ?? currentCanvasConfig.value.height
+    overlayConfig.bgType = saved.bgType ?? 'solid'
+    overlayConfig.gradientStart = saved.gradientStart ?? '#0d1b2a'
+    overlayConfig.gradientEnd = saved.gradientEnd ?? '#1b3a5c'
+    overlayConfig.gradientAngle = saved.gradientAngle ?? 135
+    overlayConfig.bgImage = saved.bgImage ?? ''
+  } else {
+    overlayConfig.show = true // 背景版 always visible
+    overlayConfig.bgColor = '#081b32'
+    overlayConfig.w = currentCanvasConfig.value.width
+    overlayConfig.h = currentCanvasConfig.value.height
+  }
+}
+
+const saveOverlay = async () => {
+  await updateCanvasConfig({
+    overlay: {
+      show: overlayConfig.show,
+      bgColor: overlayConfig.bgColor,
+      opacity: overlayConfig.opacity,
+      x: overlayConfig.x,
+      y: overlayConfig.y,
+      w: overlayConfig.w,
+      h: overlayConfig.h,
+      bgType: overlayConfig.bgType,
+      gradientStart: overlayConfig.gradientStart,
+      gradientEnd: overlayConfig.gradientEnd,
+      gradientAngle: overlayConfig.gradientAngle,
+      bgImage: overlayConfig.bgImage,
+    }
+  })
+}
+
+const toggleOverlay = async () => {
+  // 背景版 is now always visible; this just resets position
+  overlayConfig.show = true
+  overlayConfig.x = 0
+  overlayConfig.y = 0
+  await saveOverlay()
+}
+
+// 幕布拖动
+const startCurtainDrag = (e: MouseEvent) => {
+  overlaySelected.value = true
+  activeCompId.value = null
+  const startX = e.clientX
+  const startY = e.clientY
+  const ox = overlayConfig.x
+  const oy = overlayConfig.y
+  const onMove = (ev: MouseEvent) => {
+    overlayConfig.x = Math.max(0, Math.round(ox + ev.clientX - startX))
+    overlayConfig.y = Math.max(0, Math.round(oy + ev.clientY - startY))
+  }
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    saveOverlay()
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
+// 幕布调整大小
+const startCurtainResize = (e: MouseEvent, handle: string) => {
+  overlaySelected.value = true
+  activeCompId.value = null
+  const startX = e.clientX
+  const startY = e.clientY
+  const ox = overlayConfig.x; const ow = overlayConfig.w
+  const oy = overlayConfig.y; const oh = overlayConfig.h
+  const onMove = (ev: MouseEvent) => {
+    const dx = ev.clientX - startX
+    const dy = ev.clientY - startY
+    if (handle.includes('e')) overlayConfig.w = Math.max(100, Math.round(ow + dx))
+    if (handle.includes('s')) overlayConfig.h = Math.max(60, Math.round(oh + dy))
+    if (handle.includes('w')) {
+      const nx = Math.min(ox + ow - 100, Math.max(0, Math.round(ox + dx)))
+      overlayConfig.w = ow - (nx - ox)
+      overlayConfig.x = nx
+    }
+    if (handle.includes('n')) {
+      const ny = Math.min(oy + oh - 60, Math.max(0, Math.round(oy + dy)))
+      overlayConfig.h = oh - (ny - oy)
+      overlayConfig.y = ny
+    }
+  }
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    saveOverlay()
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
 
 const MIN_CARD_WIDTH = 320
 const MIN_CARD_HEIGHT = 220
@@ -793,9 +1116,29 @@ const matchedCanvasPreset = computed(() => SCREEN_CANVAS_PRESETS.find(
   (item) => item.width === currentCanvasConfig.value.width && item.height === currentCanvasConfig.value.height
 )?.id ?? 'custom')
 
+// 背景版 presets + size controls
+const matchedBgPreset = computed(() => SCREEN_CANVAS_PRESETS.find(
+  (item) => item.width === overlayConfig.w && item.height === overlayConfig.h
+)?.id ?? 'custom')
+
+const canvasWorkWidth = computed(() => Math.max(overlayConfig.w + 400, 2400))
+
 const canvasMinHeight = computed(() => {
+  const bgBottom = overlayConfig.y + overlayConfig.h + 200
   const occupied = components.value.reduce((max, item) => Math.max(max, item.posY + item.height + 24), 0)
-  return Math.max(currentCanvasConfig.value.height, 560, occupied)
+  return Math.max(currentCanvasConfig.value.height, bgBottom, 560, occupied)
+})
+
+const hRulerMarks = computed(() => {
+  const marks: number[] = []
+  for (let i = 0; i <= canvasWorkWidth.value; i += 100) marks.push(i)
+  return marks
+})
+
+const vRulerMarks = computed(() => {
+  const marks: number[] = []
+  for (let i = 0; i <= canvasMinHeight.value; i += 100) marks.push(i)
+  return marks
 })
 
 const getCanvasWidth = () => Math.max(canvasRef.value?.clientWidth ?? currentCanvasConfig.value.width, MIN_CARD_WIDTH + 32)
@@ -820,13 +1163,18 @@ const normalizeLayout = (component: DashboardComponent) => {
   component.zIndex = Number(component.zIndex) || 0
 }
 
-const getCardStyle = (component: DashboardComponent) => ({
-  left: `${component.posX}px`,
-  top: `${component.posY}px`,
-  width: `${component.width}px`,
-  height: `${component.height}px`,
-  zIndex: String(component.zIndex ?? 0),
-})
+const getCardStyle = (component: DashboardComponent) => {
+  const style = getComponentConfig(component).style
+  return {
+    left: `${component.posX}px`,
+    top: `${component.posY}px`,
+    width: `${component.width}px`,
+    height: `${component.height}px`,
+    zIndex: String(Math.max(2, component.zIndex ?? 2)),
+    borderRadius: style.cardRadius != null ? `${style.cardRadius}px` : undefined,
+    border: style.borderShow ? `${style.borderWidth}px solid ${style.borderColor}` : undefined,
+  }
+}
 
 const buildCounts = async () => {
   const entries = await Promise.all(
@@ -877,7 +1225,9 @@ const disposeCharts = () => {
 const selectDashboard = async (dashboard: Dashboard) => {
   currentDashboard.value = dashboard
   activeCompId.value = null
+  overlaySelected.value = false
   await loadComponents()
+  loadOverlayFromConfig()
 }
 
 const loadComponents = async () => {
@@ -925,7 +1275,9 @@ const renderChart = (component: DashboardComponent, data: ChartDataResult) => {
     chartInstances.set(component.id, chartInstance)
   }
   const resolved = getComponentConfig(component)
-  chartInstance.setOption(buildComponentOption(data, resolved.chart, resolved.style), true)
+  const option = buildComponentOption(data, resolved.chart, resolved.style)
+  postProcessChartOption(option, resolved.style, resolved.chart.name)
+  chartInstance.setOption(option, true)
 }
 
 const isTableChart = (component: DashboardComponent) => ['table', 'table_summary', 'table_pivot'].includes(getComponentChartConfig(component).chartType)
@@ -1245,6 +1597,15 @@ const applyCanvasPreset = async (presetId: string) => {
   await updateCanvasConfig({ width: preset.width, height: preset.height })
 }
 
+const applyBgPreset = async (presetId: string) => {
+  if (presetId === 'custom') return
+  const preset = SCREEN_CANVAS_PRESETS.find((item) => item.id === presetId)
+  if (!preset) return
+  overlayConfig.w = preset.width
+  overlayConfig.h = preset.height
+  await saveOverlay()
+}
+
 const updateCanvasDimension = async (dimension: 'width' | 'height', value: number | undefined) => {
   const fallback = currentCanvasConfig.value[dimension]
   const normalizedValue = Math.max(dimension === 'width' ? 640 : 360, Math.round(Number(value) || fallback))
@@ -1254,6 +1615,54 @@ const updateCanvasDimension = async (dimension: 'width' | 'height', value: numbe
 
 const onCanvasWidthChange = (value: number | null | undefined) => updateCanvasDimension('width', value ?? undefined)
 const onCanvasHeightChange = (value: number | null | undefined) => updateCanvasDimension('height', value ?? undefined)
+
+const onBgWidthChange = async (value: number | null | undefined) => {
+  const w = Math.max(640, Math.round(Number(value) || overlayConfig.w))
+  if (w === overlayConfig.w) return
+  overlayConfig.w = w
+  await saveOverlay()
+}
+
+const onBgHeightChange = async (value: number | null | undefined) => {
+  const h = Math.max(360, Math.round(Number(value) || overlayConfig.h))
+  if (h === overlayConfig.h) return
+  overlayConfig.h = h
+  await saveOverlay()
+}
+
+const triggerBgImageUpload = () => {
+  bgImgInputRef.value?.click()
+}
+
+const handleBgImageUpload = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  bgImgUploading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const token = localStorage.getItem('token') || ''
+    const res = await fetch('/api/upload/image', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData
+    })
+    const json = await res.json()
+    if (json.data?.url) {
+      overlayConfig.bgImage = json.data.url
+      await saveOverlay()
+      ElMessage.success('背景图片上传成功')
+    } else {
+      throw new Error('Upload failed')
+    }
+  } catch {
+    ElMessage.error('图片上传失败')
+  } finally {
+    bgImgUploading.value = false
+    input.value = ''
+  }
+}
 
 const copyShareLink = async () => {
   if (!isPublished.value) {
@@ -1777,20 +2186,128 @@ onBeforeUnmount(() => {
 
 .screen-main {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .screen-inspector {
   min-width: 0;
 }
 
-.screen-empty-state,
-.stage-panel {
+/* ─── 背景版 属性面板 ─────────────────────────────────────────────────── */
+.bg-inspector {
+  height: 100%;
+  overflow-y: auto;
+  padding: 0 0 24px;
+  color: #c8d8ea;
+  font-size: 13px;
+}
+
+.bg-insp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid rgba(77, 155, 219, 0.2);
+  margin-bottom: 4px;
+}
+
+.bg-insp-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0ecff;
+}
+
+.bg-insp-section {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(77, 155, 219, 0.1);
+}
+
+.bg-insp-section-title {
+  font-size: 12px;
+  color: #7ba7c8;
+  margin-bottom: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bg-insp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.bg-insp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #8ab0cc;
+}
+
+.bg-insp-field :deep(.el-input-number) {
+  width: 100%;
+}
+
+.bg-insp-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #9bbbd4;
+}
+
+.bg-insp-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #9bbbd4;
+  min-width: 0;
+}
+
+.bg-gradient-preview {
+  width: 100%;
+  height: 36px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.bg-image-thumb {
+  width: 100%;
+  height: 80px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.bg-insp-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.bg-insp-tip {
+  font-size: 12px;
+  color: #607080;
+  line-height: 1.6;
+  margin: 0;
+}
+
+
+
+.screen-empty-state {
   min-height: 100%;
 }
 
 .screen-toolbar,
-.selected-bar,
-.stage-panel {
+.selected-bar {
   background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
   border: 1px solid #d9e6f4;
   border-radius: 20px;
@@ -1848,70 +2365,223 @@ onBeforeUnmount(() => {
   line-height: 1.6;
 }
 
-.stage-panel {
-  margin-top: 14px;
-  padding: 18px;
+/* ─── 画布编辑器 ────────────────────────────────────────────────────────── */
+.canvas-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: #111c2a;
+  overflow: hidden;
 }
 
-.stage-head {
+.canvas-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
+  gap: 12px;
+  padding: 7px 14px;
+  background: #0d1622;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
 }
 
-.stage-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.stage-canvas-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.stage-canvas-separator {
-  color: #7b8da6;
-  font-size: 14px;
-}
-
-.stage-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #183153;
-}
-
-.stage-note,
-.stage-stats {
-  margin-top: 4px;
+.canvas-tb-label {
   font-size: 12px;
-  color: #6d7b91;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
 }
 
-.screen-stage-shell {
-  overflow: auto;
-  padding-bottom: 4px;
+.canvas-tb-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
+
+.canvas-tb-controls :deep(.el-input-number) {
+  width: 88px;
+}
+
+.canvas-tb-controls :deep(.el-input__wrapper),
+.canvas-tb-controls :deep(.el-select .el-input__wrapper) {
+  background: rgba(255,255,255,0.07);
+  box-shadow: none;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.canvas-tb-controls :deep(.el-input__inner),
+.canvas-tb-controls :deep(.el-select-dropdown__item) {
+  color: rgba(255,255,255,0.8);
+}
+
+.canvas-tb-sep {
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+}
+
+.canvas-tb-tip {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+}
+
+.canvas-tb-overlay-ctrl {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── 幕布 (Canvas Curtain Overlay) ─────────────────────────────── */
+.canvas-curtain {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed transparent;
+  cursor: move;
+  transition: border-color 0.15s;
+}
+
+.canvas-curtain--selected {
+  border-color: rgba(255, 210, 80, 0.8);
+  outline: 1px solid rgba(255, 210, 80, 0.3);
+}
+
+.curtain-badge {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 210, 80, 0.85);
+  color: #1a1200;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* 标尺区域 */
+.canvas-work-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.canvas-ruler-row {
+  display: flex;
+  flex-shrink: 0;
+  height: 20px;
+}
+
+.ruler-corner {
+  width: 28px;
+  height: 20px;
+  flex-shrink: 0;
+  background: #0a1420;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.ruler-h-strip {
+  height: 20px;
+  flex: 1;
+  background: #0a1420;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+}
+
+.ruler-h-mark {
+  position: absolute;
+  font-size: 9px;
+  color: rgba(255,255,255,0.3);
+  top: 3px;
+  transform: translateX(-50%);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.ruler-h-mark::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 1px;
+  height: 5px;
+  background: rgba(255,255,255,0.2);
+}
+
+.canvas-main-row {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ruler-v-strip {
+  width: 28px;
+  flex-shrink: 0;
+  background: #0a1420;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+}
+
+.ruler-v-mark {
+  position: absolute;
+  font-size: 9px;
+  color: rgba(255,255,255,0.3);
+  left: 0;
+  width: 28px;
+  text-align: center;
+  transform: translateY(-50%);
+  user-select: none;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  line-height: 1;
+}
+
+.ruler-v-mark::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  height: 1px;
+  width: 5px;
+  background: rgba(255,255,255,0.2);
+  transform: translateY(-50%);
+}
+
+.screen-stage-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  background: #141e2c;
+}
+
+.screen-stage-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.screen-stage-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+.screen-stage-scroll::-webkit-scrollbar-track { background: transparent; }
 
 .screen-stage {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
-  border: 1px solid #dce8f5;
+  border-radius: 4px;
+  border: 1px solid rgba(77,155,219,0.2);
   background-color: #081b32;
   background-image:
-    radial-gradient(circle at 20% 20%, rgba(20, 116, 214, 0.18), transparent 32%),
-    radial-gradient(circle at 80% 0%, rgba(66, 185, 131, 0.14), transparent 24%),
-    linear-gradient(rgba(129, 170, 215, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(129, 170, 215, 0.08) 1px, transparent 1px);
-  background-size: auto, auto, 26px 26px, 26px 26px;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    radial-gradient(circle at 20% 20%, rgba(20, 116, 214, 0.14), transparent 32%),
+    radial-gradient(circle at 80% 0%, rgba(66, 185, 131, 0.10), transparent 24%),
+    linear-gradient(rgba(129, 170, 215, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(129, 170, 215, 0.06) 1px, transparent 1px);
+  background-size: auto, auto, 24px 24px, 24px 24px;
+  flex-shrink: 0;
+  transition: border-color 0.18s ease;
 }
 
 .screen-stage--drop {
@@ -2173,8 +2843,45 @@ onBeforeUnmount(() => {
 /* ─── 编辑器模式布局 ─────────────────────────────────────────────────────────── */
 .screen-root--editor {
   display: grid;
-  grid-template-columns: v-bind("leftPanelWidth + 'px'") 1fr 300px;
+  grid-template-columns: v-bind("sidebarCollapsed ? '60px' : leftPanelWidth + 'px'") 1fr 300px;
   grid-template-rows: 1fr;
+  gap: 0;
+}
+
+.screen-root--editor .screen-toolbar {
+  background: #0d1622;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  padding: 8px 14px;
+  flex-shrink: 0;
+}
+
+.screen-root--editor .screen-title {
+  color: rgba(255,255,255,0.85);
+}
+
+.screen-root--editor .screen-comp-count {
+  color: rgba(255,255,255,0.35);
+}
+
+.screen-root--editor .screen-actions :deep(.el-button) {
+  --el-button-bg-color: rgba(255,255,255,0.07);
+  --el-button-border-color: rgba(255,255,255,0.12);
+  --el-button-text-color: rgba(255,255,255,0.75);
+  --el-button-hover-bg-color: rgba(255,255,255,0.12);
+}
+
+.screen-root--editor .screen-actions :deep(.el-button--primary) {
+  --el-button-bg-color: #2a6fba;
+  --el-button-border-color: #2a6fba;
+  --el-button-text-color: #fff;
+}
+
+.screen-root--editor .screen-actions :deep(.el-divider--vertical) {
+  border-color: rgba(255,255,255,0.15);
 }
 
 /* ─── 左侧综合面板 ───────────────────────────────────────────────────────────── */
@@ -2186,8 +2893,14 @@ onBeforeUnmount(() => {
   border-right: 1px solid rgba(255,255,255,0.07);
   overflow: hidden;
   min-height: 0;
-  min-width: 200px;
+  min-width: 0;
   user-select: none;
+  transition: width 0.22s ease;
+}
+
+.screen-left-panel--collapsed {
+  width: 60px !important;
+  min-width: 60px;
 }
 
 .lp-head {
@@ -2197,6 +2910,61 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   flex-shrink: 0;
+}
+
+.lp-toggle-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(255,255,255,0.07);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.lp-toggle-btn:hover {
+  background: rgba(255,255,255,0.13);
+}
+
+.lp-toggle-icon {
+  font-size: 14px;
+  color: rgba(255,255,255,0.7);
+  line-height: 1;
+}
+
+/* 折叠状态图标菜单 */
+.lp-icon-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.lp-icon-item {
+  width: 40px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(255,255,255,0.5);
+  transition: background 0.15s, color 0.15s;
+  overflow: hidden;
+}
+
+.lp-icon-item:hover,
+.lp-icon-item.active {
+  background: rgba(77,155,255,0.15);
+  color: rgba(77,155,255,0.9);
 }
 
 .lp-back-btn {
