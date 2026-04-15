@@ -90,13 +90,22 @@ const normalizeLayout = (comp) => {
     comp.height = Math.max(MIN_CARD_HEIGHT, Number(comp.height) || MIN_CARD_HEIGHT);
     comp.zIndex = Number(comp.zIndex) || 0;
 };
-const getCardStyle = (comp) => ({
-    left: `${comp.posX}px`,
-    top: `${comp.posY}px`,
-    width: `${comp.width}px`,
-    height: `${comp.height}px`,
-    zIndex: String(comp.zIndex ?? 0),
-});
+const getCardStyle = (comp) => {
+    const style = getComponentConfig(comp).style;
+    const shadow = style.shadowShow
+        ? `0 4px ${style.shadowBlur ?? 12}px ${style.shadowColor ?? 'rgba(0,0,0,0.4)'}`
+        : undefined;
+    return {
+        left: `${comp.posX}px`,
+        top: `${comp.posY}px`,
+        width: `${comp.width}px`,
+        height: `${comp.height}px`,
+        zIndex: String(comp.zIndex ?? 0),
+        opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
+        boxShadow: shadow,
+        padding: style.padding != null && style.padding > 0 ? `${style.padding}px` : undefined,
+    };
+};
 const canvasMinHeight = computed(() => {
     const occupied = components.value.reduce((max, c) => Math.max(max, (c.posY ?? 0) + (c.height ?? 0) + 20), 0);
     return Math.max(420, occupied);

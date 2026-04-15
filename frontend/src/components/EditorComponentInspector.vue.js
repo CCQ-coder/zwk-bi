@@ -1,7 +1,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getChartList } from '../api/chart';
-import { getDatasetList, previewDatasetSql } from '../api/dataset';
+import { getDatasetList, getDatasetPreviewData, previewDatasetSql } from '../api/dataset';
 import { buildChartSnapshot, buildComponentConfig, chartTypeLabel, COMPONENT_PRESETS, COLOR_THEMES, DEFAULT_COMPONENT_INTERACTION, DEFAULT_COMPONENT_STYLE, buildPresetChartConfig, getChartTypeMeta, getMissingChartFields, normalizeComponentDataFilters, normalizeComponentConfig, suggestChartFields, } from '../utils/component-config';
 const props = defineProps();
 const emit = defineEmits();
@@ -130,7 +130,10 @@ const onDatasetChange = async (datasetId) => {
         return;
     previewLoading.value = true;
     try {
-        const preview = await previewDatasetSql({ datasourceId: dataset.datasourceId, sqlText: dataset.sqlText });
+        // Demo datasets have null datasourceId — use the by-id preview endpoint
+        const preview = !dataset.datasourceId
+            ? await getDatasetPreviewData(dataset.id)
+            : await previewDatasetSql({ datasourceId: dataset.datasourceId, sqlText: dataset.sqlText });
         previewColumns.value = preview.columns;
         previewRows.value = preview.rows;
         previewRowCount.value = preview.rowCount;

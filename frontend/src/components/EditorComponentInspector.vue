@@ -543,7 +543,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getChartList, type Chart } from '../api/chart'
-import { getDatasetList, previewDatasetSql, type Dataset } from '../api/dataset'
+import { getDatasetList, getDatasetPreviewData, previewDatasetSql, type Dataset } from '../api/dataset'
 import type { DashboardComponent } from '../api/dashboard'
 import {
   buildChartSnapshot,
@@ -712,7 +712,10 @@ const onDatasetChange = async (datasetId: number | '') => {
   if (!dataset) return
   previewLoading.value = true
   try {
-    const preview = await previewDatasetSql({ datasourceId: dataset.datasourceId, sqlText: dataset.sqlText })
+    // Demo datasets have null datasourceId — use the by-id preview endpoint
+    const preview = !dataset.datasourceId
+      ? await getDatasetPreviewData(dataset.id)
+      : await previewDatasetSql({ datasourceId: dataset.datasourceId, sqlText: dataset.sqlText })
     previewColumns.value = preview.columns
     previewRows.value = preview.rows
     previewRowCount.value = preview.rowCount

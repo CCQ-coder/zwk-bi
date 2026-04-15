@@ -40,14 +40,25 @@ CREATE TABLE IF NOT EXISTS bi_datasource (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- BI dataset folder table
+CREATE TABLE IF NOT EXISTS bi_dataset_folder (
+    id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name       VARCHAR(100) NOT NULL,
+    parent_id  BIGINT DEFAULT NULL COMMENT 'NULL=根目录',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_folder_parent FOREIGN KEY (parent_id) REFERENCES bi_dataset_folder(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据集文件夹';
+
 -- BI dataset table
 CREATE TABLE IF NOT EXISTS bi_dataset (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(128) NOT NULL,
-  datasource_id BIGINT NOT NULL,
+  datasource_id BIGINT DEFAULT NULL COMMENT '关联数据源，NULL 表示内置演示数据',
   sql_text TEXT NOT NULL,
+  folder_id BIGINT DEFAULT NULL COMMENT '所属文件夹',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_bi_dataset_datasource FOREIGN KEY (datasource_id) REFERENCES bi_datasource(id)
+  CONSTRAINT fk_bi_dataset_folder FOREIGN KEY (folder_id) REFERENCES bi_dataset_folder(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS bi_dataset_field (
@@ -140,6 +151,7 @@ DELETE FROM bi_dataset_field;
 DELETE FROM bi_chart_template;
 DELETE FROM bi_chart;
 DELETE FROM bi_dataset;
+DELETE FROM bi_dataset_folder;
 DELETE FROM bi_datasource;
 DELETE FROM sys_role_menu;
 DELETE FROM sys_menu;
@@ -165,10 +177,21 @@ VALUES
 ('MES MySQL', '127.0.0.1', 3307, 'mes'),
 ('CRM MySQL', '127.0.0.1', 3308, 'crm');
 
-INSERT INTO bi_dataset(name, datasource_id, sql_text)
+INSERT INTO bi_dataset_folder (id, name, parent_id, sort_order)
+VALUES (1, '演示数据集', NULL, 0);
+
+INSERT INTO bi_dataset(name, datasource_id, sql_text, folder_id)
 VALUES
-('Sales Trend Dataset', 1, 'SELECT biz_date, amount FROM dwd_sales ORDER BY biz_date'),
-('Order Detail Dataset', 1, 'SELECT order_id, amount, region FROM dwd_order_detail');
+('Sales Trend Dataset', 1, 'SELECT biz_date, amount FROM dwd_sales ORDER BY biz_date', NULL),
+('Order Detail Dataset', 1, 'SELECT order_id, amount, region FROM dwd_order_detail', NULL);
+
+-- Demo datasets (internal, no datasource required)
+INSERT INTO bi_dataset(name, datasource_id, sql_text, folder_id)
+VALUES
+('销售额月度趋势（演示）', NULL, 'SELECT * FROM demo_sales_monthly', 1),
+('各区域销售额（演示）', NULL, 'SELECT * FROM demo_sales_region', 1),
+('产品类别占比（演示）', NULL, 'SELECT * FROM demo_category_pie', 1),
+('用户增长趋势（演示）', NULL, 'SELECT * FROM demo_user_growth', 1);
 
 INSERT INTO bi_dataset_field(dataset_id, field_name, field_type, field_label)
 VALUES

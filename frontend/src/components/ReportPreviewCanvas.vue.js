@@ -75,12 +75,21 @@ const normalizeLayout = (component) => {
     component.width = Math.max(MIN_CARD_WIDTH, Number(component.width) || MIN_CARD_WIDTH);
     component.height = Math.max(MIN_CARD_HEIGHT, Number(component.height) || MIN_CARD_HEIGHT);
 };
-const getCardStyle = (component) => ({
-    left: `${component.posX}px`,
-    top: `${component.posY}px`,
-    width: `${component.width}px`,
-    height: `${component.height}px`,
-});
+const getCardStyle = (component) => {
+    const style = getComponentConfig(component).style;
+    const shadow = style.shadowShow
+        ? `0 4px ${style.shadowBlur ?? 12}px ${style.shadowColor ?? 'rgba(0,0,0,0.4)'}`
+        : undefined;
+    return {
+        left: `${component.posX}px`,
+        top: `${component.posY}px`,
+        width: `${component.width}px`,
+        height: `${component.height}px`,
+        opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
+        boxShadow: shadow,
+        padding: style.padding != null && style.padding > 0 ? `${style.padding}px` : undefined,
+    };
+};
 const setChartRef = (el, componentId) => {
     if (el)
         chartRefs.set(componentId, el);
@@ -495,6 +504,17 @@ else {
                 border: true,
                 height: "100%",
                 emptyText: "暂无数据",
+                stripe: (__VLS_ctx.getComponentConfig(component).style.tableStriped),
+                headerCellStyle: ({
+                    background: __VLS_ctx.getComponentConfig(component).style.tableHeaderBg,
+                    color: __VLS_ctx.getComponentConfig(component).style.tableHeaderColor,
+                    fontSize: __VLS_ctx.getComponentConfig(component).style.tableHeaderFontSize + 'px',
+                }),
+                cellStyle: ({
+                    color: __VLS_ctx.getComponentConfig(component).style.tableFontColor,
+                    fontSize: __VLS_ctx.getComponentConfig(component).style.tableFontSize + 'px',
+                    height: __VLS_ctx.getComponentConfig(component).style.tableRowHeight + 'px',
+                }),
             }));
             const __VLS_38 = __VLS_37({
                 data: (__VLS_ctx.getTableRows(component.id)),
@@ -502,26 +522,54 @@ else {
                 border: true,
                 height: "100%",
                 emptyText: "暂无数据",
+                stripe: (__VLS_ctx.getComponentConfig(component).style.tableStriped),
+                headerCellStyle: ({
+                    background: __VLS_ctx.getComponentConfig(component).style.tableHeaderBg,
+                    color: __VLS_ctx.getComponentConfig(component).style.tableHeaderColor,
+                    fontSize: __VLS_ctx.getComponentConfig(component).style.tableHeaderFontSize + 'px',
+                }),
+                cellStyle: ({
+                    color: __VLS_ctx.getComponentConfig(component).style.tableFontColor,
+                    fontSize: __VLS_ctx.getComponentConfig(component).style.tableFontSize + 'px',
+                    height: __VLS_ctx.getComponentConfig(component).style.tableRowHeight + 'px',
+                }),
             }, ...__VLS_functionalComponentArgsRest(__VLS_37));
             __VLS_39.slots.default;
-            for (const [column] of __VLS_getVForSourceType((__VLS_ctx.getTableColumns(component.id)))) {
+            if (__VLS_ctx.getComponentConfig(component).style.tableShowIndex) {
                 const __VLS_40 = {}.ElTableColumn;
                 /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
                 // @ts-ignore
                 const __VLS_41 = __VLS_asFunctionalComponent(__VLS_40, new __VLS_40({
-                    key: (column),
-                    prop: (column),
-                    label: (column),
-                    minWidth: "120",
-                    showOverflowTooltip: true,
+                    type: "index",
+                    width: "50",
+                    label: "#",
                 }));
                 const __VLS_42 = __VLS_41({
+                    type: "index",
+                    width: "50",
+                    label: "#",
+                }, ...__VLS_functionalComponentArgsRest(__VLS_41));
+            }
+            for (const [column] of __VLS_getVForSourceType((__VLS_ctx.getTableColumns(component.id)))) {
+                const __VLS_44 = {}.ElTableColumn;
+                /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
+                // @ts-ignore
+                const __VLS_45 = __VLS_asFunctionalComponent(__VLS_44, new __VLS_44({
                     key: (column),
                     prop: (column),
                     label: (column),
                     minWidth: "120",
                     showOverflowTooltip: true,
-                }, ...__VLS_functionalComponentArgsRest(__VLS_41));
+                    sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
+                }));
+                const __VLS_46 = __VLS_45({
+                    key: (column),
+                    prop: (column),
+                    label: (column),
+                    minWidth: "120",
+                    showOverflowTooltip: true,
+                    sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
+                }, ...__VLS_functionalComponentArgsRest(__VLS_45));
             }
             var __VLS_39;
         }
@@ -544,17 +592,17 @@ else {
         }
     }
     if (!__VLS_ctx.components.length && !__VLS_ctx.chartLoading) {
-        const __VLS_44 = {}.ElEmpty;
+        const __VLS_48 = {}.ElEmpty;
         /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
         // @ts-ignore
-        const __VLS_45 = __VLS_asFunctionalComponent(__VLS_44, new __VLS_44({
+        const __VLS_49 = __VLS_asFunctionalComponent(__VLS_48, new __VLS_48({
             description: "当前报告暂无组件",
             ...{ class: "preview-empty" },
         }));
-        const __VLS_46 = __VLS_45({
+        const __VLS_50 = __VLS_49({
             description: "当前报告暂无组件",
             ...{ class: "preview-empty" },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_45));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_49));
     }
 }
 /** @type {__VLS_StyleScopedClasses['preview-shell']} */ ;
@@ -594,6 +642,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             components: components,
             activeFilters: activeFilters,
             canvasRef: canvasRef,
+            getComponentConfig: getComponentConfig,
             getComponentChartConfig: getComponentChartConfig,
             canvasConfig: canvasConfig,
             activeFilterEntries: activeFilterEntries,

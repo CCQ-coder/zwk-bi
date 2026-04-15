@@ -73,7 +73,30 @@
 
         <div class="preview-card-body">
           <div v-if="isTableChart(component)" class="table-wrapper">
-            <el-table :data="getTableRows(component.id)" size="small" border height="100%" empty-text="暂无数据">
+            <el-table
+              :data="getTableRows(component.id)"
+              size="small"
+              border
+              height="100%"
+              empty-text="暂无数据"
+              :stripe="getComponentConfig(component).style.tableStriped"
+              :header-cell-style="{
+                background: getComponentConfig(component).style.tableHeaderBg,
+                color: getComponentConfig(component).style.tableHeaderColor,
+                fontSize: getComponentConfig(component).style.tableHeaderFontSize + 'px',
+              }"
+              :cell-style="{
+                color: getComponentConfig(component).style.tableFontColor,
+                fontSize: getComponentConfig(component).style.tableFontSize + 'px',
+                height: getComponentConfig(component).style.tableRowHeight + 'px',
+              }"
+            >
+              <el-table-column
+                v-if="getComponentConfig(component).style.tableShowIndex"
+                type="index"
+                width="50"
+                label="#"
+              />
               <el-table-column
                 v-for="column in getTableColumns(component.id)"
                 :key="column"
@@ -81,6 +104,7 @@
                 :label="column"
                 min-width="120"
                 show-overflow-tooltip
+                :sortable="getComponentConfig(component).style.tableEnableSort ? 'custom' : false"
               />
             </el-table>
           </div>
@@ -208,12 +232,21 @@ const normalizeLayout = (component: DashboardComponent) => {
   component.height = Math.max(MIN_CARD_HEIGHT, Number(component.height) || MIN_CARD_HEIGHT)
 }
 
-const getCardStyle = (component: DashboardComponent) => ({
-  left: `${component.posX}px`,
-  top: `${component.posY}px`,
-  width: `${component.width}px`,
-  height: `${component.height}px`,
-})
+const getCardStyle = (component: DashboardComponent) => {
+  const style = getComponentConfig(component).style
+  const shadow = style.shadowShow
+    ? `0 4px ${style.shadowBlur ?? 12}px ${style.shadowColor ?? 'rgba(0,0,0,0.4)'}`
+    : undefined
+  return {
+    left: `${component.posX}px`,
+    top: `${component.posY}px`,
+    width: `${component.width}px`,
+    height: `${component.height}px`,
+    opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
+    boxShadow: shadow,
+    padding: style.padding != null && style.padding > 0 ? `${style.padding}px` : undefined,
+  }
+}
 
 const setChartRef = (el: HTMLElement | null, componentId: number) => {
   if (el) chartRefs.set(componentId, el)

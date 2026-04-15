@@ -421,13 +421,38 @@
 
                 <div class="stage-card-body">
                   <div v-if="isTableChart(component)" class="table-wrapper">
-                    <el-table :data="getTableRows(component.id)" height="100%" size="small" stripe>
+                    <el-table
+                      :data="getTableRows(component.id)"
+                      height="100%"
+                      size="small"
+                      :stripe="getComponentConfig(component).style.tableStriped"
+                      :show-header="true"
+                      :header-cell-style="{
+                        background: getComponentConfig(component).style.tableHeaderBg,
+                        color: getComponentConfig(component).style.tableHeaderColor,
+                        fontSize: getComponentConfig(component).style.tableHeaderFontSize + 'px',
+                        borderBottom: `${getComponentConfig(component).style.tableBorderWidth}px solid ${getComponentConfig(component).style.tableBorderColor}`,
+                      }"
+                      :cell-style="{
+                        color: getComponentConfig(component).style.tableFontColor,
+                        fontSize: getComponentConfig(component).style.tableFontSize + 'px',
+                        height: getComponentConfig(component).style.tableRowHeight + 'px',
+                        borderBottom: `${getComponentConfig(component).style.tableBorderWidth}px solid ${getComponentConfig(component).style.tableBorderColor}`,
+                      }"
+                    >
+                      <el-table-column
+                        v-if="getComponentConfig(component).style.tableShowIndex"
+                        type="index"
+                        width="50"
+                        label="#"
+                      />
                       <el-table-column
                         v-for="column in getTableColumns(component.id)"
                         :key="column"
                         :prop="column"
                         :label="column"
                         min-width="120"
+                        :sortable="getComponentConfig(component).style.tableEnableSort ? 'custom' : false"
                       />
                     </el-table>
                   </div>
@@ -1165,6 +1190,9 @@ const normalizeLayout = (component: DashboardComponent) => {
 
 const getCardStyle = (component: DashboardComponent) => {
   const style = getComponentConfig(component).style
+  const shadow = style.shadowShow
+    ? `0 4px ${style.shadowBlur ?? 12}px ${style.shadowColor ?? 'rgba(0,0,0,0.4)'}`
+    : undefined
   return {
     left: `${component.posX}px`,
     top: `${component.posY}px`,
@@ -1173,6 +1201,9 @@ const getCardStyle = (component: DashboardComponent) => {
     zIndex: String(Math.max(2, component.zIndex ?? 2)),
     borderRadius: style.cardRadius != null ? `${style.cardRadius}px` : undefined,
     border: style.borderShow ? `${style.borderWidth}px solid ${style.borderColor}` : undefined,
+    opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
+    boxShadow: shadow,
+    padding: style.padding != null && style.padding > 0 ? `${style.padding}px` : undefined,
   }
 }
 

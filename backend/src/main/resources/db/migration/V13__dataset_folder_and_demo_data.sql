@@ -10,8 +10,19 @@ CREATE TABLE IF NOT EXISTS bi_dataset_folder (
     CONSTRAINT fk_folder_parent FOREIGN KEY (parent_id) REFERENCES bi_dataset_folder(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据集文件夹';
 
--- 2. 给 bi_dataset 增加 folder_id 列
-ALTER TABLE bi_dataset ADD COLUMN IF NOT EXISTS folder_id BIGINT DEFAULT NULL COMMENT '所属文件夹';
+-- 2. 给 bi_dataset 增加 folder_id 列（兼容 MySQL 5.7，不使用 IF NOT EXISTS）
+SET @v13_col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'bi_dataset'
+      AND COLUMN_NAME  = 'folder_id'
+);
+SET @v13_add_col = IF(@v13_col_exists = 0,
+    'ALTER TABLE bi_dataset ADD COLUMN folder_id BIGINT DEFAULT NULL COMMENT \'所属文件夹\'',
+    'SELECT 1');
+PREPARE v13_add_col_stmt FROM @v13_add_col;
+EXECUTE v13_add_col_stmt;
+DEALLOCATE PREPARE v13_add_col_stmt;
 
 -- 3. 插入演示文件夹
 INSERT INTO bi_dataset_folder (id, name, parent_id, sort_order)
