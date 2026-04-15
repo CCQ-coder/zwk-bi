@@ -234,7 +234,7 @@ const setChartRef = (el: HTMLElement | null, componentId: number) => {
   else chartRefs.delete(componentId)
 }
 
-const isTableChart = (component: DashboardComponent) => getComponentChartConfig(component).chartType === 'table'
+const isTableChart = (component: DashboardComponent) => ['table', 'table_summary', 'table_pivot'].includes(getComponentChartConfig(component).chartType)
 
 const showNoField = (component: DashboardComponent) => getMissingChartFields(getComponentChartConfig(component)).length > 0
 

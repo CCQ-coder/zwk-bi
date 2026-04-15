@@ -403,6 +403,201 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
     supportsBarStyle: false,
     stablePreview: true,
   },
+  table_summary: {
+    label: '汇总表',
+    description: '按维度字段分组聚合展示。',
+    requiresDimension: false,
+    allowsOptionalDimension: false,
+    requiresMetric: false,
+    allowsGroup: false,
+    supportsLegend: false,
+    supportsAxisNames: false,
+    supportsGrid: false,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: false,
+    stablePreview: true,
+  },
+  table_pivot: {
+    label: '透视表',
+    description: '行列交叉聚合数据展示。',
+    requiresDimension: false,
+    allowsOptionalDimension: false,
+    requiresMetric: false,
+    allowsGroup: false,
+    supportsLegend: false,
+    supportsAxisNames: false,
+    supportsGrid: false,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: false,
+    stablePreview: true,
+  },
+  bar_group_stack: {
+    label: '分组堆叠柱状图',
+    description: '在每组内进行堆叠，同时展示分组对比。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: true,
+    supportsLegend: true,
+    supportsAxisNames: true,
+    supportsGrid: true,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: true,
+    stablePreview: true,
+  },
+  bar_waterfall: {
+    label: '瀑布图',
+    description: '展示数值的累计增减变化，适合财务分析。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: false,
+    supportsLegend: false,
+    supportsAxisNames: true,
+    supportsGrid: true,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: true,
+    stablePreview: true,
+  },
+  bar_horizontal_percent: {
+    label: '百分比条形图',
+    description: '水平方向百分比堆叠，多系列占比分析。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: true,
+    supportsLegend: true,
+    supportsAxisNames: true,
+    supportsGrid: true,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: true,
+    stablePreview: true,
+  },
+  bar_horizontal_range: {
+    label: '区间条形图',
+    description: '展示数值起终区间，适合甘特图类场景。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: false,
+    supportsLegend: false,
+    supportsAxisNames: true,
+    supportsGrid: true,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: false,
+    stablePreview: false,
+  },
+  bar_horizontal_symmetric: {
+    label: '对称条形图',
+    description: '双向条形图，适合正负对比分析。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: true,
+    supportsLegend: true,
+    supportsAxisNames: true,
+    supportsGrid: true,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: false,
+    stablePreview: true,
+  },
+  bar_progress: {
+    label: '进度条',
+    description: '以条形展示进度或完成率。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: false,
+    supportsLegend: false,
+    supportsAxisNames: false,
+    supportsGrid: false,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: false,
+    stablePreview: true,
+  },
+  bar_combo: {
+    label: '柱线组合图',
+    description: '柱状图和折线图组合，适合双指标对比。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: true,
+    supportsLegend: true,
+    supportsAxisNames: true,
+    supportsGrid: true,
+    supportsSmooth: true,
+    supportsAreaFill: false,
+    supportsBarStyle: true,
+    stablePreview: true,
+  },
+  bar_combo_group: {
+    label: '分组柱线组合图',
+    description: '分组柱状图与折线图组合。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: true,
+    supportsLegend: true,
+    supportsAxisNames: true,
+    supportsGrid: true,
+    supportsSmooth: true,
+    supportsAreaFill: false,
+    supportsBarStyle: true,
+    stablePreview: true,
+  },
+  bar_combo_stack: {
+    label: '堆叠柱线组合图',
+    description: '堆叠柱状图与折线图组合，展示累积趋势。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: true,
+    supportsLegend: true,
+    supportsAxisNames: true,
+    supportsGrid: true,
+    supportsSmooth: true,
+    supportsAreaFill: false,
+    supportsBarStyle: true,
+    stablePreview: true,
+  },
+  heatmap: {
+    label: '热力图',
+    description: '用颜色深浅展示矩阵中的数值密度。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: true,
+    supportsLegend: true,
+    supportsAxisNames: true,
+    supportsGrid: false,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: false,
+    stablePreview: true,
+  },
+  map: {
+    label: '地图',
+    description: '地理数据可视化，需要省市名称字段和度量字段。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: true,
+    allowsGroup: false,
+    supportsLegend: true,
+    supportsAxisNames: false,
+    supportsGrid: false,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: false,
+    stablePreview: false,
+  },
 }
 
 export const COMPONENT_PRESETS: ComponentPreset[] = [
@@ -415,11 +610,15 @@ export const COMPONENT_PRESETS: ComponentPreset[] = [
 ]
 
 export const CANVAS_RENDERABLE_CHART_TYPES = new Set([
-  'bar', 'bar_stack', 'bar_percent', 'bar_group',
-  'bar_horizontal', 'bar_horizontal_stack',
+  'bar', 'bar_stack', 'bar_percent', 'bar_group', 'bar_group_stack',
+  'bar_horizontal', 'bar_horizontal_stack', 'bar_horizontal_percent', 'bar_horizontal_symmetric',
+  'bar_waterfall', 'bar_progress',
+  'bar_combo', 'bar_combo_group', 'bar_combo_stack',
   'line', 'area', 'line_stack',
   'pie', 'doughnut', 'rose',
   'funnel', 'gauge', 'radar', 'scatter', 'treemap',
+  'table_summary', 'table_pivot',
+  'heatmap',
 ])
 
 export const DEFAULT_COMPONENT_ASSET_LAYOUT: ComponentAssetLayout = {
@@ -633,8 +832,17 @@ export const chartTypeLabel = (type: string) => ({
   bar_stack: '堆叠柱状图',
   bar_percent: '百分比柱状图',
   bar_group: '分组柱状图',
+  bar_group_stack: '分组堆叠柱状图',
+  bar_waterfall: '瀑布图',
   bar_horizontal: '条形图',
   bar_horizontal_stack: '堆叠条形图',
+  bar_horizontal_percent: '百分比条形图',
+  bar_horizontal_range: '区间条形图',
+  bar_horizontal_symmetric: '对称条形图',
+  bar_progress: '进度条',
+  bar_combo: '柱线组合图',
+  bar_combo_group: '分组柱线组合图',
+  bar_combo_stack: '堆叠柱线组合图',
   line: '折线图',
   area: '面积图',
   line_stack: '堆叠折线图',
@@ -642,11 +850,15 @@ export const chartTypeLabel = (type: string) => ({
   doughnut: '环图',
   rose: '玫瑰图',
   table: '表格',
+  table_summary: '汇总表',
+  table_pivot: '透视表',
   funnel: '漏斗图',
   gauge: '仪表盘',
   scatter: '散点图',
   radar: '雷达图',
   treemap: '矩形树图',
+  heatmap: '热力图',
+  map: '地图',
 }[type] ?? (type || '未知类型'))
 
 const sumValues = (left: unknown, right: unknown) => {
@@ -904,8 +1116,152 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
     }
   }
 
+  // ─── 热力图 ────────────────────────────────────────────────────────────────
+  if (data.chartType === 'heatmap') {
+    const rawRows = data.rawRows ?? []
+    if (!chartConfig.xField || !chartConfig.yField || !rawRows.length) {
+      return { color: colors, backgroundColor: style.bgColor }
+    }
+    const yKey = chartConfig.groupField || chartConfig.xField
+    const xCats: string[] = []
+    const yCats: string[] = []
+    const valueMap = new Map<string, number>()
+    rawRows.forEach((row) => {
+      const x = String(row[chartConfig.xField] ?? '')
+      const y = String(row[yKey] ?? '')
+      const v = Number(row[chartConfig.yField]) || 0
+      if (!xCats.includes(x)) xCats.push(x)
+      if (!yCats.includes(y)) yCats.push(y)
+      valueMap.set(`${x}||${y}`, v)
+    })
+    const heatData: [number, number, number][] = []
+    xCats.forEach((x, xi) => yCats.forEach((y, yi) => heatData.push([xi, yi, valueMap.get(`${x}||${y}`) ?? 0])))
+    const allVals = heatData.map(([,, v]) => v)
+    const maxVal = Math.max(...allVals, 1)
+    const minVal = Math.min(...allVals, 0)
+    const heatColors = colors.slice(0, 2).length >= 2 ? [colors[0], colors[1]] : ['#e0f3f8', '#4575b4']
+    return {
+      color: colors,
+      backgroundColor: style.bgColor,
+      tooltip: { position: 'top' },
+      grid: { left: 60, right: 20, bottom: style.showLegend ? 52 : 22, top: 20 },
+      xAxis: { type: 'category', data: xCats, splitArea: { show: true } },
+      yAxis: { type: 'category', data: yCats, splitArea: { show: true } },
+      visualMap: { min: minVal, max: maxVal, show: style.showLegend, orient: 'horizontal', left: 'center', bottom: 2, inRange: { color: heatColors } },
+      series: [{ type: 'heatmap', data: heatData, label: style.showLabel ? { show: true, fontSize: style.labelSize } : { show: false }, emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.4)' } } }],
+    }
+  }
+
+  // ─── 柱线组合图 ──────────────────────────────────────────────────────────────
+  if (data.chartType === 'bar_combo' || data.chartType === 'bar_combo_group' || data.chartType === 'bar_combo_stack') {
+    if (!data.series.length) return { color: colors, backgroundColor: style.bgColor }
+    const isComboStack = data.chartType === 'bar_combo_stack'
+    const shouldShowLegend = style.showLegend && data.series.length > 0
+    const legend = shouldShowLegend ? (style.legendPos === 'top' ? { top: 6 } : { bottom: 0 }) : undefined
+    const gridSplit = style.showGrid ? {} : { splitLine: { show: false } }
+    const midpoint = Math.max(1, Math.ceil(data.series.length / 2))
+    const barSeries = data.series.slice(0, midpoint)
+    const lineSeries = data.series.slice(midpoint)
+    return {
+      color: colors,
+      backgroundColor: style.bgColor,
+      tooltip: { trigger: 'axis' },
+      legend,
+      grid: { left: 24, right: 60, bottom: shouldShowLegend && style.legendPos === 'bottom' ? 32 : 22, top: shouldShowLegend && style.legendPos !== 'bottom' ? 42 : 18, containLabel: true },
+      xAxis: { type: 'category', data: data.labels, axisLabel: { rotate: data.labels.length > 8 ? 28 : 0 } },
+      yAxis: [
+        { type: 'value', ...gridSplit, name: style.showYName ? chartConfig.yField : '' },
+        { type: 'value', splitLine: { show: false } },
+      ],
+      series: [
+        ...barSeries.map((item) => ({ name: item.name, type: 'bar' as const, stack: isComboStack ? 'combo' : undefined, barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [style.barRadius, style.barRadius, 0, 0] }, label: style.showLabel ? { show: true, position: 'top' as const, fontSize: style.labelSize } : { show: false }, data: item.data })),
+        ...lineSeries.map((item) => ({ name: item.name, type: 'line' as const, yAxisIndex: 1, smooth: style.smooth, symbol: 'circle', symbolSize: 6, label: style.showLabel ? { show: true, position: 'top' as const, fontSize: style.labelSize } : { show: false }, data: item.data })),
+      ],
+    }
+  }
+
+  // ─── 瀑布图 ────────────────────────────────────────────────────────────────
+  if (data.chartType === 'bar_waterfall') {
+    if (!data.series.length) return { color: colors, backgroundColor: style.bgColor }
+    const rawVals = data.series[0].data.map((v) => Number(v) || 0)
+    const helpers: number[] = []
+    const barVals: number[] = []
+    let acc = 0
+    rawVals.forEach((v) => { helpers.push(acc < 0 ? acc + Math.min(v, 0) : acc + Math.min(v, 0) + (v < 0 ? 0 : 0)); barVals.push(v); if (v >= 0) { helpers[helpers.length - 1] = acc } else { helpers[helpers.length - 1] = acc + v }; acc += v })
+    // Simplified waterfall: helper = cumulative base, actual = delta
+    const helper2: number[] = [0]
+    const bar2: number[] = [rawVals[0]]
+    let cum = rawVals[0]
+    for (let i = 1; i < rawVals.length; i++) { helper2.push(cum >= 0 ? cum : 0); bar2.push(rawVals[i]); cum += rawVals[i] }
+    return {
+      color: colors,
+      backgroundColor: style.bgColor,
+      tooltip: { trigger: 'axis', formatter: (p: any[]) => `${p[1]?.axisValue}: ${p[1]?.value}` },
+      grid: { left: 24, right: 18, bottom: 22, top: 18, containLabel: true },
+      xAxis: { type: 'category', data: data.labels },
+      yAxis: { type: 'value', splitLine: style.showGrid ? {} : { show: false } },
+      series: [
+        { type: 'bar', stack: 'wf', itemStyle: { borderColor: 'transparent', color: 'transparent' }, emphasis: { itemStyle: { color: 'transparent', borderColor: 'transparent' } }, data: helper2 },
+        { type: 'bar', stack: 'wf', barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [style.barRadius, style.barRadius, 0, 0], color: (p: any) => rawVals[p.dataIndex] >= 0 ? (colors[0] ?? '#5470c6') : (colors[2] ?? '#ee6666') as any }, label: style.showLabel ? { show: true, position: 'top' as const, fontSize: style.labelSize } : { show: false }, data: bar2 },
+      ],
+    }
+  }
+
+  // ─── 进度条 ────────────────────────────────────────────────────────────────
+  if (data.chartType === 'bar_progress') {
+    if (!data.series.length) return { color: colors, backgroundColor: style.bgColor }
+    const maxVal = Math.max(...data.series[0].data.map((v) => Number(v) || 0), 1)
+    return {
+      color: colors,
+      backgroundColor: style.bgColor,
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: 16, right: 16, bottom: 8, top: 8, containLabel: true },
+      xAxis: { type: 'value', max: maxVal, splitLine: { show: false }, axisLabel: { show: false }, axisTick: { show: false }, axisLine: { show: false } },
+      yAxis: { type: 'category', data: data.labels, axisTick: { show: false }, axisLine: { show: false } },
+      series: [{ type: 'bar', data: data.series[0].data.map((v) => Number(v) || 0), barMaxWidth: 20, itemStyle: { borderRadius: 10, color: colors[0] ?? '#5470c6' }, label: style.showLabel ? { show: true, position: 'insideRight' as const, fontSize: style.labelSize, color: '#fff' } : { show: false }, showBackground: true, backgroundStyle: { color: 'rgba(200,200,200,0.15)', borderRadius: 10 } }],
+    }
+  }
+
+  // ─── 对称条形图 ──────────────────────────────────────────────────────────────
+  if (data.chartType === 'bar_horizontal_symmetric') {
+    if (!data.series.length) return { color: colors, backgroundColor: style.bgColor }
+    const leftData = data.series[0].data.map((v) => -Math.abs(Number(v) || 0))
+    const rightData = (data.series[1] ?? data.series[0]).data.map((v) => Math.abs(Number(v) || 0))
+    const shouldShowLegend = style.showLegend && data.series.length > 0
+    return {
+      color: colors,
+      backgroundColor: style.bgColor,
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: shouldShowLegend ? (style.legendPos === 'top' ? { top: 6 } : { bottom: 0 }) : undefined,
+      grid: { left: 16, right: 16, bottom: shouldShowLegend && style.legendPos === 'bottom' ? 32 : 22, top: shouldShowLegend ? 42 : 22, containLabel: true },
+      xAxis: { type: 'value', splitLine: style.showGrid ? {} : { show: false }, axisLabel: { formatter: (v: number) => Math.abs(v).toString() } },
+      yAxis: { type: 'category', data: data.labels },
+      series: [
+        { name: data.series[0]?.name ?? '系列1', type: 'bar' as const, barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [0, style.barRadius, style.barRadius, 0], color: colors[0] }, label: style.showLabel ? { show: true, position: 'left' as const, fontSize: style.labelSize, formatter: (p: any) => Math.abs(p.value).toString() } : { show: false }, data: leftData },
+        { name: (data.series[1] ?? data.series[0])?.name ?? '系列2', type: 'bar' as const, barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [style.barRadius, 0, 0, style.barRadius], color: colors[1] ?? colors[0] }, label: style.showLabel ? { show: true, position: 'right' as const, fontSize: style.labelSize } : { show: false }, data: rightData },
+      ],
+    }
+  }
+
+  // ─── 百分比条形图（水平） ────────────────────────────────────────────────────
+  if (data.chartType === 'bar_horizontal_percent') {
+    if (!data.series.length) return { color: colors, backgroundColor: style.bgColor }
+    const totals = data.labels.map((_: string, idx: number) => data.series.reduce((s, ser) => s + (Number(ser.data[idx]) || 0), 0))
+    const shouldShowLegend = style.showLegend && data.series.length > 0
+    return {
+      color: colors,
+      backgroundColor: style.bgColor,
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: shouldShowLegend ? (style.legendPos === 'top' ? { top: 6 } : { bottom: 0 }) : undefined,
+      grid: { left: 24, right: 18, bottom: shouldShowLegend && style.legendPos === 'bottom' ? 32 : 22, top: shouldShowLegend && style.legendPos !== 'bottom' ? 42 : 18, containLabel: true },
+      xAxis: { type: 'value', max: Math.max(...totals, 1), splitLine: style.showGrid ? {} : { show: false } },
+      yAxis: { type: 'category', data: data.labels },
+      series: data.series.map((item) => ({ name: item.name, type: 'bar' as const, stack: 'total', barMaxWidth: style.barMaxWidth, label: style.showLabel ? { show: true, fontSize: style.labelSize, formatter: (p: any) => `${((p.value / totals[p.dataIndex]) * 100).toFixed(1)}%` } : { show: false }, data: item.data })),
+    }
+  }
+
   const horizontal = data.chartType === 'bar_horizontal' || data.chartType === 'bar_horizontal_stack'
-  const isStackType = ['bar_stack', 'bar_percent', 'line_stack', 'bar_horizontal_stack'].includes(data.chartType)
+  const isStackType = ['bar_stack', 'bar_percent', 'line_stack', 'bar_horizontal_stack', 'bar_group_stack'].includes(data.chartType)
   const isPercent = data.chartType === 'bar_percent'
   const isAreaType = data.chartType === 'area'
   const baseType = (horizontal || data.chartType === 'bar' || data.chartType === 'bar_stack' || data.chartType === 'bar_percent' || data.chartType === 'bar_group') ? 'bar'

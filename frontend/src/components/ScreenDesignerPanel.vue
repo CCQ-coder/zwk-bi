@@ -1,28 +1,112 @@
 <template>
   <div class="screen-root" :class="{ 'screen-root--editor': screenId }">
-    <!-- 编辑器模式：分类组件选择器 -->
-    <aside v-if="screenId" class="screen-type-sidebar">
-      <div class="type-cat-nav">
-        <div
-          v-for="cat in CHART_CATEGORIES"
-          :key="cat.label"
-          class="type-cat-item"
-          :class="{ active: activeCat === cat.label }"
-          @click="activeCat = cat.label"
-        >{{ cat.label }}</div>
+    <!-- 编辑器模式：可拖拽缩放的左侧综合面板 -->
+    <aside v-if="screenId" class="screen-left-panel" :style="{ width: leftPanelWidth + 'px' }">
+      <!-- 头部 -->
+      <div class="lp-head">
+        <el-button size="small" :icon="ArrowLeft" @click="$emit('back')" class="lp-back-btn">返回</el-button>
+        <span class="lp-title" :title="currentDashboard?.name ?? '编辑大屏'">{{ currentDashboard?.name ?? '编辑大屏' }}</span>
       </div>
-      <div class="type-cat-grid">
-        <div
-          v-for="item in activeCategoryTypes"
-          :key="item.type"
-          class="type-grid-item"
-          :class="{ 'type-grid-item--active': assetType === item.type }"
-          @click="selectTypeFilter(item.type)"
-        >
-          <div class="type-grid-icon" v-html="item.svgIcon"></div>
-          <div class="type-grid-label">{{ item.label }}</div>
+
+      <!-- 搜索栏 -->
+      <div class="lp-search">
+        <el-input v-model="assetSearch" placeholder="搜索组件名称..." clearable size="small" :prefix-icon="Search" />
+      </div>
+
+      <!-- 分类折叠列表 -->
+      <div class="lp-cat-scroll">
+        <div v-for="cat in CHART_CATEGORIES" :key="cat.label" class="lp-cat-section">
+          <div
+            class="lp-cat-header"
+            :class="{ 'lp-cat-header--open': expandedCats.has(cat.label) }"
+            @click="toggleCategory(cat.label)"
+          >
+            <span class="lp-cat-label">{{ cat.label }}</span>
+            <el-icon class="lp-cat-arrow" :class="{ 'lp-cat-arrow--open': expandedCats.has(cat.label) }">
+              <ArrowRight />
+            </el-icon>
+          </div>
+          <div v-if="expandedCats.has(cat.label)" class="lp-type-grid">
+            <div
+              v-for="item in cat.types"
+              :key="item.type"
+              class="lp-type-chip"
+              :class="{ 'lp-type-chip--active': assetType === item.type }"
+              :title="item.label"
+              @click="assetType = item.type"
+            >
+              <span class="lp-type-icon" v-html="item.svgIcon" />
+              <span class="lp-type-label">{{ item.label }}</span>
+            </div>
+          </div>
         </div>
       </div>
+
+      <!-- 分隔行 -->
+      <div class="lp-divider">
+        <span class="lp-divider-text">{{ assetType ? chartTypeLabel(assetType) : '全部组件' }}</span>
+        <el-button v-if="assetType" link size="small" style="font-size:11px;color:#4db3ff" @click="assetType = ''">清除</el-button>
+      </div>
+
+      <!-- 组件列表 Tabs -->
+      <el-tabs v-model="libraryTab" class="lp-tabs">
+        <el-tab-pane label="模板库" name="templates">
+          <div class="lp-asset-scroll">
+            <div
+              v-for="template in filteredTemplates"
+              :key="template.id"
+              class="lp-asset-card"
+              :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
+              draggable="true"
+              @click="selectedTemplateId = template.id"
+              @dblclick="quickAddTemplate(template)"
+              @dragstart="onTemplateDragStart($event, template)"
+              @dragend="onTemplateDragEnd"
+            >
+              <div class="lp-ac-row">
+                <span class="lp-ac-name">{{ template.name }}</span>
+                <div class="lp-ac-tags">
+                  <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
+                  <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
+                </div>
+              </div>
+              <div class="lp-ac-foot">
+                <span class="lp-ac-hint">拖入画布 · {{ getTemplateDatasetName(template) }}</span>
+                <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddTemplate(template)">加入</el-button>
+              </div>
+            </div>
+            <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="图表源" name="charts">
+          <div class="lp-asset-scroll">
+            <div
+              v-for="chart in filteredCharts"
+              :key="chart.id"
+              class="lp-asset-card"
+              :class="{ 'lp-asset-card--selected': selectedChartId === chart.id }"
+              draggable="true"
+              @click="selectedChartId = chart.id"
+              @dblclick="quickAddChart(chart)"
+              @dragstart="onChartDragStart($event, chart)"
+              @dragend="onChartDragEnd"
+            >
+              <div class="lp-ac-row">
+                <span class="lp-ac-name">{{ chart.name }}</span>
+                <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(chart.chartType) }}</el-tag>
+              </div>
+              <div class="lp-ac-foot">
+                <span class="lp-ac-hint">拖入画布 · {{ datasetMap.get(chart.datasetId)?.name ?? '未关联数据集' }}</span>
+                <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddChart(chart)">加入</el-button>
+              </div>
+            </div>
+            <el-empty v-if="!filteredCharts.length && !loading" description="暂无匹配图表" :image-size="42" />
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+
+      <!-- 拖拽缩放手柄 -->
+      <div class="lp-resize-handle" @mousedown.prevent="startPanelResize" />
     </aside>
 
     <!-- 列表模式：侧边栏 -->
@@ -163,69 +247,6 @@
       </section>
     </aside>
 
-    <!-- 编辑器模式：带返回按钮的组件库面板 -->
-    <aside v-if="screenId" class="screen-library-panel">
-      <div class="library-editor-head">
-        <el-button size="small" :icon="ArrowLeft" @click="$emit('back')">返回列表</el-button>
-        <span class="library-editor-title">{{ currentDashboard?.name ?? '编辑大屏' }}</span>
-      </div>
-      <div class="library-toolbar">
-        <el-input v-model="assetSearch" placeholder="搜索组件名称" clearable size="small" />
-      </div>
-      <el-tabs v-model="libraryTab" class="library-tabs">
-        <el-tab-pane label="组件库" name="templates">
-          <div class="asset-list">
-            <div
-              v-for="template in filteredTemplates"
-              :key="template.id"
-              class="asset-card template-card"
-              :class="{ selected: selectedTemplateId === template.id, 'asset-card--builtin': template.builtIn }"
-              draggable="true"
-              @click="selectedTemplateId = template.id"
-              @dblclick="quickAddTemplate(template)"
-              @dragstart="onTemplateDragStart($event, template)"
-              @dragend="onTemplateDragEnd"
-            >
-              <div class="asset-card-top">
-                <div>
-                  <div class="asset-card-name">{{ template.name }}</div>
-                  <div class="asset-card-meta">{{ template.description || '可复用组件资产' }}</div>
-                </div>
-                <div class="asset-card-tags">
-                  <el-tag v-if="template.builtIn" size="small" type="success">默认</el-tag>
-                  <el-tag size="small" effect="dark">{{ chartTypeLabel(template.chartType) }}</el-tag>
-                </div>
-              </div>
-              <div class="asset-card-actions">
-                <span class="drag-tip">拖入画布</span>
-                <el-button link type="primary" @click.stop="quickAddTemplate(template)">立即加入</el-button>
-              </div>
-            </div>
-            <el-empty v-if="!filteredTemplates.length && !loading" description="没有匹配的组件" :image-size="60" />
-          </div>
-        </el-tab-pane>
-        <el-tab-pane label="图表源" name="charts">
-          <div class="asset-list">
-            <div
-              v-for="chart in filteredCharts"
-              :key="chart.id"
-              class="asset-card"
-              :class="{ selected: selectedChartId === chart.id }"
-              @click="selectedChartId = chart.id"
-              @dblclick="quickAddChart(chart)"
-            >
-              <div class="asset-card-top">
-                <div class="asset-card-name">{{ chart.name }}</div>
-                <el-tag size="small" effect="dark">{{ chartTypeLabel(chart.chartType) }}</el-tag>
-              </div>
-              <div class="asset-card-meta">{{ datasetMap.get(chart.datasetId)?.name ?? '未关联' }}</div>
-            </div>
-            <el-empty v-if="!filteredCharts.length && !loading" description="没有匹配的图表源" :image-size="60" />
-          </div>
-        </el-tab-pane>
-      </el-tabs>
-    </aside>
-
     <main class="screen-main" v-loading="loading || compLoading">
       <div v-if="!currentDashboard" class="screen-empty-state">
         <el-empty description="请先创建或选择一个数据大屏" :image-size="90" />
@@ -233,39 +254,20 @@
 
       <template v-else>
         <div class="screen-toolbar">
-          <div>
-            <div class="screen-title-row">
-              <div class="screen-title">{{ currentDashboard.name }}</div>
-              <el-tag size="small" :type="isPublished ? 'success' : 'info'">{{ isPublished ? '已发布' : '草稿' }}</el-tag>
-            </div>
-            <div class="screen-subtitle">
-              组件资产存于 bi_chart_template，画布实例存于 bi_dashboard_component，使用时按参数即时生成
-            </div>
+          <div class="screen-title-row">
+            <div class="screen-title">{{ currentDashboard.name }}</div>
+            <el-tag size="small" :type="isPublished ? 'success' : 'info'">{{ isPublished ? '已发布' : '草稿' }}</el-tag>
+            <span class="screen-comp-count">{{ components.length }} 个组件</span>
           </div>
           <div class="screen-actions">
-            <el-button size="small" :icon="Refresh" :loading="compLoading" @click="loadComponents">刷新画布</el-button>
-            <el-button size="small" :icon="View" @click="openPreview">预览</el-button>
-            <el-button size="small" :icon="Promotion" @click="openPublishDialog">{{ isPublished ? '发布设置' : '发布' }}</el-button>
-            <el-button size="small" :icon="Share" @click="openShareDialog">分享</el-button>
-            <el-button size="small" :icon="Download" @click="exportScreenJson">导出</el-button>
+            <el-button size="small" :icon="Refresh" :loading="compLoading" @click="loadComponents" title="刷新画布" />
+            <el-button size="small" :icon="View" @click="openPreview" title="预览" />
+            <el-button size="small" :icon="Download" @click="exportScreenJson" title="导出JSON" />
+            <el-divider direction="vertical" />
             <el-button size="small" @click="openSaveAssetDialog" :disabled="!activeComponent">存为组件</el-button>
-            <el-button size="small" type="primary" :icon="CirclePlus" :disabled="!selectedLibraryAsset" @click="handleAddSelectedAsset">
-              放入大屏
-            </el-button>
-          </div>
-        </div>
-
-        <div class="readonly-banner">
-          <span>选中画布组件后，可在右侧属性面板修改布局、切换组件引用及调整字段绑定。</span>
-        </div>
-
-        <div v-if="selectedLibraryAsset" class="selected-bar">
-          <div class="selected-bar-title">当前待加入组件</div>
-          <div class="selected-bar-content">
-            <span>{{ selectedLibraryAsset.name }}</span>
-            <el-tag size="small">{{ chartTypeLabel(selectedLibraryAsset.chartType) }}</el-tag>
-            <span v-if="libraryTab === 'templates'">{{ selectedTemplate?.builtIn ? '默认组件' : '自定义组件' }}</span>
-            <span v-else>数据集: {{ datasetMap.get(selectedChartAsset?.datasetId ?? -1)?.name ?? '未关联' }}</span>
+            <el-button size="small" :icon="Promotion" @click="openPublishDialog">{{ isPublished ? '发布管理' : '发布' }}</el-button>
+            <el-button size="small" :icon="Share" @click="openShareDialog">分享</el-button>
+            <el-button size="small" type="primary" :icon="CirclePlus" :disabled="!selectedLibraryAsset" @click="handleAddSelectedAsset">放入</el-button>
           </div>
         </div>
 
@@ -487,7 +489,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, CirclePlus, Close, Delete, Download, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import EditorComponentInspector from './EditorComponentInspector.vue'
 import {
@@ -540,8 +542,15 @@ const emit = defineEmits<{ (e: 'back'): void }>()
 interface ChartTypeItem { type: string; label: string; svgIcon: string }
 interface ChartCategory { label: string; types: ChartTypeItem[] }
 
-const makeBarIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="18" width="6" height="10" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="18" fill="currentColor" rx="1"/><rect x="20" y="14" width="6" height="14" fill="currentColor" rx="1"/><rect x="28" y="6" width="6" height="22" fill="currentColor" rx="1"/></svg>`
+const makeBarComboIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="18" width="6" height="10" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="18" fill="currentColor" rx="1"/><rect x="20" y="14" width="6" height="14" fill="currentColor" rx="1"/><rect x="28" y="6" width="6" height="22" fill="currentColor" rx="1"/><polyline points="7,12 15,8 23,11 31,4" fill="none" stroke="currentColor" stroke-width="2" opacity=".7" stroke-linecap="round"/></svg>`
+const makeHeatmapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="7" height="7" fill="currentColor" opacity=".9" rx="1"/><rect x="13" y="4" width="7" height="7" fill="currentColor" opacity=".5" rx="1"/><rect x="22" y="4" width="7" height="7" fill="currentColor" opacity=".2" rx="1"/><rect x="31" y="4" width="7" height="7" fill="currentColor" opacity=".7" rx="1"/><rect x="4" y="13" width="7" height="7" fill="currentColor" opacity=".3" rx="1"/><rect x="13" y="13" width="7" height="7" fill="currentColor" opacity=".8" rx="1"/><rect x="22" y="13" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="31" y="13" width="7" height="7" fill="currentColor" opacity=".15" rx="1"/><rect x="4" y="22" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="13" y="22" width="7" height="7" fill="currentColor" opacity=".25" rx="1"/><rect x="22" y="22" width="7" height="7" fill="currentColor" opacity=".95" rx="1"/><rect x="31" y="22" width="7" height="7" fill="currentColor" opacity=".4" rx="1"/></svg>`
+const makeMapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M5,6 L15,4 L25,8 L35,5 L35,26 L25,23 L15,27 L5,25 Z" fill="currentColor" opacity=".3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M15,4 L15,27" stroke="currentColor" stroke-width="1" opacity=".5"/><path d="M25,8 L25,23" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="22" cy="13" r="3" fill="currentColor" opacity=".8"/></svg>`
+const makeBarWaterfallIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="16" width="6" height="12" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="12" y="16" width="6" height="6" fill="currentColor" rx="1"/><rect x="20" y="6" width="6" height="4" fill="currentColor" opacity=".5" rx="1"/><rect x="20" y="10" width="6" height="12" fill="currentColor" rx="1"/><rect x="28" y="4" width="6" height="24" fill="currentColor" opacity=".7" rx="1"/></svg>`
+const makeBarProgressIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="30" height="5" fill="currentColor" opacity=".2" rx="2.5"/><rect x="4" y="6" width="22" height="5" fill="currentColor" rx="2.5"/><rect x="4" y="14" width="30" height="5" fill="currentColor" opacity=".2" rx="2.5"/><rect x="4" y="14" width="30" height="5" fill="currentColor" opacity=".5" rx="2.5"/><rect x="4" y="22" width="30" height="5" fill="currentColor" opacity=".2" rx="2.5"/><rect x="4" y="22" width="14" height="5" fill="currentColor" opacity=".8" rx="2.5"/></svg>`
+const makeBarSymmetricIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="4" width="14" height="6" fill="currentColor" rx="1"/><rect x="6" y="4" width="14" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="20" y="13" width="8" height="6" fill="currentColor" rx="1"/><rect x="12" y="13" width="8" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="20" y="22" width="16" height="6" fill="currentColor" rx="1"/><rect x="4" y="22" width="16" height="6" fill="currentColor" opacity=".5" rx="1"/></svg>`
+const makeBarGroupStackIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="18" width="5" height="10" fill="currentColor" opacity=".9" rx="1"/><rect x="4" y="12" width="5" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="10" y="14" width="5" height="14" fill="currentColor" opacity=".9" rx="1"/><rect x="10" y="8" width="5" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="19" y="16" width="5" height="12" fill="currentColor" opacity=".9" rx="1"/><rect x="19" y="10" width="5" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="25" y="12" width="5" height="16" fill="currentColor" opacity=".9" rx="1"/><rect x="25" y="6" width="5" height="6" fill="currentColor" opacity=".5" rx="1"/></svg>`
 const makeBarStackIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="16" width="8" height="12" fill="currentColor" opacity=".9" rx="1"/><rect x="6" y="8" width="8" height="8" fill="currentColor" opacity=".5" rx="1"/><rect x="18" y="12" width="8" height="16" fill="currentColor" opacity=".9" rx="1"/><rect x="18" y="4" width="8" height="8" fill="currentColor" opacity=".5" rx="1"/><rect x="30" y="18" width="8" height="10" fill="currentColor" opacity=".9" rx="1"/><rect x="30" y="10" width="8" height="8" fill="currentColor" opacity=".5" rx="1"/></svg>`
+const makeBarIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="14" width="6" height="14" fill="currentColor" rx="1"/><rect x="14" y="8" width="6" height="20" fill="currentColor" rx="1"/><rect x="22" y="18" width="6" height="10" fill="currentColor" rx="1"/><rect x="30" y="4" width="6" height="24" fill="currentColor" rx="1"/></svg>`
 const makeBarHIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="20" height="6" fill="currentColor" rx="1"/><rect x="4" y="13" width="28" height="6" fill="currentColor" rx="1"/><rect x="4" y="22" width="14" height="6" fill="currentColor" rx="1"/></svg>`
 const makeLineIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><polyline points="4,26 12,16 20,20 28,8 36,14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`
 const makeAreaIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><polygon points="4,28 4,20 12,12 20,16 28,6 36,10 36,28" fill="currentColor" opacity=".4"/><polyline points="4,20 12,12 20,16 28,6 36,10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
@@ -567,6 +576,8 @@ const CHART_CATEGORIES: ChartCategory[] = [
     label: '表格',
     types: [
       { type: 'table', label: '明细表', svgIcon: makeTableIcon() },
+      { type: 'table_summary', label: '汇总表', svgIcon: makeTableIcon() },
+      { type: 'table_pivot', label: '透视表', svgIcon: makeTableIcon() },
     ],
   },
   {
@@ -578,14 +589,28 @@ const CHART_CATEGORIES: ChartCategory[] = [
     ],
   },
   {
+    label: '双轴图',
+    types: [
+      { type: 'bar_combo', label: '柱线组合图', svgIcon: makeBarComboIcon() },
+      { type: 'bar_combo_group', label: '分组柱线图', svgIcon: makeBarComboIcon() },
+      { type: 'bar_combo_stack', label: '堆叠柱线图', svgIcon: makeBarComboIcon() },
+    ],
+  },
+  {
     label: '柱/条图',
     types: [
       { type: 'bar', label: '基础柱状图', svgIcon: makeBarIcon() },
       { type: 'bar_stack', label: '堆叠柱状图', svgIcon: makeBarStackIcon() },
       { type: 'bar_percent', label: '百分比柱状图', svgIcon: makeBarStackIcon() },
       { type: 'bar_group', label: '分组柱状图', svgIcon: makeBarIcon() },
+      { type: 'bar_group_stack', label: '分组堆叠', svgIcon: makeBarGroupStackIcon() },
+      { type: 'bar_waterfall', label: '瀑布图', svgIcon: makeBarWaterfallIcon() },
       { type: 'bar_horizontal', label: '基础条形图', svgIcon: makeBarHIcon() },
       { type: 'bar_horizontal_stack', label: '堆叠条形图', svgIcon: makeBarHIcon() },
+      { type: 'bar_horizontal_percent', label: '百分比条形图', svgIcon: makeBarHIcon() },
+      { type: 'bar_horizontal_range', label: '区间条形图', svgIcon: makeBarSymmetricIcon() },
+      { type: 'bar_horizontal_symmetric', label: '对称条形图', svgIcon: makeBarSymmetricIcon() },
+      { type: 'bar_progress', label: '进度条', svgIcon: makeBarProgressIcon() },
     ],
   },
   {
@@ -600,9 +625,21 @@ const CHART_CATEGORIES: ChartCategory[] = [
     ],
   },
   {
+    label: '热力图',
+    types: [
+      { type: 'heatmap', label: '热力图', svgIcon: makeHeatmapIcon() },
+    ],
+  },
+  {
     label: '关系图',
     types: [
       { type: 'scatter', label: '散点图', svgIcon: makeScatterIcon() },
+    ],
+  },
+  {
+    label: '地图',
+    types: [
+      { type: 'map', label: '地图', svgIcon: makeMapIcon() },
     ],
   },
 ]
@@ -612,9 +649,28 @@ const activeCategoryTypes = computed(() =>
   CHART_CATEGORIES.find((c) => c.label === activeCat.value)?.types ?? []
 )
 
-const selectTypeFilter = (type: string) => {
-  assetType.value = assetType.value === type ? '' : type
-  libraryTab.value = 'templates'
+// ─── 左侧面板展开/折叠 & 拖拽缩放 ────────────────────────────────────────────
+const expandedCats = ref(new Set<string>(CHART_CATEGORIES.map((c) => c.label)))
+const toggleCategory = (label: string) => {
+  const next = new Set(expandedCats.value)
+  if (next.has(label)) { next.delete(label) } else { next.add(label) }
+  expandedCats.value = next
+}
+const selectTypeFilter = (type: string) => { assetType.value = type }
+
+const leftPanelWidth = ref(280)
+const startPanelResize = (e: MouseEvent) => {
+  const startX = e.clientX
+  const startWidth = leftPanelWidth.value
+  const onMove = (ev: MouseEvent) => {
+    leftPanelWidth.value = Math.max(200, Math.min(520, startWidth + ev.clientX - startX))
+  }
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
 }
 
 const loading = ref(false)
@@ -643,6 +699,7 @@ const assetType = ref('')
 const selectedChartId = ref<number | null>(null)
 const selectedTemplateId = ref<number | null>(null)
 const draggingTemplateId = ref<number | null>(null)
+const draggingChartId = ref<number | null>(null)
 const stageDropActive = ref(false)
 
 const createDashVisible = ref(false)
@@ -871,7 +928,7 @@ const renderChart = (component: DashboardComponent, data: ChartDataResult) => {
   chartInstance.setOption(buildComponentOption(data, resolved.chart, resolved.style), true)
 }
 
-const isTableChart = (component: DashboardComponent) => getComponentChartConfig(component).chartType === 'table'
+const isTableChart = (component: DashboardComponent) => ['table', 'table_summary', 'table_pivot'].includes(getComponentChartConfig(component).chartType)
 
 const isRenderableChart = (component: DashboardComponent) => {
   const type = getComponentChartConfig(component).chartType ?? ''
@@ -1418,11 +1475,10 @@ const removeComponent = async (componentId: number) => {
 const onTemplateDragStart = (event: DragEvent, template: ChartTemplate) => {
   selectedTemplateId.value = template.id
   draggingTemplateId.value = template.id
+  draggingChartId.value = null
   stageDropActive.value = true
-  event.dataTransfer?.setData('text/plain', String(template.id))
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'copy'
-  }
+  event.dataTransfer?.setData('text/plain', `template:${template.id}`)
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy'
 }
 
 const onTemplateDragEnd = () => {
@@ -1430,12 +1486,24 @@ const onTemplateDragEnd = () => {
   stageDropActive.value = false
 }
 
-const onStageDragOver = (event: DragEvent) => {
-  if (!draggingTemplateId.value) return
+const onChartDragStart = (event: DragEvent, chart: Chart) => {
+  selectedChartId.value = chart.id
+  draggingChartId.value = chart.id
+  draggingTemplateId.value = null
   stageDropActive.value = true
-  if (event.dataTransfer) {
-    event.dataTransfer.dropEffect = 'copy'
-  }
+  event.dataTransfer?.setData('text/plain', `chart:${chart.id}`)
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy'
+}
+
+const onChartDragEnd = () => {
+  draggingChartId.value = null
+  stageDropActive.value = false
+}
+
+const onStageDragOver = (event: DragEvent) => {
+  if (!draggingTemplateId.value && !draggingChartId.value) return
+  stageDropActive.value = true
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
 }
 
 const onStageDragLeave = (event: DragEvent) => {
@@ -1447,10 +1515,20 @@ const onStageDragLeave = (event: DragEvent) => {
 }
 
 const onStageDrop = async (event: DragEvent) => {
-  const templateId = draggingTemplateId.value ?? Number(event.dataTransfer?.getData('text/plain') || 0)
-  const template = templates.value.find((item) => item.id === templateId)
+  const raw = event.dataTransfer?.getData('text/plain') ?? ''
   stageDropActive.value = false
+  if (raw.startsWith('chart:') || draggingChartId.value) {
+    const chartId = draggingChartId.value ?? Number(raw.replace('chart:', '') || 0)
+    draggingChartId.value = null
+    draggingTemplateId.value = null
+    const chart = charts.value.find((item) => item.id === chartId)
+    if (!chart) return
+    await addChartToScreen(chart, undefined, undefined, { clientX: event.clientX, clientY: event.clientY })
+    return
+  }
+  const templateId = draggingTemplateId.value ?? Number(raw.replace('template:', '') || raw || 0)
   draggingTemplateId.value = null
+  const template = templates.value.find((item) => item.id === templateId)
   if (!template) return
   await addTemplateToScreen(template, { clientX: event.clientX, clientY: event.clientY })
 }
@@ -1724,24 +1802,11 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 22px;
-}
-
-.readonly-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 12px 16px;
-  border: 1px solid #ffe1a6;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #fffaf0 0%, #fffdf7 100%);
-  color: #8a5a00;
-  font-size: 12px;
+  padding: 14px 18px;
 }
 
 .screen-title {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   color: #163050;
 }
@@ -1752,21 +1817,17 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
-.screen-subtitle {
-  margin-top: 6px;
+.screen-comp-count {
   font-size: 12px;
-  color: #71829b;
+  color: #91aac8;
+  margin-left: 4px;
 }
 
 .screen-actions {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.selected-bar {
-  margin-top: 14px;
-  padding: 14px 18px;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 .share-block {
@@ -1785,21 +1846,6 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #909399;
   line-height: 1.6;
-}
-
-.selected-bar-title {
-  font-size: 12px;
-  color: #6d7b91;
-}
-
-.selected-bar-content {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  font-size: 13px;
-  color: #183153;
-  flex-wrap: wrap;
 }
 
 .stage-panel {
@@ -2104,14 +2150,12 @@ onBeforeUnmount(() => {
 
 @media (max-width: 768px) {
   .screen-toolbar,
-  .stage-head,
-  .readonly-banner {
+  .stage-head {
     flex-direction: column;
     align-items: flex-start;
   }
 
   .screen-actions,
-  .selected-bar-content,
   .library-toolbar {
     width: 100%;
   }
@@ -2129,166 +2173,361 @@ onBeforeUnmount(() => {
 /* ─── 编辑器模式布局 ─────────────────────────────────────────────────────────── */
 .screen-root--editor {
   display: grid;
-  grid-template-columns: 120px 220px 1fr 300px;
+  grid-template-columns: v-bind("leftPanelWidth + 'px'") 1fr 300px;
   grid-template-rows: 1fr;
 }
 
-.screen-type-sidebar {
-  display: flex;
-  flex-direction: column;
-  background: #101b2e;
-  border-right: 1px solid rgba(255,255,255,0.06);
-  overflow: hidden;
-}
-
-.type-cat-nav {
-  flex-shrink: 0;
-  overflow-y: auto;
-  padding: 8px 0;
-}
-
-.type-cat-item {
-  padding: 10px 12px;
-  font-size: 12px;
-  color: rgba(255,255,255,0.6);
-  cursor: pointer;
-  text-align: center;
-  line-height: 1.4;
-  border-left: 2px solid transparent;
-  transition: all 0.15s;
-}
-
-.type-cat-item:hover {
-  color: rgba(255,255,255,0.9);
-  background: rgba(255,255,255,0.05);
-}
-
-.type-cat-item.active {
-  color: #4db3ff;
-  background: rgba(77,179,255,0.1);
-  border-left-color: #4db3ff;
-}
-
-.type-cat-grid {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px 8px;
-  display: none; /* hidden - shown on hover */
-}
-
-.screen-type-sidebar:hover .type-cat-grid,
-.screen-type-sidebar.picker-open .type-cat-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-  align-content: start;
-}
-
-/* Always show grid inside the library panel area */
-.screen-type-sidebar {
-  overflow: visible;
+/* ─── 左侧综合面板 ───────────────────────────────────────────────────────────── */
+.screen-left-panel {
   position: relative;
-}
-
-.type-cat-grid {
-  display: grid !important;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 4px;
-  align-content: start;
-  overflow-y: auto;
-  padding: 6px;
-}
-
-.type-grid-item {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 4px 6px;
-  border-radius: 6px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.15s;
-  background: rgba(255,255,255,0.03);
-}
-
-.type-grid-item:hover {
-  background: rgba(77,179,255,0.12);
-  border-color: rgba(77,179,255,0.3);
-}
-
-.type-grid-item--active {
-  background: rgba(77,179,255,0.18);
-  border-color: rgba(77,179,255,0.5);
-}
-
-.type-grid-icon {
-  width: 36px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4db3ff;
-}
-
-.type-grid-icon svg {
-  width: 100%;
-  height: 100%;
-}
-
-.type-grid-label {
-  font-size: 10px;
-  color: rgba(255,255,255,0.7);
-  text-align: center;
-  line-height: 1.3;
-  word-break: break-all;
-}
-
-.screen-library-panel {
-  display: flex;
-  flex-direction: column;
-  background: #0e1c2f;
-  border-right: 1px solid rgba(255,255,255,0.06);
+  background: #0d1b2e;
+  border-right: 1px solid rgba(255,255,255,0.07);
   overflow: hidden;
   min-height: 0;
+  min-width: 200px;
+  user-select: none;
 }
 
-.library-editor-head {
+.lp-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  background: rgba(255,255,255,0.02);
   flex-shrink: 0;
 }
 
-.library-editor-title {
+.lp-back-btn {
+  flex-shrink: 0;
+}
+
+.lp-title {
+  flex: 1;
   font-size: 13px;
   font-weight: 600;
   color: rgba(255,255,255,0.85);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
 }
 
-.screen-library-panel .library-toolbar {
-  padding: 8px 12px;
+.lp-search {
+  padding: 8px 10px 6px;
   flex-shrink: 0;
 }
 
-.screen-library-panel .library-tabs {
-  flex: 1;
+.lp-search :deep(.el-input__wrapper) {
+  background: rgba(255,255,255,0.06);
+  box-shadow: none;
+  border-radius: 8px;
+}
+
+.lp-search :deep(.el-input__inner) {
+  color: rgba(255,255,255,0.85);
+  font-size: 12px;
+}
+
+.lp-search :deep(.el-input__inner::placeholder) {
+  color: rgba(255,255,255,0.3);
+}
+
+.lp-search :deep(.el-input__prefix .el-icon) {
+  color: rgba(255,255,255,0.35);
+}
+
+/* 分类折叠区 */
+.lp-cat-scroll {
+  flex-shrink: 0;
+  overflow-y: auto;
+  max-height: 44vh;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.lp-cat-section {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.lp-cat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.lp-cat-header:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.lp-cat-header--open {
+  background: rgba(77,179,255,0.07);
+}
+
+.lp-cat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.02em;
+}
+
+.lp-cat-header--open .lp-cat-label {
+  color: #4db3ff;
+}
+
+.lp-cat-arrow {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  transition: transform 0.2s;
+}
+
+.lp-cat-arrow--open {
+  transform: rotate(90deg);
+  color: #4db3ff;
+}
+
+.lp-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px 8px 8px;
+}
+
+.lp-type-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px 5px;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: rgba(255,255,255,0.03);
+  transition: all 0.15s;
+  min-width: 0;
+}
+
+.lp-type-chip:hover {
+  background: rgba(77,179,255,0.12);
+  border-color: rgba(77,179,255,0.28);
+}
+
+.lp-type-chip--active {
+  background: rgba(77,179,255,0.2);
+  border-color: rgba(77,179,255,0.55);
+}
+
+.lp-type-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 22px;
+  color: #4db3ff;
+  flex-shrink: 0;
+}
+
+.lp-type-icon :deep(svg) {
+  width: 100%;
+  height: 100%;
+}
+
+.lp-type-label {
+  font-size: 10px;
+  color: rgba(255,255,255,0.62);
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-all;
+  max-width: 100%;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 分隔行 */
+.lp-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 4px;
+  flex-shrink: 0;
+}
+
+.lp-divider-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.38);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* 组件列表 Tabs */
+.lp-tabs {
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  padding: 0 8px 4px;
 }
 
-.screen-library-panel .asset-list {
+.lp-tabs :deep(.el-tabs__header) {
+  margin-bottom: 4px;
+}
+
+.lp-tabs :deep(.el-tabs__nav-wrap::after) {
+  background: rgba(255,255,255,0.07);
+}
+
+.lp-tabs :deep(.el-tabs__item) {
+  color: rgba(255,255,255,0.45);
+  font-size: 12px;
+  padding: 0 10px;
+  height: 30px;
+  line-height: 30px;
+}
+
+.lp-tabs :deep(.el-tabs__item.is-active) {
+  color: #4db3ff;
+}
+
+.lp-tabs :deep(.el-tabs__active-bar) {
+  background: #4db3ff;
+}
+
+.lp-tabs :deep(.el-tabs__content) {
   flex: 1;
+  overflow: hidden;
+  height: calc(100% - 38px);
+}
+
+.lp-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+.lp-asset-scroll {
+  height: 100%;
   overflow-y: auto;
-  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 2px 2px 8px;
+}
+
+.lp-asset-card {
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.lp-asset-card:hover {
+  border-color: rgba(77,179,255,0.3);
+  background: rgba(77,179,255,0.06);
+}
+
+.lp-asset-card--selected {
+  border-color: rgba(77,179,255,0.6);
+  background: rgba(77,179,255,0.12);
+}
+
+.lp-asset-card--builtin {
+  border-color: rgba(52,187,131,0.3);
+  background: rgba(52,187,131,0.05);
+}
+
+.lp-asset-card--builtin:hover {
+  border-color: rgba(52,187,131,0.5);
+  background: rgba(52,187,131,0.1);
+}
+
+.lp-ac-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lp-ac-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lp-ac-tags {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.lp-tag {
+  font-size: 10px !important;
+  padding: 0 4px !important;
+  height: 18px !important;
+  line-height: 18px !important;
+  border-radius: 3px !important;
+}
+
+.lp-ac-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.lp-ac-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.lp-ac-add {
+  font-size: 11px !important;
+  flex-shrink: 0;
+}
+
+/* 拖拽缩放手柄 */
+.lp-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  z-index: 10;
+}
+
+.lp-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 1px;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 40px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.08);
+  transition: background 0.15s, height 0.15s;
+}
+
+.lp-resize-handle:hover::after {
+  background: rgba(77,179,255,0.6);
+  height: 60px;
 }
 </style>

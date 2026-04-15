@@ -86,7 +86,7 @@ const setChartRef = (el, componentId) => {
     else
         chartRefs.delete(componentId);
 };
-const isTableChart = (component) => getComponentChartConfig(component).chartType === 'table';
+const isTableChart = (component) => ['table', 'table_summary', 'table_pivot'].includes(getComponentChartConfig(component).chartType);
 const showNoField = (component) => getMissingChartFields(getComponentChartConfig(component)).length > 0;
 const isRenderableChart = (component) => {
     const type = getComponentChartConfig(component).chartType ?? '';
