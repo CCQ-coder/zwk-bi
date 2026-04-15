@@ -23,17 +23,20 @@ public class ChartService {
     private final BiDatasetMapper biDatasetMapper;
     private final BiDatasourceMapper biDatasourceMapper;
     private final JdbcPreviewService jdbcPreviewService;
+    private final DatasetService datasetService;
     private final ObjectMapper objectMapper;
 
     public ChartService(BiChartMapper biChartMapper,
                         BiDatasetMapper biDatasetMapper,
                         BiDatasourceMapper biDatasourceMapper,
                         JdbcPreviewService jdbcPreviewService,
+                        DatasetService datasetService,
                         ObjectMapper objectMapper) {
         this.biChartMapper = biChartMapper;
         this.biDatasetMapper = biDatasetMapper;
         this.biDatasourceMapper = biDatasourceMapper;
         this.jdbcPreviewService = jdbcPreviewService;
+        this.datasetService = datasetService;
         this.objectMapper = objectMapper;
     }
 
@@ -89,10 +92,14 @@ public class ChartService {
         BiDataset dataset = biDatasetMapper.findById(resolvedConfig.datasetId());
         if (dataset == null) throw new IllegalArgumentException("Dataset not found");
 
-        BiDatasource datasource = biDatasourceMapper.findById(dataset.getDatasourceId());
-        if (datasource == null) throw new IllegalArgumentException("Datasource not found");
-
-        DatasetPreviewResponse preview = jdbcPreviewService.preview(datasource, dataset.getSqlText());
+        DatasetPreviewResponse preview;
+        if (dataset.getDatasourceId() == null || dataset.getDatasourceId() == 0L) {
+            preview = datasetService.getDemoPreviewResponse(dataset.getSqlText());
+        } else {
+            BiDatasource datasource = biDatasourceMapper.findById(dataset.getDatasourceId());
+            if (datasource == null) throw new IllegalArgumentException("Datasource not found");
+            preview = jdbcPreviewService.preview(datasource, dataset.getSqlText());
+        }
         Map<String, String> filters = parseFilters(filterJson);
         List<Map<String, Object>> rows = applyFilters(preview.getRows(), filters);
 

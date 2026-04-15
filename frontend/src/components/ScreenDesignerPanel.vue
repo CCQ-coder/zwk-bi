@@ -1673,7 +1673,7 @@ const handleBgImageUpload = async (event: Event) => {
   try {
     const formData = new FormData()
     formData.append('file', file)
-    const token = localStorage.getItem('token') || ''
+    const token = localStorage.getItem('bi_token') || ''
     const res = await fetch('/api/upload/image', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },

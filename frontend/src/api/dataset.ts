@@ -3,7 +3,7 @@ import request from './request'
 export interface Dataset {
   id: number
   name: string
-  datasourceId: number
+  datasourceId: number | null
   sqlText: string
   folderId: number | null
   createdAt: string

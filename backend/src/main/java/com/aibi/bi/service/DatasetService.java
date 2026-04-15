@@ -276,7 +276,7 @@ public class DatasetService {
         }
     }
 
-    DatasetPreviewResponse getDemoPreviewResponse(String sqlText) {
+    public DatasetPreviewResponse getDemoPreviewResponse(String sqlText) {
         if (sqlText != null && sqlText.contains("demo_sales_monthly")) {
             return buildDemoResponse(
                     Arrays.asList("月份", "销售额"),

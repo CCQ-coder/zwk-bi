@@ -128,8 +128,12 @@
         </div>
 
         <div class="preview-card">
-          <div class="preview-title">配置预览</div>
-          <pre>{{ previewConfigJson }}</pre>
+          <div class="preview-title">
+            图表预览
+            <span v-if="previewLoading" style="font-size:11px;color:#888;margin-left:6px">加载中...</span>
+          </div>
+          <div v-if="isPreviewRenderable" ref="previewChartRef" style="width:100%;height:240px" />
+          <pre v-else style="font-size:11px;max-height:180px;overflow:auto;margin:0">{{ previewConfigJson }}</pre>
         </div>
       </el-form>
       <template #footer>
@@ -141,13 +145,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createTemplate, deleteTemplate, getTemplateList, updateTemplate, type ChartTemplate } from '../api/chart-template'
 import { getChartList, type Chart } from '../api/chart'
-import { getDatasetFields, getDatasetList, type Dataset, type DatasetField } from '../api/dataset'
-import { COLOR_THEMES, chartTypeLabel, normalizeComponentAssetConfig } from '../utils/component-config'
+import { getDatasetFields, getDatasetList, getDatasetPreviewData, type Dataset, type DatasetField } from '../api/dataset'
+import * as echarts from 'echarts'
+import { buildComponentOption, COLOR_THEMES, chartTypeLabel, isCanvasRenderableChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config'
 
 interface TemplateFormState {
   name: string
@@ -422,6 +427,58 @@ const handleDelete = async (item: ChartTemplate) => {
   ElMessage.success(`已删除组件资产：${item.name}`)
   await loadAll()
 }
+
+// ─── 图表预览 ────────────────────────────────────────────────────────────────
+const previewChartRef = ref<HTMLElement | null>(null)
+let previewChartInstance: echarts.ECharts | null = null
+const previewLoading = ref(false)
+
+const isPreviewRenderable = computed(() =>
+  !!form.datasetId && !!form.xField && !!form.yField && isCanvasRenderableChartType(form.chartType)
+)
+
+let previewTimer: ReturnType<typeof setTimeout> | null = null
+
+const updatePreview = () => {
+  if (previewTimer) clearTimeout(previewTimer)
+  previewTimer = setTimeout(async () => {
+    if (!isPreviewRenderable.value) {
+      previewChartInstance?.clear()
+      return
+    }
+    await nextTick()
+    if (!previewChartRef.value) return
+    previewLoading.value = true
+    try {
+      const result = await getDatasetPreviewData(form.datasetId as number)
+      const config = normalizeComponentAssetConfig(JSON.stringify(buildPayloadConfig()))
+      const data = materializeChartData(result.rows as Record<string, unknown>[], result.columns, config.chart)
+      if (!previewChartInstance) {
+        previewChartInstance = echarts.init(previewChartRef.value, null, { renderer: 'canvas' })
+      } else {
+        previewChartInstance.resize()
+      }
+      const option = buildComponentOption(data, config.chart, config.style)
+      previewChartInstance.setOption(option, true)
+    } catch {
+      // 预览失败时静默处理
+    } finally {
+      previewLoading.value = false
+    }
+  }, 400)
+}
+
+watch(
+  () => [form.datasetId, form.chartType, form.xField, form.yField, form.groupField,
+    form.theme, form.showLegend, form.showLabel, form.showGrid, form.smooth, form.areaFill],
+  updatePreview
+)
+
+onUnmounted(() => {
+  if (previewTimer) clearTimeout(previewTimer)
+  previewChartInstance?.dispose()
+  previewChartInstance = null
+})
 
 onMounted(loadAll)
 </script>

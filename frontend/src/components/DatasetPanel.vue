@@ -41,19 +41,19 @@
           <div class="content-header">
             <span class="content-title">{{ selectedDataset.name }}</span>
             <div class="content-actions">
-              <el-button v-if="selectedDataset.datasourceId !== 0" type="primary" size="small" @click="openEdit(selectedDataset)">编辑</el-button>
-              <el-popconfirm v-if="selectedDataset.datasourceId !== 0" title="确认删除？" @confirm="handleDeleteDataset(selectedDataset.id)">
+              <el-button v-if="selectedDataset.datasourceId" type="primary" size="small" @click="openEdit(selectedDataset)">编辑</el-button>
+              <el-popconfirm v-if="selectedDataset.datasourceId" title="确认删除？" @confirm="handleDeleteDataset(selectedDataset.id)">
                 <template #reference>
                   <el-button type="danger" size="small">删除</el-button>
                 </template>
               </el-popconfirm>
-              <el-tag v-if="selectedDataset.datasourceId === 0" type="success" size="small">演示数据集</el-tag>
+              <el-tag v-if="!selectedDataset.datasourceId" type="success" size="small">演示数据集</el-tag>
             </div>
           </div>
           <div class="content-info">
             <div class="info-row">
               <span class="info-label">数据源ID</span>
-              <span class="info-val">{{ selectedDataset.datasourceId === 0 ? '内置演示' : selectedDataset.datasourceId }}</span>
+              <span class="info-val">{{ !selectedDataset.datasourceId ? '内置演示' : selectedDataset.datasourceId }}</span>
             </div>
             <div class="info-row">
               <span class="info-label">SQL</span>
@@ -309,7 +309,7 @@ const TreeNode = defineComponent({
         >
           <el-icon style="color:#409eff;margin-right:4px;font-size:12px"><DataLine /></el-icon>
           <span class="dataset-name">{{ ds.name }}</span>
-          <div v-show="hoverDataset === ds.id && ds.datasourceId !== 0" class="node-actions" @click.stop>
+          <div v-show="hoverDataset === ds.id && !!ds.datasourceId" class="node-actions" @click.stop>
             <el-tooltip content="删除"><el-button link :icon="Delete" style="color:#f56c6c" @click="emit('delete-dataset', ds.id)" /></el-tooltip>
           </div>
         </div>
@@ -490,7 +490,7 @@ const openCreate = (folderId: number | null) => {
 const openEdit = (row: Dataset) => {
   editId.value = row.id
   form.name = row.name
-  form.datasourceId = row.datasourceId
+  form.datasourceId = row.datasourceId ?? ''
   form.sqlText = row.sqlText
   form.folderId = row.folderId
   Object.assign(formPreview, { columns: [], rows: [], rowCount: 0 })

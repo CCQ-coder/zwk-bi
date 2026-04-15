@@ -159,6 +159,12 @@ DELETE FROM sys_user_role;
 DELETE FROM sys_role;
 DELETE FROM sys_user;
 DELETE FROM bi_dashboard;
+-- Reset auto_increment so demo dataset IDs are predictable
+ALTER TABLE bi_dataset AUTO_INCREMENT = 1;
+ALTER TABLE bi_dataset_field AUTO_INCREMENT = 1;
+ALTER TABLE bi_chart AUTO_INCREMENT = 1;
+ALTER TABLE bi_chart_template AUTO_INCREMENT = 1;
+ALTER TABLE bi_datasource AUTO_INCREMENT = 1;
 
 INSERT INTO sys_user(username, password_hash, display_name, role, email)
 VALUES ('admin', '123456', 'Admin', 'ADMIN', 'admin@aibi.local');
@@ -180,18 +186,20 @@ VALUES
 INSERT INTO bi_dataset_folder (id, name, parent_id, sort_order)
 VALUES (1, '演示数据集', NULL, 0);
 
-INSERT INTO bi_dataset(name, datasource_id, sql_text, folder_id)
+INSERT INTO bi_dataset(id, name, datasource_id, sql_text, folder_id)
 VALUES
-('Sales Trend Dataset', 1, 'SELECT biz_date, amount FROM dwd_sales ORDER BY biz_date', NULL),
-('Order Detail Dataset', 1, 'SELECT order_id, amount, region FROM dwd_order_detail', NULL);
+(1, 'Sales Trend Dataset', 1, 'SELECT biz_date, amount FROM dwd_sales ORDER BY biz_date', NULL),
+(2, 'Order Detail Dataset', 1, 'SELECT order_id, amount, region FROM dwd_order_detail', NULL);
 
--- Demo datasets (internal, no datasource required)
-INSERT INTO bi_dataset(name, datasource_id, sql_text, folder_id)
+-- Demo datasets (internal, no datasource required) -- IDs 3-6 are fixed for template references
+INSERT INTO bi_dataset(id, name, datasource_id, sql_text, folder_id)
 VALUES
-('销售额月度趋势（演示）', NULL, 'SELECT * FROM demo_sales_monthly', 1),
-('各区域销售额（演示）', NULL, 'SELECT * FROM demo_sales_region', 1),
-('产品类别占比（演示）', NULL, 'SELECT * FROM demo_category_pie', 1),
-('用户增长趋势（演示）', NULL, 'SELECT * FROM demo_user_growth', 1);
+(3, '销售额月度趋势（演示）', NULL, 'SELECT * FROM demo_sales_monthly', 1),
+(4, '各区域销售额（演示）', NULL, 'SELECT * FROM demo_sales_region', 1),
+(5, '产品类别占比（演示）', NULL, 'SELECT * FROM demo_category_pie', 1),
+(6, '用户增长趋势（演示）', NULL, 'SELECT * FROM demo_user_growth', 1);
+-- Ensure auto_increment continues after explicit inserts
+ALTER TABLE bi_dataset AUTO_INCREMENT = 7;
 
 INSERT INTO bi_dataset_field(dataset_id, field_name, field_type, field_label)
 VALUES
@@ -305,12 +313,12 @@ VALUES (1, 1, 0, 0, 12, 4),
 
 INSERT INTO bi_chart_template(name, description, chart_type, config_json, built_in, sort_order, created_by)
 VALUES
-('晨光趋势卡', '适合首页趋势区，默认柔和渐变和面积填充。', 'line', '{"chart":{"name":"晨光趋势卡","datasetId":1,"chartType":"line","xField":"biz_date","yField":"amount","groupField":""},"style":{"theme":"海湾晨光","bgColor":"#f6fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":true,"areaFill":true,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":560,"height":320}}', 1, 10, 'system'),
-('经营对比卡', '适合经营总览中的分类对比。', 'bar', '{"chart":{"name":"经营对比卡","datasetId":1,"chartType":"bar","xField":"biz_date","yField":"amount","groupField":""},"style":{"theme":"琥珀橙金","bgColor":"#fffaf3","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":10,"barMaxWidth":32,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":320}}', 1, 20, 'system'),
-('排行条形卡', '适合 TopN 榜单和长名称类目。', 'bar_horizontal', '{"chart":{"name":"排行条形卡","datasetId":1,"chartType":"bar_horizontal","xField":"biz_date","yField":"amount","groupField":""},"style":{"theme":"山岚青绿","bgColor":"#f5fcf8","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":12,"barMaxWidth":26,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":340}}', 1, 30, 'system'),
-('结构占比卡', '适合结构占比、贡献度分析。', 'doughnut', '{"chart":{"name":"结构占比卡","datasetId":2,"chartType":"doughnut","xField":"region","yField":"amount","groupField":""},"style":{"theme":"霓光星砂","bgColor":"#fff9fb","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"right"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":420,"height":320}}', 1, 40, 'system'),
-('转化漏斗卡', '适合阶段转化与流程流失分析。', 'funnel', '{"chart":{"name":"转化漏斗卡","datasetId":2,"chartType":"funnel","xField":"region","yField":"amount","groupField":""},"style":{"theme":"暮光珊瑚","bgColor":"#fff8f5","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":420,"height":320}}', 1, 50, 'system'),
-('目标仪表卡', '适合完成率、达成率和告警值展示。', 'gauge', '{"chart":{"name":"目标仪表卡","datasetId":1,"chartType":"gauge","xField":"biz_date","yField":"amount","groupField":""},"style":{"theme":"深海荧光","bgColor":"#f4fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":360,"height":300}}', 1, 60, 'system'),
-('能力雷达卡', '适合多维度能力、质量评分等场景。', 'radar', '{"chart":{"name":"能力雷达卡","datasetId":2,"chartType":"radar","xField":"region","yField":"amount","groupField":""},"style":{"theme":"山岚青绿","bgColor":"#f8fbff","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":480,"height":340}}', 1, 70, 'system'),
-('关系散点卡', '适合相关性、分布和聚类趋势观察。', 'scatter', '{"chart":{"name":"关系散点卡","datasetId":2,"chartType":"scatter","xField":"order_id","yField":"amount","groupField":"region"},"style":{"theme":"深海荧光","bgColor":"#f5fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":340}}', 1, 80, 'system'),
-('经营明细表', '适合明细追踪、问题回溯和导出。', 'table', '{"chart":{"name":"经营明细表","datasetId":2,"chartType":"table","xField":"order_id","yField":"amount","groupField":"region"},"style":{"theme":"海湾晨光","bgColor":"#ffffff","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":640,"height":360}}', 1, 90, 'system');
+('晨光趋势卡', '适合首页趋势区，默认柔和渐变和面积填充。', 'line', '{"chart":{"name":"晨光趋势卡","datasetId":3,"chartType":"line","xField":"月份","yField":"销售额","groupField":""},"style":{"theme":"海湾晨光","bgColor":"#f6fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":true,"areaFill":true,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":560,"height":320}}', 1, 10, 'system'),
+('经营对比卡', '适合经营总览中的分类对比。', 'bar', '{"chart":{"name":"经营对比卡","datasetId":4,"chartType":"bar","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"琥珀橙金","bgColor":"#fffaf3","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":10,"barMaxWidth":32,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":320}}', 1, 20, 'system'),
+('排行条形卡', '适合 TopN 榜单和长名称类目。', 'bar_horizontal', '{"chart":{"name":"排行条形卡","datasetId":4,"chartType":"bar_horizontal","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"山岚青绿","bgColor":"#f5fcf8","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":12,"barMaxWidth":26,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":340}}', 1, 30, 'system'),
+('结构占比卡', '适合结构占比、贡献度分析。', 'doughnut', '{"chart":{"name":"结构占比卡","datasetId":5,"chartType":"doughnut","xField":"产品类别","yField":"销售占比","groupField":""},"style":{"theme":"霓光星砂","bgColor":"#fff9fb","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"right"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":420,"height":320}}', 1, 40, 'system'),
+('转化漏斗卡', '适合阶段转化与流程流失分析。', 'funnel', '{"chart":{"name":"转化漏斗卡","datasetId":4,"chartType":"funnel","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"暮光珊瑚","bgColor":"#fff8f5","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":420,"height":320}}', 1, 50, 'system'),
+('目标仪表卡', '适合完成率、达成率和告警值展示。', 'gauge', '{"chart":{"name":"目标仪表卡","datasetId":3,"chartType":"gauge","xField":"月份","yField":"销售额","groupField":""},"style":{"theme":"深海荧光","bgColor":"#f4fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":360,"height":300}}', 1, 60, 'system'),
+('能力雷达卡', '适合多维度能力、质量评分等场景。', 'radar', '{"chart":{"name":"能力雷达卡","datasetId":4,"chartType":"radar","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"山岚青绿","bgColor":"#f8fbff","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":480,"height":340}}', 1, 70, 'system'),
+('关系散点卡', '适合相关性、分布和聚类趋势观察。', 'scatter', '{"chart":{"name":"关系散点卡","datasetId":4,"chartType":"scatter","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"深海荧光","bgColor":"#f5fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":340}}', 1, 80, 'system'),
+('经营明细表', '适合明细追踪、问题回溯和导出。', 'table', '{"chart":{"name":"经营明细表","datasetId":4,"chartType":"table","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"海湾晨光","bgColor":"#ffffff","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":640,"height":360}}', 1, 90, 'system');

@@ -8,6 +8,7 @@ export default defineConfig({
     extensions: ['.mts', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.vue', '.json']
   },
   server: {
+    host: '0.0.0.0',
     proxy: {
       // /api 开头的请求全部转发到后端，解决前后端跨域问题
       '/api': {
