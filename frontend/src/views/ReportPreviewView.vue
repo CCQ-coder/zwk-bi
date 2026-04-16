@@ -1,30 +1,52 @@
 <template>
-  <div class="preview-page">
-    <header class="preview-toolbar">
-      <div>
-        <div class="toolbar-title">{{ scene === 'screen' ? '数据大屏预览' : '仪表板预览' }}</div>
-        <div class="toolbar-subtitle">只读查看、分享、查询联动与导出</div>
-      </div>
-      <div class="toolbar-actions">
-        <el-button @click="goBack">返回</el-button>
-        <el-button v-if="canShareLink" @click="copyShareLink">复制链接</el-button>
-        <el-button type="primary" @click="printReport">打印 / PDF</el-button>
-      </div>
-    </header>
+  <div class="preview-page" :class="{ 'preview-page--screen': scene === 'screen' }">
+    <template v-if="scene !== 'screen'">
+      <header class="preview-toolbar">
+        <div>
+          <div class="toolbar-title">仪表板预览</div>
+          <div class="toolbar-subtitle">只读查看、分享、查询联动与导出</div>
+        </div>
+        <div class="toolbar-actions">
+          <el-button @click="goBack">返回</el-button>
+          <el-button v-if="canShareLink" @click="copyShareLink">复制链接</el-button>
+          <el-button type="primary" @click="printReport">打印 / PDF</el-button>
+        </div>
+      </header>
 
-    <main class="preview-body">
-      <el-alert
-        v-if="dashboard && accessResult.allowed"
-        class="preview-banner"
-        :title="publishBannerTitle"
-        type="success"
-        :closable="false"
-        show-icon
-      />
+      <main class="preview-body">
+        <el-alert
+          v-if="dashboard && accessResult.allowed"
+          class="preview-banner"
+          :title="publishBannerTitle"
+          type="success"
+          :closable="false"
+          show-icon
+        />
+        <el-result
+          v-if="!loading && !accessResult.allowed"
+          icon="warning"
+          title="无法访问该报告"
+          :sub-title="accessResult.reason || '请检查发布状态、访问角色或分享链接是否正确'"
+        >
+          <template #extra>
+            <el-button @click="goBack">返回</el-button>
+          </template>
+        </el-result>
+        <ReportPreviewCanvas
+          v-else-if="dashboard && accessResult.allowed"
+          :dashboard-id="dashboardId"
+          :scene="scene"
+          :access-mode="accessMode"
+          :share-token="token"
+        />
+      </main>
+    </template>
+
+    <main v-else class="preview-screen-body">
       <el-result
         v-if="!loading && !accessResult.allowed"
         icon="warning"
-        title="无法访问该报告"
+        title="无法访问该大屏"
         :sub-title="accessResult.reason || '请检查发布状态、访问角色或分享链接是否正确'"
       >
         <template #extra>
@@ -153,6 +175,12 @@ watch([dashboardId, token, hasSession], loadDashboard)
   background: linear-gradient(180deg, #eef4fb 0%, #f8fbff 100%);
 }
 
+.preview-page--screen {
+  height: 100vh;
+  overflow: hidden;
+  background: #050b14;
+}
+
 .preview-toolbar {
   display: flex;
   align-items: center;
@@ -186,6 +214,17 @@ watch([dashboardId, token, hasSession], loadDashboard)
 
 .preview-body {
   padding: 22px;
+}
+
+.preview-screen-body {
+  height: 100vh;
+}
+
+.preview-page--screen .preview-screen-body :deep(.el-result) {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .preview-banner {

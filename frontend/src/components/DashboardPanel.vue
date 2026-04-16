@@ -1,11 +1,15 @@
 <template>
   <div class="dash-root">
     <!-- 左侧仪表板列表 -->
-    <aside class="dash-sidebar">
+    <aside class="dash-sidebar" :class="{ 'dash-sidebar--collapsed': sidebarCollapsed }">
       <div class="sidebar-header">
-        <span class="sidebar-title">仪表板</span>
-        <el-button type="primary" size="small" :icon="Plus" @click="openCreateDashboard" />
+        <span v-if="!sidebarCollapsed" class="sidebar-title">仪表板</span>
+        <div class="sidebar-header-btns">
+          <el-button v-if="!sidebarCollapsed" type="primary" size="small" :icon="Plus" @click="openCreateDashboard" />
+          <el-button size="small" :icon="Fold" @click="sidebarCollapsed = !sidebarCollapsed" />
+        </div>
       </div>
+      <template v-if="!sidebarCollapsed">
       <div class="sidebar-search-wrap">
         <el-input v-model="dashboardSearch" :prefix-icon="Search" placeholder="检索目录" clearable />
       </div>
@@ -27,6 +31,7 @@
         </div>
         <div v-if="!dashboards.length" class="sidebar-empty">暂无仪表板</div>
       </div>
+      </template>
     </aside>
 
     <!-- 主内容区 -->
@@ -227,7 +232,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Close, Delete, Download, Grid, PieChart, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
+import { Close, Delete, Download, Fold, Grid, PieChart, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import EditorComponentInspector from './EditorComponentInspector.vue'
 import {
@@ -278,6 +283,7 @@ const LEGACY_GRID_ROW_PX = 70
 const createDashVisible = ref(false)
 const dashSaving = ref(false)
 const dashForm = reactive({ name: '' })
+const sidebarCollapsed = ref(false)
 const dashboardSearch = ref('')
 const shareVisible = ref(false)
 const publishVisible = ref(false)
@@ -336,10 +342,14 @@ const setChartRef = (el: HTMLElement | null, compId: number) => {
 const getCanvasWidth = () => Math.max(canvasRef.value?.clientWidth ?? 1200, MIN_CARD_WIDTH + 32)
 
 const normalizeLayout = (comp: DashboardComponent) => {
-  if (comp.width <= 24) comp.width = Math.max(MIN_CARD_WIDTH, comp.width * LEGACY_GRID_COL_PX)
-  if (comp.height <= 12) comp.height = Math.max(MIN_CARD_HEIGHT, comp.height * LEGACY_GRID_ROW_PX)
-  if (comp.posX <= 24 && comp.width > 24) comp.posX = comp.posX * LEGACY_GRID_COL_PX
-  if (comp.posY <= 24 && comp.height > 12) comp.posY = comp.posY * LEGACY_GRID_ROW_PX
+  // Legacy conversion: only convert when BOTH width and height are in old grid units
+  const isLegacy = comp.width <= 24 && comp.height <= 12
+  if (isLegacy) {
+    comp.width = Math.max(MIN_CARD_WIDTH, comp.width * LEGACY_GRID_COL_PX)
+    comp.height = Math.max(MIN_CARD_HEIGHT, comp.height * LEGACY_GRID_ROW_PX)
+    comp.posX = comp.posX * LEGACY_GRID_COL_PX
+    comp.posY = comp.posY * LEGACY_GRID_ROW_PX
+  }
 
   comp.posX = Math.max(0, Number(comp.posX) || 0)
   comp.posY = Math.max(0, Number(comp.posY) || 0)
@@ -738,14 +748,23 @@ const handleAddChart = async () => {
   if (!currentDashboard.value || !selectedChartId.value) return
   addingChart.value = true
   try {
-    // auto pos: place below existing cards in canvas coordinates
-    const lastY = components.value.reduce((max, c) => Math.max(max, c.posY + c.height), 0)
+    // auto pos: place below existing cards; flow into columns when space allows
+    const cardW = 520
+    const cardH = 320
+    const gap = 12
+    const canvasW = getCanvasWidth()
+    const cols = Math.max(1, Math.floor((canvasW + gap) / (cardW + gap)))
+    const count = components.value.length
+    const col = count % cols
+    const row = Math.floor(count / cols)
+    const posX = gap + col * (cardW + gap)
+    const posY = gap + row * (cardH + gap)
     const comp = await addDashboardComponent(currentDashboard.value.id, {
       chartId: selectedChartId.value,
-      posX: 12,
-      posY: lastY + 12,
-      width: 520,
-      height: 320,
+      posX,
+      posY,
+      width: cardW,
+      height: cardH,
       zIndex: getMaxZ() + 1,
       configJson: buildComponentConfig(chartMap.value.get(selectedChartId.value) ?? null, undefined, {
         chart: buildChartSnapshot(chartMap.value.get(selectedChartId.value) ?? null),
@@ -798,6 +817,14 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.2s ease;
+}
+.dash-sidebar--collapsed {
+  width: 48px;
+}
+.sidebar-header-btns {
+  display: flex;
+  gap: 4px;
 }
 .sidebar-header {
   display: flex;

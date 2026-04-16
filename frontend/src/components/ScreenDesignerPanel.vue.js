@@ -1,7 +1,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue';
 import * as echarts from 'echarts';
+import ComponentDataFallback from './ComponentDataFallback.vue';
 import EditorComponentInspector from './EditorComponentInspector.vue';
 import { addDashboardComponent, createDashboard, deleteDashboard, getDashboardComponents, getDashboardList, removeDashboardComponent, updateDashboard, updateDashboardComponent } from '../api/dashboard';
 import { createChart, getChartData, getChartList } from '../api/chart';
@@ -16,6 +17,7 @@ const emit = defineEmits();
 const makeBarComboIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="18" width="6" height="10" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="18" fill="currentColor" rx="1"/><rect x="20" y="14" width="6" height="14" fill="currentColor" rx="1"/><rect x="28" y="6" width="6" height="22" fill="currentColor" rx="1"/><polyline points="7,12 15,8 23,11 31,4" fill="none" stroke="currentColor" stroke-width="2" opacity=".7" stroke-linecap="round"/></svg>`;
 const makeHeatmapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="7" height="7" fill="currentColor" opacity=".9" rx="1"/><rect x="13" y="4" width="7" height="7" fill="currentColor" opacity=".5" rx="1"/><rect x="22" y="4" width="7" height="7" fill="currentColor" opacity=".2" rx="1"/><rect x="31" y="4" width="7" height="7" fill="currentColor" opacity=".7" rx="1"/><rect x="4" y="13" width="7" height="7" fill="currentColor" opacity=".3" rx="1"/><rect x="13" y="13" width="7" height="7" fill="currentColor" opacity=".8" rx="1"/><rect x="22" y="13" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="31" y="13" width="7" height="7" fill="currentColor" opacity=".15" rx="1"/><rect x="4" y="22" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="13" y="22" width="7" height="7" fill="currentColor" opacity=".25" rx="1"/><rect x="22" y="22" width="7" height="7" fill="currentColor" opacity=".95" rx="1"/><rect x="31" y="22" width="7" height="7" fill="currentColor" opacity=".4" rx="1"/></svg>`;
 const makeMapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M5,6 L15,4 L25,8 L35,5 L35,26 L25,23 L15,27 L5,25 Z" fill="currentColor" opacity=".3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M15,4 L15,27" stroke="currentColor" stroke-width="1" opacity=".5"/><path d="M25,8 L25,23" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="22" cy="13" r="3" fill="currentColor" opacity=".8"/></svg>`;
+const makeFilterButtonIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="8" width="32" height="16" rx="4" fill="currentColor" opacity=".2" stroke="currentColor" stroke-width="1.2"/><path d="M10,14 L14,18 L14,22" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M10,14 L18,14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="28" cy="18" r="1.5" fill="currentColor"/><circle cx="23" cy="18" r="1.5" fill="currentColor"/><circle cx="33" cy="18" r="1.5" fill="currentColor" opacity=".4"/></svg>`;
 const makeBarWaterfallIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="16" width="6" height="12" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="12" y="16" width="6" height="6" fill="currentColor" rx="1"/><rect x="20" y="6" width="6" height="4" fill="currentColor" opacity=".5" rx="1"/><rect x="20" y="10" width="6" height="12" fill="currentColor" rx="1"/><rect x="28" y="4" width="6" height="24" fill="currentColor" opacity=".7" rx="1"/></svg>`;
 const makeBarProgressIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="30" height="5" fill="currentColor" opacity=".2" rx="2.5"/><rect x="4" y="6" width="22" height="5" fill="currentColor" rx="2.5"/><rect x="4" y="14" width="30" height="5" fill="currentColor" opacity=".2" rx="2.5"/><rect x="4" y="14" width="30" height="5" fill="currentColor" opacity=".5" rx="2.5"/><rect x="4" y="22" width="30" height="5" fill="currentColor" opacity=".2" rx="2.5"/><rect x="4" y="22" width="14" height="5" fill="currentColor" opacity=".8" rx="2.5"/></svg>`;
 const makeBarSymmetricIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="4" width="14" height="6" fill="currentColor" rx="1"/><rect x="6" y="4" width="14" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="20" y="13" width="8" height="6" fill="currentColor" rx="1"/><rect x="12" y="13" width="8" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="20" y="22" width="16" height="6" fill="currentColor" rx="1"/><rect x="4" y="22" width="16" height="6" fill="currentColor" opacity=".5" rx="1"/></svg>`;
@@ -110,6 +112,12 @@ const CHART_CATEGORIES = [
         label: '地图',
         types: [
             { type: 'map', label: '地图', svgIcon: makeMapIcon() },
+        ],
+    },
+    {
+        label: '交互控件',
+        types: [
+            { type: 'filter_button', label: '筛选按钮', svgIcon: makeFilterButtonIcon() },
         ],
     },
 ];
@@ -305,8 +313,9 @@ const startCurtainDrag = (e) => {
     const ox = overlayConfig.x;
     const oy = overlayConfig.y;
     const onMove = (ev) => {
-        overlayConfig.x = Math.max(0, Math.round(ox + ev.clientX - startX));
-        overlayConfig.y = Math.max(0, Math.round(oy + ev.clientY - startY));
+        const scale = canvasScale.value || 1;
+        overlayConfig.x = Math.max(0, Math.round(ox + (ev.clientX - startX) / scale));
+        overlayConfig.y = Math.max(0, Math.round(oy + (ev.clientY - startY) / scale));
     };
     const onUp = () => {
         document.removeEventListener('mousemove', onMove);
@@ -327,8 +336,9 @@ const startCurtainResize = (e, handle) => {
     const oy = overlayConfig.y;
     const oh = overlayConfig.h;
     const onMove = (ev) => {
-        const dx = ev.clientX - startX;
-        const dy = ev.clientY - startY;
+        const scale = canvasScale.value || 1;
+        const dx = (ev.clientX - startX) / scale;
+        const dy = (ev.clientY - startY) / scale;
         if (handle.includes('e'))
             overlayConfig.w = Math.max(100, Math.round(ow + dx));
         if (handle.includes('s'))
@@ -375,6 +385,7 @@ const chartTypeOptions = [
     { label: '散点图', value: 'scatter' },
     { label: '雷达图', value: 'radar' },
     { label: '矩形树图', value: 'treemap' },
+    { label: '筛选按钮', value: 'filter_button' },
 ];
 const filteredCharts = computed(() => {
     const keyword = assetSearch.value.trim().toLowerCase();
@@ -422,6 +433,22 @@ const matchedCanvasPreset = computed(() => SCREEN_CANVAS_PRESETS.find((item) => 
 // 背景版 presets + size controls
 const matchedBgPreset = computed(() => SCREEN_CANVAS_PRESETS.find((item) => item.width === overlayConfig.w && item.height === overlayConfig.h)?.id ?? 'custom');
 const canvasWorkWidth = computed(() => Math.max(overlayConfig.w + 400, 2400));
+// ─── 缩放控制 ───────────────────────────────────────────────────────────
+const canvasScale = ref(1);
+const SCALE_MIN = 0.25;
+const SCALE_MAX = 2;
+const SCALE_STEP = 0.1;
+const zoomIn = () => { canvasScale.value = Math.min(SCALE_MAX, +(canvasScale.value + SCALE_STEP).toFixed(2)); };
+const zoomOut = () => { canvasScale.value = Math.max(SCALE_MIN, +(canvasScale.value - SCALE_STEP).toFixed(2)); };
+const zoomReset = () => { canvasScale.value = 1; };
+const zoomFit = () => {
+    const scrollEl = document.querySelector('.screen-stage-scroll');
+    if (!scrollEl)
+        return;
+    const fitW = (scrollEl.clientWidth - 40) / canvasWorkWidth.value;
+    const fitH = (scrollEl.clientHeight - 40) / canvasMinHeight.value;
+    canvasScale.value = Math.max(SCALE_MIN, Math.min(SCALE_MAX, +Math.min(fitW, fitH).toFixed(2)));
+};
 const canvasMinHeight = computed(() => {
     const bgBottom = overlayConfig.y + overlayConfig.h + 200;
     const occupied = components.value.reduce((max, item) => Math.max(max, item.posY + item.height + 24), 0);
@@ -587,6 +614,7 @@ const renderChart = (component, data) => {
     chartInstance.setOption(option, true);
 };
 const isTableChart = (component) => ['table', 'table_summary', 'table_pivot'].includes(getComponentChartConfig(component).chartType);
+const isFilterButtonChart = (component) => getComponentChartConfig(component).chartType === 'filter_button';
 const isRenderableChart = (component) => {
     const type = getComponentChartConfig(component).chartType ?? '';
     return isCanvasRenderableChartType(type);
@@ -676,8 +704,9 @@ const applyInteractionFrame = () => {
     const component = findComponent(interaction.compId);
     if (!component)
         return;
-    const dx = pendingPointer.x - interaction.startMouseX;
-    const dy = pendingPointer.y - interaction.startMouseY;
+    const scale = canvasScale.value || 1;
+    const dx = (pendingPointer.x - interaction.startMouseX) / scale;
+    const dy = (pendingPointer.y - interaction.startMouseY) / scale;
     if (interaction.mode === 'move') {
         const maxX = Math.max(0, getCanvasWidth() - component.width);
         component.posX = Math.min(maxX, Math.max(0, interaction.startX + dx));
@@ -931,7 +960,7 @@ const handleBgImageUpload = async (event) => {
     try {
         const formData = new FormData();
         formData.append('file', file);
-        const token = localStorage.getItem('token') || '';
+        const token = localStorage.getItem('bi_token') || '';
         const res = await fetch('/api/upload/image', {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
@@ -1067,17 +1096,15 @@ const quickAddTemplate = async (template) => {
 };
 const resolveDropPlacement = (width, height, point) => {
     if (!point || !canvasRef.value) {
-        const lastY = components.value.reduce((max, item) => Math.max(max, item.posY + item.height), 0);
-        return {
-            posX: 16,
-            posY: lastY + 16,
-            width,
-            height,
-        };
+        // 无拖拽坐标时，放在背景板顶部中间
+        const cx = Math.max(0, Math.round((overlayConfig.w - width) / 2) + overlayConfig.x);
+        const cy = overlayConfig.y + 16;
+        return { posX: cx, posY: cy, width, height };
     }
     const rect = canvasRef.value.getBoundingClientRect();
-    const posX = Math.max(0, Math.min(getCanvasWidth() - width, point.clientX - rect.left - width / 2));
-    const posY = Math.max(0, point.clientY - rect.top - 28);
+    const scale = canvasScale.value || 1;
+    const posX = Math.max(0, Math.min(getCanvasWidth() - width, (point.clientX - rect.left) / scale - width / 2));
+    const posY = Math.max(0, (point.clientY - rect.top) / scale - 28);
     return {
         posX: Math.round(posX),
         posY: Math.round(posY),
@@ -1091,8 +1118,8 @@ const addChartToScreen = async (chart, configJson, size, point) => {
         return;
     }
     const nextSize = size ?? {
-        width: chart.chartType === 'table' ? 760 : 520,
-        height: chart.chartType === 'table' ? 340 : 320,
+        width: chart.chartType === 'table' ? 760 : chart.chartType === 'filter_button' ? 200 : 520,
+        height: chart.chartType === 'table' ? 340 : chart.chartType === 'filter_button' ? 60 : 320,
     };
     const placement = resolveDropPlacement(nextSize.width, nextSize.height, point);
     const component = await addDashboardComponent(currentDashboard.value.id, {
@@ -1262,6 +1289,8 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['el-input__wrapper']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-tb-controls']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-tb-controls']} */ ;
+/** @type {__VLS_StyleScopedClasses['canvas-tb-zoom']} */ ;
+/** @type {__VLS_StyleScopedClasses['zoom-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['ruler-h-mark']} */ ;
 /** @type {__VLS_StyleScopedClasses['ruler-v-mark']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-stage-scroll']} */ ;
@@ -1308,6 +1337,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['screen-comp-count']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-root--editor']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-root--editor']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-root--editor']} */ ;
@@ -2828,49 +2858,157 @@ else {
     });
     (__VLS_ctx.components.length);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "canvas-tb-zoom" },
+    });
+    const __VLS_304 = {}.ElTooltip;
+    /** @type {[typeof __VLS_components.ElTooltip, typeof __VLS_components.elTooltip, typeof __VLS_components.ElTooltip, typeof __VLS_components.elTooltip, ]} */ ;
+    // @ts-ignore
+    const __VLS_305 = __VLS_asFunctionalComponent(__VLS_304, new __VLS_304({
+        content: "缩小",
+    }));
+    const __VLS_306 = __VLS_305({
+        content: "缩小",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_305));
+    __VLS_307.slots.default;
+    const __VLS_308 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_309 = __VLS_asFunctionalComponent(__VLS_308, new __VLS_308({
+        ...{ 'onClick': {} },
+        link: true,
+        size: "small",
+        disabled: (__VLS_ctx.canvasScale <= __VLS_ctx.SCALE_MIN),
+    }));
+    const __VLS_310 = __VLS_309({
+        ...{ 'onClick': {} },
+        link: true,
+        size: "small",
+        disabled: (__VLS_ctx.canvasScale <= __VLS_ctx.SCALE_MIN),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_309));
+    let __VLS_312;
+    let __VLS_313;
+    let __VLS_314;
+    const __VLS_315 = {
+        onClick: (__VLS_ctx.zoomOut)
+    };
+    __VLS_311.slots.default;
+    var __VLS_311;
+    var __VLS_307;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ onClick: (__VLS_ctx.zoomReset) },
+        ...{ class: "zoom-label" },
+    });
+    (Math.round(__VLS_ctx.canvasScale * 100));
+    const __VLS_316 = {}.ElTooltip;
+    /** @type {[typeof __VLS_components.ElTooltip, typeof __VLS_components.elTooltip, typeof __VLS_components.ElTooltip, typeof __VLS_components.elTooltip, ]} */ ;
+    // @ts-ignore
+    const __VLS_317 = __VLS_asFunctionalComponent(__VLS_316, new __VLS_316({
+        content: "放大",
+    }));
+    const __VLS_318 = __VLS_317({
+        content: "放大",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_317));
+    __VLS_319.slots.default;
+    const __VLS_320 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_321 = __VLS_asFunctionalComponent(__VLS_320, new __VLS_320({
+        ...{ 'onClick': {} },
+        link: true,
+        size: "small",
+        disabled: (__VLS_ctx.canvasScale >= __VLS_ctx.SCALE_MAX),
+    }));
+    const __VLS_322 = __VLS_321({
+        ...{ 'onClick': {} },
+        link: true,
+        size: "small",
+        disabled: (__VLS_ctx.canvasScale >= __VLS_ctx.SCALE_MAX),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_321));
+    let __VLS_324;
+    let __VLS_325;
+    let __VLS_326;
+    const __VLS_327 = {
+        onClick: (__VLS_ctx.zoomIn)
+    };
+    __VLS_323.slots.default;
+    var __VLS_323;
+    var __VLS_319;
+    const __VLS_328 = {}.ElTooltip;
+    /** @type {[typeof __VLS_components.ElTooltip, typeof __VLS_components.elTooltip, typeof __VLS_components.ElTooltip, typeof __VLS_components.elTooltip, ]} */ ;
+    // @ts-ignore
+    const __VLS_329 = __VLS_asFunctionalComponent(__VLS_328, new __VLS_328({
+        content: "适应屏幕",
+    }));
+    const __VLS_330 = __VLS_329({
+        content: "适应屏幕",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_329));
+    __VLS_331.slots.default;
+    const __VLS_332 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_333 = __VLS_asFunctionalComponent(__VLS_332, new __VLS_332({
+        ...{ 'onClick': {} },
+        link: true,
+        size: "small",
+    }));
+    const __VLS_334 = __VLS_333({
+        ...{ 'onClick': {} },
+        link: true,
+        size: "small",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_333));
+    let __VLS_336;
+    let __VLS_337;
+    let __VLS_338;
+    const __VLS_339 = {
+        onClick: (__VLS_ctx.zoomFit)
+    };
+    __VLS_335.slots.default;
+    var __VLS_335;
+    var __VLS_331;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "canvas-tb-overlay-ctrl" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ style: {} },
     });
-    const __VLS_304 = {}.ElColorPicker;
+    const __VLS_340 = {}.ElColorPicker;
     /** @type {[typeof __VLS_components.ElColorPicker, typeof __VLS_components.elColorPicker, ]} */ ;
     // @ts-ignore
-    const __VLS_305 = __VLS_asFunctionalComponent(__VLS_304, new __VLS_304({
+    const __VLS_341 = __VLS_asFunctionalComponent(__VLS_340, new __VLS_340({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.bgColor),
         showAlpha: true,
         size: "small",
     }));
-    const __VLS_306 = __VLS_305({
+    const __VLS_342 = __VLS_341({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.bgColor),
         showAlpha: true,
         size: "small",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_305));
-    let __VLS_308;
-    let __VLS_309;
-    let __VLS_310;
-    const __VLS_311 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_341));
+    let __VLS_344;
+    let __VLS_345;
+    let __VLS_346;
+    const __VLS_347 = {
         onChange: (__VLS_ctx.saveOverlay)
     };
-    var __VLS_307;
-    const __VLS_312 = {}.ElTooltip;
+    var __VLS_343;
+    const __VLS_348 = {}.ElTooltip;
     /** @type {[typeof __VLS_components.ElTooltip, typeof __VLS_components.elTooltip, typeof __VLS_components.ElTooltip, typeof __VLS_components.elTooltip, ]} */ ;
     // @ts-ignore
-    const __VLS_313 = __VLS_asFunctionalComponent(__VLS_312, new __VLS_312({
+    const __VLS_349 = __VLS_asFunctionalComponent(__VLS_348, new __VLS_348({
         content: "不透明度",
         placement: "bottom",
     }));
-    const __VLS_314 = __VLS_313({
+    const __VLS_350 = __VLS_349({
         content: "不透明度",
         placement: "bottom",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_313));
-    __VLS_315.slots.default;
-    const __VLS_316 = {}.ElInputNumber;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_349));
+    __VLS_351.slots.default;
+    const __VLS_352 = {}.ElInputNumber;
     /** @type {[typeof __VLS_components.ElInputNumber, typeof __VLS_components.elInputNumber, ]} */ ;
     // @ts-ignore
-    const __VLS_317 = __VLS_asFunctionalComponent(__VLS_316, new __VLS_316({
+    const __VLS_353 = __VLS_asFunctionalComponent(__VLS_352, new __VLS_352({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.opacity),
         min: (0.05),
@@ -2881,7 +3019,7 @@ else {
         controlsPosition: "right",
         ...{ style: {} },
     }));
-    const __VLS_318 = __VLS_317({
+    const __VLS_354 = __VLS_353({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.opacity),
         min: (0.05),
@@ -2891,15 +3029,15 @@ else {
         size: "small",
         controlsPosition: "right",
         ...{ style: {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_317));
-    let __VLS_320;
-    let __VLS_321;
-    let __VLS_322;
-    const __VLS_323 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_353));
+    let __VLS_356;
+    let __VLS_357;
+    let __VLS_358;
+    const __VLS_359 = {
         onChange: (__VLS_ctx.saveOverlay)
     };
-    var __VLS_319;
-    var __VLS_315;
+    var __VLS_355;
+    var __VLS_351;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "canvas-work-area" },
     });
@@ -2949,7 +3087,7 @@ else {
         ref: "canvasRef",
         ...{ class: "screen-stage" },
         ...{ class: ({ 'screen-stage--drop': __VLS_ctx.stageDropActive }) },
-        ...{ style: ({ width: `${__VLS_ctx.canvasWorkWidth}px`, minHeight: `${__VLS_ctx.canvasMinHeight}px`, height: `${__VLS_ctx.canvasMinHeight}px` }) },
+        ...{ style: ({ width: `${__VLS_ctx.canvasWorkWidth}px`, minHeight: `${__VLS_ctx.canvasMinHeight}px`, height: `${__VLS_ctx.canvasMinHeight}px`, transform: `scale(${__VLS_ctx.canvasScale})`, transformOrigin: '0 0' }) },
     });
     /** @type {typeof __VLS_ctx.canvasRef} */ ;
     if (__VLS_ctx.overlayConfig.show) {
@@ -3089,75 +3227,112 @@ else {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "stage-card-meta" },
         });
-        const __VLS_324 = {}.ElTag;
+        const __VLS_360 = {}.ElTag;
         /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
         // @ts-ignore
-        const __VLS_325 = __VLS_asFunctionalComponent(__VLS_324, new __VLS_324({
+        const __VLS_361 = __VLS_asFunctionalComponent(__VLS_360, new __VLS_360({
             size: "small",
             type: "info",
         }));
-        const __VLS_326 = __VLS_325({
+        const __VLS_362 = __VLS_361({
             size: "small",
             type: "info",
-        }, ...__VLS_functionalComponentArgsRest(__VLS_325));
-        __VLS_327.slots.default;
+        }, ...__VLS_functionalComponentArgsRest(__VLS_361));
+        __VLS_363.slots.default;
         (__VLS_ctx.chartTypeLabel(__VLS_ctx.getComponentChartConfig(component).chartType));
-        var __VLS_327;
+        var __VLS_363;
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         (__VLS_ctx.datasetMap.get(Number(__VLS_ctx.getComponentChartConfig(component).datasetId) || -1)?.name ?? '未关联数据集');
-        const __VLS_328 = {}.ElPopconfirm;
+        const __VLS_364 = {}.ElPopconfirm;
         /** @type {[typeof __VLS_components.ElPopconfirm, typeof __VLS_components.elPopconfirm, typeof __VLS_components.ElPopconfirm, typeof __VLS_components.elPopconfirm, ]} */ ;
         // @ts-ignore
-        const __VLS_329 = __VLS_asFunctionalComponent(__VLS_328, new __VLS_328({
+        const __VLS_365 = __VLS_asFunctionalComponent(__VLS_364, new __VLS_364({
             ...{ 'onConfirm': {} },
             title: "从大屏移除此组件？",
         }));
-        const __VLS_330 = __VLS_329({
+        const __VLS_366 = __VLS_365({
             ...{ 'onConfirm': {} },
             title: "从大屏移除此组件？",
-        }, ...__VLS_functionalComponentArgsRest(__VLS_329));
-        let __VLS_332;
-        let __VLS_333;
-        let __VLS_334;
-        const __VLS_335 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_365));
+        let __VLS_368;
+        let __VLS_369;
+        let __VLS_370;
+        const __VLS_371 = {
             onConfirm: (...[$event]) => {
                 if (!!(!__VLS_ctx.currentDashboard))
                     return;
                 __VLS_ctx.removeComponent(component.id);
             }
         };
-        __VLS_331.slots.default;
+        __VLS_367.slots.default;
         {
-            const { reference: __VLS_thisSlot } = __VLS_331.slots;
-            const __VLS_336 = {}.ElIcon;
+            const { reference: __VLS_thisSlot } = __VLS_367.slots;
+            const __VLS_372 = {}.ElIcon;
             /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
             // @ts-ignore
-            const __VLS_337 = __VLS_asFunctionalComponent(__VLS_336, new __VLS_336({
+            const __VLS_373 = __VLS_asFunctionalComponent(__VLS_372, new __VLS_372({
                 ...{ class: "remove-btn" },
             }));
-            const __VLS_338 = __VLS_337({
+            const __VLS_374 = __VLS_373({
                 ...{ class: "remove-btn" },
-            }, ...__VLS_functionalComponentArgsRest(__VLS_337));
-            __VLS_339.slots.default;
-            const __VLS_340 = {}.Close;
+            }, ...__VLS_functionalComponentArgsRest(__VLS_373));
+            __VLS_375.slots.default;
+            const __VLS_376 = {}.Close;
             /** @type {[typeof __VLS_components.Close, ]} */ ;
             // @ts-ignore
-            const __VLS_341 = __VLS_asFunctionalComponent(__VLS_340, new __VLS_340({}));
-            const __VLS_342 = __VLS_341({}, ...__VLS_functionalComponentArgsRest(__VLS_341));
-            var __VLS_339;
+            const __VLS_377 = __VLS_asFunctionalComponent(__VLS_376, new __VLS_376({}));
+            const __VLS_378 = __VLS_377({}, ...__VLS_functionalComponentArgsRest(__VLS_377));
+            var __VLS_375;
         }
-        var __VLS_331;
+        var __VLS_367;
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "stage-card-body" },
         });
-        if (__VLS_ctx.isTableChart(component)) {
+        if (__VLS_ctx.isFilterButtonChart(component)) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "filter-button-wrapper" },
+            });
+            const __VLS_380 = {}.ElButton;
+            /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+            // @ts-ignore
+            const __VLS_381 = __VLS_asFunctionalComponent(__VLS_380, new __VLS_380({
+                size: "small",
+                type: "primary",
+                ...{ style: {} },
+            }));
+            const __VLS_382 = __VLS_381({
+                size: "small",
+                type: "primary",
+                ...{ style: {} },
+            }, ...__VLS_functionalComponentArgsRest(__VLS_381));
+            __VLS_383.slots.default;
+            const __VLS_384 = {}.ElIcon;
+            /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
+            // @ts-ignore
+            const __VLS_385 = __VLS_asFunctionalComponent(__VLS_384, new __VLS_384({
+                ...{ style: {} },
+            }));
+            const __VLS_386 = __VLS_385({
+                ...{ style: {} },
+            }, ...__VLS_functionalComponentArgsRest(__VLS_385));
+            __VLS_387.slots.default;
+            const __VLS_388 = {}.Filter;
+            /** @type {[typeof __VLS_components.Filter, ]} */ ;
+            // @ts-ignore
+            const __VLS_389 = __VLS_asFunctionalComponent(__VLS_388, new __VLS_388({}));
+            const __VLS_390 = __VLS_389({}, ...__VLS_functionalComponentArgsRest(__VLS_389));
+            var __VLS_387;
+            (__VLS_ctx.getComponentConfig(component).chart.name || '筛选');
+            var __VLS_383;
+        }
+        else if (__VLS_ctx.isTableChart(component)) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ class: "table-wrapper" },
             });
-            const __VLS_344 = {}.ElTable;
+            const __VLS_392 = {}.ElTable;
             /** @type {[typeof __VLS_components.ElTable, typeof __VLS_components.elTable, typeof __VLS_components.ElTable, typeof __VLS_components.elTable, ]} */ ;
             // @ts-ignore
-            const __VLS_345 = __VLS_asFunctionalComponent(__VLS_344, new __VLS_344({
+            const __VLS_393 = __VLS_asFunctionalComponent(__VLS_392, new __VLS_392({
                 data: (__VLS_ctx.getTableRows(component.id)),
                 height: "100%",
                 size: "small",
@@ -3176,7 +3351,7 @@ else {
                     borderBottom: `${__VLS_ctx.getComponentConfig(component).style.tableBorderWidth}px solid ${__VLS_ctx.getComponentConfig(component).style.tableBorderColor}`,
                 }),
             }));
-            const __VLS_346 = __VLS_345({
+            const __VLS_394 = __VLS_393({
                 data: (__VLS_ctx.getTableRows(component.id)),
                 height: "100%",
                 size: "small",
@@ -3194,43 +3369,43 @@ else {
                     height: __VLS_ctx.getComponentConfig(component).style.tableRowHeight + 'px',
                     borderBottom: `${__VLS_ctx.getComponentConfig(component).style.tableBorderWidth}px solid ${__VLS_ctx.getComponentConfig(component).style.tableBorderColor}`,
                 }),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_345));
-            __VLS_347.slots.default;
+            }, ...__VLS_functionalComponentArgsRest(__VLS_393));
+            __VLS_395.slots.default;
             if (__VLS_ctx.getComponentConfig(component).style.tableShowIndex) {
-                const __VLS_348 = {}.ElTableColumn;
+                const __VLS_396 = {}.ElTableColumn;
                 /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
                 // @ts-ignore
-                const __VLS_349 = __VLS_asFunctionalComponent(__VLS_348, new __VLS_348({
+                const __VLS_397 = __VLS_asFunctionalComponent(__VLS_396, new __VLS_396({
                     type: "index",
                     width: "50",
                     label: "#",
                 }));
-                const __VLS_350 = __VLS_349({
+                const __VLS_398 = __VLS_397({
                     type: "index",
                     width: "50",
                     label: "#",
-                }, ...__VLS_functionalComponentArgsRest(__VLS_349));
+                }, ...__VLS_functionalComponentArgsRest(__VLS_397));
             }
             for (const [column] of __VLS_getVForSourceType((__VLS_ctx.getTableColumns(component.id)))) {
-                const __VLS_352 = {}.ElTableColumn;
+                const __VLS_400 = {}.ElTableColumn;
                 /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
                 // @ts-ignore
-                const __VLS_353 = __VLS_asFunctionalComponent(__VLS_352, new __VLS_352({
+                const __VLS_401 = __VLS_asFunctionalComponent(__VLS_400, new __VLS_400({
                     key: (column),
                     prop: (column),
                     label: (column),
                     minWidth: "120",
                     sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
                 }));
-                const __VLS_354 = __VLS_353({
+                const __VLS_402 = __VLS_401({
                     key: (column),
                     prop: (column),
                     label: (column),
                     minWidth: "120",
                     sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
-                }, ...__VLS_functionalComponentArgsRest(__VLS_353));
+                }, ...__VLS_functionalComponentArgsRest(__VLS_401));
             }
-            var __VLS_347;
+            var __VLS_395;
         }
         else if (__VLS_ctx.showNoField(component)) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -3238,10 +3413,20 @@ else {
             });
         }
         else if (!__VLS_ctx.isRenderableChart(component)) {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "chart-placeholder" },
-            });
-            (__VLS_ctx.chartTypeLabel(__VLS_ctx.getComponentChartConfig(component).chartType));
+            /** @type {[typeof ComponentDataFallback, ]} */ ;
+            // @ts-ignore
+            const __VLS_404 = __VLS_asFunctionalComponent(ComponentDataFallback, new ComponentDataFallback({
+                chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
+                chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
+                data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
+                dark: true,
+            }));
+            const __VLS_405 = __VLS_404({
+                chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
+                chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
+                data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
+                dark: true,
+            }, ...__VLS_functionalComponentArgsRest(__VLS_404));
         }
         else {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
@@ -3318,17 +3503,17 @@ else {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "stage-empty" },
         });
-        const __VLS_356 = {}.ElEmpty;
+        const __VLS_407 = {}.ElEmpty;
         /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
         // @ts-ignore
-        const __VLS_357 = __VLS_asFunctionalComponent(__VLS_356, new __VLS_356({
+        const __VLS_408 = __VLS_asFunctionalComponent(__VLS_407, new __VLS_407({
             description: "请从左侧双击或拖入一个组件资产",
             imageSize: (80),
         }));
-        const __VLS_358 = __VLS_357({
+        const __VLS_409 = __VLS_408({
             description: "请从左侧双击或拖入一个组件资产",
             imageSize: (80),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_357));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_408));
     }
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
@@ -3344,31 +3529,31 @@ if (__VLS_ctx.overlaySelected) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "bg-insp-title" },
     });
-    const __VLS_360 = {}.ElButton;
+    const __VLS_411 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_361 = __VLS_asFunctionalComponent(__VLS_360, new __VLS_360({
+    const __VLS_412 = __VLS_asFunctionalComponent(__VLS_411, new __VLS_411({
         ...{ 'onClick': {} },
         size: "small",
         link: true,
     }));
-    const __VLS_362 = __VLS_361({
+    const __VLS_413 = __VLS_412({
         ...{ 'onClick': {} },
         size: "small",
         link: true,
-    }, ...__VLS_functionalComponentArgsRest(__VLS_361));
-    let __VLS_364;
-    let __VLS_365;
-    let __VLS_366;
-    const __VLS_367 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_412));
+    let __VLS_415;
+    let __VLS_416;
+    let __VLS_417;
+    const __VLS_418 = {
         onClick: (...[$event]) => {
             if (!(__VLS_ctx.overlaySelected))
                 return;
             __VLS_ctx.overlaySelected = false;
         }
     };
-    __VLS_363.slots.default;
-    var __VLS_363;
+    __VLS_414.slots.default;
+    var __VLS_414;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "bg-insp-section" },
     });
@@ -3382,10 +3567,10 @@ if (__VLS_ctx.overlaySelected) {
         ...{ class: "bg-insp-field" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    const __VLS_368 = {}.ElInputNumber;
+    const __VLS_419 = {}.ElInputNumber;
     /** @type {[typeof __VLS_components.ElInputNumber, typeof __VLS_components.elInputNumber, ]} */ ;
     // @ts-ignore
-    const __VLS_369 = __VLS_asFunctionalComponent(__VLS_368, new __VLS_368({
+    const __VLS_420 = __VLS_asFunctionalComponent(__VLS_419, new __VLS_419({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.w),
         min: (640),
@@ -3394,7 +3579,7 @@ if (__VLS_ctx.overlaySelected) {
         size: "small",
         controlsPosition: "right",
     }));
-    const __VLS_370 = __VLS_369({
+    const __VLS_421 = __VLS_420({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.w),
         min: (640),
@@ -3402,22 +3587,22 @@ if (__VLS_ctx.overlaySelected) {
         step: (10),
         size: "small",
         controlsPosition: "right",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_369));
-    let __VLS_372;
-    let __VLS_373;
-    let __VLS_374;
-    const __VLS_375 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_420));
+    let __VLS_423;
+    let __VLS_424;
+    let __VLS_425;
+    const __VLS_426 = {
         onChange: (__VLS_ctx.saveOverlay)
     };
-    var __VLS_371;
+    var __VLS_422;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
         ...{ class: "bg-insp-field" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    const __VLS_376 = {}.ElInputNumber;
+    const __VLS_427 = {}.ElInputNumber;
     /** @type {[typeof __VLS_components.ElInputNumber, typeof __VLS_components.elInputNumber, ]} */ ;
     // @ts-ignore
-    const __VLS_377 = __VLS_asFunctionalComponent(__VLS_376, new __VLS_376({
+    const __VLS_428 = __VLS_asFunctionalComponent(__VLS_427, new __VLS_427({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.h),
         min: (360),
@@ -3426,7 +3611,7 @@ if (__VLS_ctx.overlaySelected) {
         size: "small",
         controlsPosition: "right",
     }));
-    const __VLS_378 = __VLS_377({
+    const __VLS_429 = __VLS_428({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.h),
         min: (360),
@@ -3434,157 +3619,157 @@ if (__VLS_ctx.overlaySelected) {
         step: (10),
         size: "small",
         controlsPosition: "right",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_377));
-    let __VLS_380;
-    let __VLS_381;
-    let __VLS_382;
-    const __VLS_383 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_428));
+    let __VLS_431;
+    let __VLS_432;
+    let __VLS_433;
+    const __VLS_434 = {
         onChange: (__VLS_ctx.saveOverlay)
     };
-    var __VLS_379;
+    var __VLS_430;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
         ...{ class: "bg-insp-field" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    const __VLS_384 = {}.ElInputNumber;
+    const __VLS_435 = {}.ElInputNumber;
     /** @type {[typeof __VLS_components.ElInputNumber, typeof __VLS_components.elInputNumber, ]} */ ;
     // @ts-ignore
-    const __VLS_385 = __VLS_asFunctionalComponent(__VLS_384, new __VLS_384({
+    const __VLS_436 = __VLS_asFunctionalComponent(__VLS_435, new __VLS_435({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.x),
         min: (0),
         size: "small",
         controlsPosition: "right",
     }));
-    const __VLS_386 = __VLS_385({
+    const __VLS_437 = __VLS_436({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.x),
         min: (0),
         size: "small",
         controlsPosition: "right",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_385));
-    let __VLS_388;
-    let __VLS_389;
-    let __VLS_390;
-    const __VLS_391 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_436));
+    let __VLS_439;
+    let __VLS_440;
+    let __VLS_441;
+    const __VLS_442 = {
         onChange: (__VLS_ctx.saveOverlay)
     };
-    var __VLS_387;
+    var __VLS_438;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
         ...{ class: "bg-insp-field" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    const __VLS_392 = {}.ElInputNumber;
+    const __VLS_443 = {}.ElInputNumber;
     /** @type {[typeof __VLS_components.ElInputNumber, typeof __VLS_components.elInputNumber, ]} */ ;
     // @ts-ignore
-    const __VLS_393 = __VLS_asFunctionalComponent(__VLS_392, new __VLS_392({
+    const __VLS_444 = __VLS_asFunctionalComponent(__VLS_443, new __VLS_443({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.y),
         min: (0),
         size: "small",
         controlsPosition: "right",
     }));
-    const __VLS_394 = __VLS_393({
+    const __VLS_445 = __VLS_444({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.y),
         min: (0),
         size: "small",
         controlsPosition: "right",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_393));
-    let __VLS_396;
-    let __VLS_397;
-    let __VLS_398;
-    const __VLS_399 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_444));
+    let __VLS_447;
+    let __VLS_448;
+    let __VLS_449;
+    const __VLS_450 = {
         onChange: (__VLS_ctx.saveOverlay)
     };
-    var __VLS_395;
+    var __VLS_446;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "bg-insp-section" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "bg-insp-section-title" },
     });
-    const __VLS_400 = {}.ElRadioGroup;
+    const __VLS_451 = {}.ElRadioGroup;
     /** @type {[typeof __VLS_components.ElRadioGroup, typeof __VLS_components.elRadioGroup, typeof __VLS_components.ElRadioGroup, typeof __VLS_components.elRadioGroup, ]} */ ;
     // @ts-ignore
-    const __VLS_401 = __VLS_asFunctionalComponent(__VLS_400, new __VLS_400({
+    const __VLS_452 = __VLS_asFunctionalComponent(__VLS_451, new __VLS_451({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.bgType),
         size: "small",
         ...{ style: {} },
     }));
-    const __VLS_402 = __VLS_401({
+    const __VLS_453 = __VLS_452({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.bgType),
         size: "small",
         ...{ style: {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_401));
-    let __VLS_404;
-    let __VLS_405;
-    let __VLS_406;
-    const __VLS_407 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_452));
+    let __VLS_455;
+    let __VLS_456;
+    let __VLS_457;
+    const __VLS_458 = {
         onChange: (__VLS_ctx.saveOverlay)
     };
-    __VLS_403.slots.default;
-    const __VLS_408 = {}.ElRadioButton;
+    __VLS_454.slots.default;
+    const __VLS_459 = {}.ElRadioButton;
     /** @type {[typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, ]} */ ;
     // @ts-ignore
-    const __VLS_409 = __VLS_asFunctionalComponent(__VLS_408, new __VLS_408({
+    const __VLS_460 = __VLS_asFunctionalComponent(__VLS_459, new __VLS_459({
         value: "solid",
     }));
-    const __VLS_410 = __VLS_409({
+    const __VLS_461 = __VLS_460({
         value: "solid",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_409));
-    __VLS_411.slots.default;
-    var __VLS_411;
-    const __VLS_412 = {}.ElRadioButton;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_460));
+    __VLS_462.slots.default;
+    var __VLS_462;
+    const __VLS_463 = {}.ElRadioButton;
     /** @type {[typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, ]} */ ;
     // @ts-ignore
-    const __VLS_413 = __VLS_asFunctionalComponent(__VLS_412, new __VLS_412({
+    const __VLS_464 = __VLS_asFunctionalComponent(__VLS_463, new __VLS_463({
         value: "gradient",
     }));
-    const __VLS_414 = __VLS_413({
+    const __VLS_465 = __VLS_464({
         value: "gradient",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_413));
-    __VLS_415.slots.default;
-    var __VLS_415;
-    const __VLS_416 = {}.ElRadioButton;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_464));
+    __VLS_466.slots.default;
+    var __VLS_466;
+    const __VLS_467 = {}.ElRadioButton;
     /** @type {[typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, ]} */ ;
     // @ts-ignore
-    const __VLS_417 = __VLS_asFunctionalComponent(__VLS_416, new __VLS_416({
+    const __VLS_468 = __VLS_asFunctionalComponent(__VLS_467, new __VLS_467({
         value: "image",
     }));
-    const __VLS_418 = __VLS_417({
+    const __VLS_469 = __VLS_468({
         value: "image",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_417));
-    __VLS_419.slots.default;
-    var __VLS_419;
-    var __VLS_403;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_468));
+    __VLS_470.slots.default;
+    var __VLS_470;
+    var __VLS_454;
     if (__VLS_ctx.overlayConfig.bgType === 'solid') {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "bg-insp-color-row" },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-        const __VLS_420 = {}.ElColorPicker;
+        const __VLS_471 = {}.ElColorPicker;
         /** @type {[typeof __VLS_components.ElColorPicker, typeof __VLS_components.elColorPicker, ]} */ ;
         // @ts-ignore
-        const __VLS_421 = __VLS_asFunctionalComponent(__VLS_420, new __VLS_420({
+        const __VLS_472 = __VLS_asFunctionalComponent(__VLS_471, new __VLS_471({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.bgColor),
             showAlpha: true,
         }));
-        const __VLS_422 = __VLS_421({
+        const __VLS_473 = __VLS_472({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.bgColor),
             showAlpha: true,
-        }, ...__VLS_functionalComponentArgsRest(__VLS_421));
-        let __VLS_424;
-        let __VLS_425;
-        let __VLS_426;
-        const __VLS_427 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_472));
+        let __VLS_475;
+        let __VLS_476;
+        let __VLS_477;
+        const __VLS_478 = {
             onChange: (__VLS_ctx.saveOverlay)
         };
-        var __VLS_423;
+        var __VLS_474;
     }
     else if (__VLS_ctx.overlayConfig.bgType === 'gradient') {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -3595,79 +3780,79 @@ if (__VLS_ctx.overlaySelected) {
             ...{ class: "bg-insp-color-row" },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-        const __VLS_428 = {}.ElColorPicker;
+        const __VLS_479 = {}.ElColorPicker;
         /** @type {[typeof __VLS_components.ElColorPicker, typeof __VLS_components.elColorPicker, ]} */ ;
         // @ts-ignore
-        const __VLS_429 = __VLS_asFunctionalComponent(__VLS_428, new __VLS_428({
+        const __VLS_480 = __VLS_asFunctionalComponent(__VLS_479, new __VLS_479({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.gradientStart),
             showAlpha: true,
         }));
-        const __VLS_430 = __VLS_429({
+        const __VLS_481 = __VLS_480({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.gradientStart),
             showAlpha: true,
-        }, ...__VLS_functionalComponentArgsRest(__VLS_429));
-        let __VLS_432;
-        let __VLS_433;
-        let __VLS_434;
-        const __VLS_435 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_480));
+        let __VLS_483;
+        let __VLS_484;
+        let __VLS_485;
+        const __VLS_486 = {
             onChange: (__VLS_ctx.saveOverlay)
         };
-        var __VLS_431;
+        var __VLS_482;
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "bg-insp-color-row" },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-        const __VLS_436 = {}.ElColorPicker;
+        const __VLS_487 = {}.ElColorPicker;
         /** @type {[typeof __VLS_components.ElColorPicker, typeof __VLS_components.elColorPicker, ]} */ ;
         // @ts-ignore
-        const __VLS_437 = __VLS_asFunctionalComponent(__VLS_436, new __VLS_436({
+        const __VLS_488 = __VLS_asFunctionalComponent(__VLS_487, new __VLS_487({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.gradientEnd),
             showAlpha: true,
         }));
-        const __VLS_438 = __VLS_437({
+        const __VLS_489 = __VLS_488({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.gradientEnd),
             showAlpha: true,
-        }, ...__VLS_functionalComponentArgsRest(__VLS_437));
-        let __VLS_440;
-        let __VLS_441;
-        let __VLS_442;
-        const __VLS_443 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_488));
+        let __VLS_491;
+        let __VLS_492;
+        let __VLS_493;
+        const __VLS_494 = {
             onChange: (__VLS_ctx.saveOverlay)
         };
-        var __VLS_439;
+        var __VLS_490;
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "bg-insp-slider-row" },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         (__VLS_ctx.overlayConfig.gradientAngle);
-        const __VLS_444 = {}.ElSlider;
+        const __VLS_495 = {}.ElSlider;
         /** @type {[typeof __VLS_components.ElSlider, typeof __VLS_components.elSlider, ]} */ ;
         // @ts-ignore
-        const __VLS_445 = __VLS_asFunctionalComponent(__VLS_444, new __VLS_444({
+        const __VLS_496 = __VLS_asFunctionalComponent(__VLS_495, new __VLS_495({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.gradientAngle),
             min: (0),
             max: (360),
             ...{ style: {} },
         }));
-        const __VLS_446 = __VLS_445({
+        const __VLS_497 = __VLS_496({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.gradientAngle),
             min: (0),
             max: (360),
             ...{ style: {} },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_445));
-        let __VLS_448;
-        let __VLS_449;
-        let __VLS_450;
-        const __VLS_451 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_496));
+        let __VLS_499;
+        let __VLS_500;
+        let __VLS_501;
+        const __VLS_502 = {
             onChange: (__VLS_ctx.saveOverlay)
         };
-        var __VLS_447;
+        var __VLS_498;
     }
     else if (__VLS_ctx.overlayConfig.bgType === 'image') {
         if (__VLS_ctx.overlayConfig.bgImage) {
@@ -3679,47 +3864,47 @@ if (__VLS_ctx.overlaySelected) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "bg-insp-btn-row" },
         });
-        const __VLS_452 = {}.ElButton;
+        const __VLS_503 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_453 = __VLS_asFunctionalComponent(__VLS_452, new __VLS_452({
+        const __VLS_504 = __VLS_asFunctionalComponent(__VLS_503, new __VLS_503({
             ...{ 'onClick': {} },
             size: "small",
             loading: (__VLS_ctx.bgImgUploading),
         }));
-        const __VLS_454 = __VLS_453({
+        const __VLS_505 = __VLS_504({
             ...{ 'onClick': {} },
             size: "small",
             loading: (__VLS_ctx.bgImgUploading),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_453));
-        let __VLS_456;
-        let __VLS_457;
-        let __VLS_458;
-        const __VLS_459 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_504));
+        let __VLS_507;
+        let __VLS_508;
+        let __VLS_509;
+        const __VLS_510 = {
             onClick: (__VLS_ctx.triggerBgImageUpload)
         };
-        __VLS_455.slots.default;
-        var __VLS_455;
+        __VLS_506.slots.default;
+        var __VLS_506;
         if (__VLS_ctx.overlayConfig.bgImage) {
-            const __VLS_460 = {}.ElButton;
+            const __VLS_511 = {}.ElButton;
             /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
             // @ts-ignore
-            const __VLS_461 = __VLS_asFunctionalComponent(__VLS_460, new __VLS_460({
+            const __VLS_512 = __VLS_asFunctionalComponent(__VLS_511, new __VLS_511({
                 ...{ 'onClick': {} },
                 size: "small",
                 type: "danger",
                 plain: true,
             }));
-            const __VLS_462 = __VLS_461({
+            const __VLS_513 = __VLS_512({
                 ...{ 'onClick': {} },
                 size: "small",
                 type: "danger",
                 plain: true,
-            }, ...__VLS_functionalComponentArgsRest(__VLS_461));
-            let __VLS_464;
-            let __VLS_465;
-            let __VLS_466;
-            const __VLS_467 = {
+            }, ...__VLS_functionalComponentArgsRest(__VLS_512));
+            let __VLS_515;
+            let __VLS_516;
+            let __VLS_517;
+            const __VLS_518 = {
                 onClick: (...[$event]) => {
                     if (!(__VLS_ctx.overlaySelected))
                         return;
@@ -3735,8 +3920,8 @@ if (__VLS_ctx.overlaySelected) {
                     __VLS_ctx.saveOverlay();
                 }
             };
-            __VLS_463.slots.default;
-            var __VLS_463;
+            __VLS_514.slots.default;
+            var __VLS_514;
         }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
             ...{ onChange: (__VLS_ctx.handleBgImageUpload) },
@@ -3751,26 +3936,26 @@ if (__VLS_ctx.overlaySelected) {
             ...{ style: {} },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-        const __VLS_468 = {}.ElColorPicker;
+        const __VLS_519 = {}.ElColorPicker;
         /** @type {[typeof __VLS_components.ElColorPicker, typeof __VLS_components.elColorPicker, ]} */ ;
         // @ts-ignore
-        const __VLS_469 = __VLS_asFunctionalComponent(__VLS_468, new __VLS_468({
+        const __VLS_520 = __VLS_asFunctionalComponent(__VLS_519, new __VLS_519({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.bgColor),
             showAlpha: true,
         }));
-        const __VLS_470 = __VLS_469({
+        const __VLS_521 = __VLS_520({
             ...{ 'onChange': {} },
             modelValue: (__VLS_ctx.overlayConfig.bgColor),
             showAlpha: true,
-        }, ...__VLS_functionalComponentArgsRest(__VLS_469));
-        let __VLS_472;
-        let __VLS_473;
-        let __VLS_474;
-        const __VLS_475 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_520));
+        let __VLS_523;
+        let __VLS_524;
+        let __VLS_525;
+        const __VLS_526 = {
             onChange: (__VLS_ctx.saveOverlay)
         };
-        var __VLS_471;
+        var __VLS_522;
     }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "bg-insp-slider-row" },
@@ -3778,10 +3963,10 @@ if (__VLS_ctx.overlaySelected) {
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (Math.round(__VLS_ctx.overlayConfig.opacity * 100));
-    const __VLS_476 = {}.ElSlider;
+    const __VLS_527 = {}.ElSlider;
     /** @type {[typeof __VLS_components.ElSlider, typeof __VLS_components.elSlider, ]} */ ;
     // @ts-ignore
-    const __VLS_477 = __VLS_asFunctionalComponent(__VLS_476, new __VLS_476({
+    const __VLS_528 = __VLS_asFunctionalComponent(__VLS_527, new __VLS_527({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.opacity),
         min: (0.05),
@@ -3789,21 +3974,21 @@ if (__VLS_ctx.overlaySelected) {
         step: (0.05),
         ...{ style: {} },
     }));
-    const __VLS_478 = __VLS_477({
+    const __VLS_529 = __VLS_528({
         ...{ 'onChange': {} },
         modelValue: (__VLS_ctx.overlayConfig.opacity),
         min: (0.05),
         max: (1),
         step: (0.05),
         ...{ style: {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_477));
-    let __VLS_480;
-    let __VLS_481;
-    let __VLS_482;
-    const __VLS_483 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_528));
+    let __VLS_531;
+    let __VLS_532;
+    let __VLS_533;
+    const __VLS_534 = {
         onChange: (__VLS_ctx.saveOverlay)
     };
-    var __VLS_479;
+    var __VLS_530;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "bg-insp-section" },
     });
@@ -3817,7 +4002,7 @@ if (__VLS_ctx.overlaySelected) {
 else {
     /** @type {[typeof EditorComponentInspector, ]} */ ;
     // @ts-ignore
-    const __VLS_484 = __VLS_asFunctionalComponent(EditorComponentInspector, new EditorComponentInspector({
+    const __VLS_535 = __VLS_asFunctionalComponent(EditorComponentInspector, new EditorComponentInspector({
         ...{ 'onApplyLayout': {} },
         ...{ 'onBringFront': {} },
         ...{ 'onRemove': {} },
@@ -3827,7 +4012,7 @@ else {
         component: (__VLS_ctx.activeComponent),
         chart: (__VLS_ctx.activeChart),
     }));
-    const __VLS_485 = __VLS_484({
+    const __VLS_536 = __VLS_535({
         ...{ 'onApplyLayout': {} },
         ...{ 'onBringFront': {} },
         ...{ 'onRemove': {} },
@@ -3836,259 +4021,259 @@ else {
         scene: "screen",
         component: (__VLS_ctx.activeComponent),
         chart: (__VLS_ctx.activeChart),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_484));
-    let __VLS_487;
-    let __VLS_488;
-    let __VLS_489;
-    const __VLS_490 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_535));
+    let __VLS_538;
+    let __VLS_539;
+    let __VLS_540;
+    const __VLS_541 = {
         onApplyLayout: (__VLS_ctx.applyLayoutPatch)
     };
-    const __VLS_491 = {
+    const __VLS_542 = {
         onBringFront: (__VLS_ctx.bringComponentToFront)
     };
-    const __VLS_492 = {
+    const __VLS_543 = {
         onRemove: (__VLS_ctx.handleRemoveActiveComponent)
     };
-    const __VLS_493 = {
+    const __VLS_544 = {
         onPreviewComponent: (__VLS_ctx.previewActiveComponent)
     };
-    const __VLS_494 = {
+    const __VLS_545 = {
         onSaveComponent: (__VLS_ctx.saveActiveComponent)
     };
-    var __VLS_486;
+    var __VLS_537;
 }
-const __VLS_495 = {}.ElDialog;
+const __VLS_546 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_496 = __VLS_asFunctionalComponent(__VLS_495, new __VLS_495({
+const __VLS_547 = __VLS_asFunctionalComponent(__VLS_546, new __VLS_546({
     modelValue: (__VLS_ctx.createDashVisible),
     title: "新建数据大屏",
     width: "420px",
     destroyOnClose: true,
 }));
-const __VLS_497 = __VLS_496({
+const __VLS_548 = __VLS_547({
     modelValue: (__VLS_ctx.createDashVisible),
     title: "新建数据大屏",
     width: "420px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_496));
-__VLS_498.slots.default;
-const __VLS_499 = {}.ElForm;
+}, ...__VLS_functionalComponentArgsRest(__VLS_547));
+__VLS_549.slots.default;
+const __VLS_550 = {}.ElForm;
 /** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
-const __VLS_500 = __VLS_asFunctionalComponent(__VLS_499, new __VLS_499({
+const __VLS_551 = __VLS_asFunctionalComponent(__VLS_550, new __VLS_550({
     model: (__VLS_ctx.dashForm),
     labelWidth: "80px",
 }));
-const __VLS_501 = __VLS_500({
+const __VLS_552 = __VLS_551({
     model: (__VLS_ctx.dashForm),
     labelWidth: "80px",
-}, ...__VLS_functionalComponentArgsRest(__VLS_500));
-__VLS_502.slots.default;
-const __VLS_503 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_551));
+__VLS_553.slots.default;
+const __VLS_554 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_504 = __VLS_asFunctionalComponent(__VLS_503, new __VLS_503({
+const __VLS_555 = __VLS_asFunctionalComponent(__VLS_554, new __VLS_554({
     label: "名称",
 }));
-const __VLS_505 = __VLS_504({
+const __VLS_556 = __VLS_555({
     label: "名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_504));
-__VLS_506.slots.default;
-const __VLS_507 = {}.ElInput;
+}, ...__VLS_functionalComponentArgsRest(__VLS_555));
+__VLS_557.slots.default;
+const __VLS_558 = {}.ElInput;
 /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
-const __VLS_508 = __VLS_asFunctionalComponent(__VLS_507, new __VLS_507({
+const __VLS_559 = __VLS_asFunctionalComponent(__VLS_558, new __VLS_558({
     modelValue: (__VLS_ctx.dashForm.name),
     placeholder: "请输入大屏名称",
 }));
-const __VLS_509 = __VLS_508({
+const __VLS_560 = __VLS_559({
     modelValue: (__VLS_ctx.dashForm.name),
     placeholder: "请输入大屏名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_508));
-var __VLS_506;
-var __VLS_502;
+}, ...__VLS_functionalComponentArgsRest(__VLS_559));
+var __VLS_557;
+var __VLS_553;
 {
-    const { footer: __VLS_thisSlot } = __VLS_498.slots;
-    const __VLS_511 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_549.slots;
+    const __VLS_562 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_512 = __VLS_asFunctionalComponent(__VLS_511, new __VLS_511({
+    const __VLS_563 = __VLS_asFunctionalComponent(__VLS_562, new __VLS_562({
         ...{ 'onClick': {} },
     }));
-    const __VLS_513 = __VLS_512({
+    const __VLS_564 = __VLS_563({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_512));
-    let __VLS_515;
-    let __VLS_516;
-    let __VLS_517;
-    const __VLS_518 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_563));
+    let __VLS_566;
+    let __VLS_567;
+    let __VLS_568;
+    const __VLS_569 = {
         onClick: (...[$event]) => {
             __VLS_ctx.createDashVisible = false;
         }
     };
-    __VLS_514.slots.default;
-    var __VLS_514;
-    const __VLS_519 = {}.ElButton;
+    __VLS_565.slots.default;
+    var __VLS_565;
+    const __VLS_570 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_520 = __VLS_asFunctionalComponent(__VLS_519, new __VLS_519({
+    const __VLS_571 = __VLS_asFunctionalComponent(__VLS_570, new __VLS_570({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.dashSaving),
     }));
-    const __VLS_521 = __VLS_520({
+    const __VLS_572 = __VLS_571({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.dashSaving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_520));
-    let __VLS_523;
-    let __VLS_524;
-    let __VLS_525;
-    const __VLS_526 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_571));
+    let __VLS_574;
+    let __VLS_575;
+    let __VLS_576;
+    const __VLS_577 = {
         onClick: (__VLS_ctx.handleCreateDashboard)
     };
-    __VLS_522.slots.default;
-    var __VLS_522;
+    __VLS_573.slots.default;
+    var __VLS_573;
 }
-var __VLS_498;
-const __VLS_527 = {}.ElDialog;
+var __VLS_549;
+const __VLS_578 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_528 = __VLS_asFunctionalComponent(__VLS_527, new __VLS_527({
+const __VLS_579 = __VLS_asFunctionalComponent(__VLS_578, new __VLS_578({
     modelValue: (__VLS_ctx.templateSaveVisible),
     title: "保存为可复用组件",
     width: "460px",
     destroyOnClose: true,
 }));
-const __VLS_529 = __VLS_528({
+const __VLS_580 = __VLS_579({
     modelValue: (__VLS_ctx.templateSaveVisible),
     title: "保存为可复用组件",
     width: "460px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_528));
-__VLS_530.slots.default;
-const __VLS_531 = {}.ElForm;
+}, ...__VLS_functionalComponentArgsRest(__VLS_579));
+__VLS_581.slots.default;
+const __VLS_582 = {}.ElForm;
 /** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
-const __VLS_532 = __VLS_asFunctionalComponent(__VLS_531, new __VLS_531({
+const __VLS_583 = __VLS_asFunctionalComponent(__VLS_582, new __VLS_582({
     model: (__VLS_ctx.templateForm),
     labelWidth: "90px",
 }));
-const __VLS_533 = __VLS_532({
+const __VLS_584 = __VLS_583({
     model: (__VLS_ctx.templateForm),
     labelWidth: "90px",
-}, ...__VLS_functionalComponentArgsRest(__VLS_532));
-__VLS_534.slots.default;
-const __VLS_535 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_583));
+__VLS_585.slots.default;
+const __VLS_586 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_536 = __VLS_asFunctionalComponent(__VLS_535, new __VLS_535({
+const __VLS_587 = __VLS_asFunctionalComponent(__VLS_586, new __VLS_586({
     label: "组件名称",
 }));
-const __VLS_537 = __VLS_536({
+const __VLS_588 = __VLS_587({
     label: "组件名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_536));
-__VLS_538.slots.default;
-const __VLS_539 = {}.ElInput;
+}, ...__VLS_functionalComponentArgsRest(__VLS_587));
+__VLS_589.slots.default;
+const __VLS_590 = {}.ElInput;
 /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
-const __VLS_540 = __VLS_asFunctionalComponent(__VLS_539, new __VLS_539({
+const __VLS_591 = __VLS_asFunctionalComponent(__VLS_590, new __VLS_590({
     modelValue: (__VLS_ctx.templateForm.name),
     placeholder: "请输入组件资产名称",
 }));
-const __VLS_541 = __VLS_540({
+const __VLS_592 = __VLS_591({
     modelValue: (__VLS_ctx.templateForm.name),
     placeholder: "请输入组件资产名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_540));
-var __VLS_538;
-const __VLS_543 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_591));
+var __VLS_589;
+const __VLS_594 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_544 = __VLS_asFunctionalComponent(__VLS_543, new __VLS_543({
+const __VLS_595 = __VLS_asFunctionalComponent(__VLS_594, new __VLS_594({
     label: "说明",
 }));
-const __VLS_545 = __VLS_544({
+const __VLS_596 = __VLS_595({
     label: "说明",
-}, ...__VLS_functionalComponentArgsRest(__VLS_544));
-__VLS_546.slots.default;
-const __VLS_547 = {}.ElInput;
+}, ...__VLS_functionalComponentArgsRest(__VLS_595));
+__VLS_597.slots.default;
+const __VLS_598 = {}.ElInput;
 /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
-const __VLS_548 = __VLS_asFunctionalComponent(__VLS_547, new __VLS_547({
+const __VLS_599 = __VLS_asFunctionalComponent(__VLS_598, new __VLS_598({
     modelValue: (__VLS_ctx.templateForm.description),
     type: "textarea",
     rows: (3),
     placeholder: "说明这个组件适合什么场景",
 }));
-const __VLS_549 = __VLS_548({
+const __VLS_600 = __VLS_599({
     modelValue: (__VLS_ctx.templateForm.description),
     type: "textarea",
     rows: (3),
     placeholder: "说明这个组件适合什么场景",
-}, ...__VLS_functionalComponentArgsRest(__VLS_548));
-var __VLS_546;
-var __VLS_534;
+}, ...__VLS_functionalComponentArgsRest(__VLS_599));
+var __VLS_597;
+var __VLS_585;
 {
-    const { footer: __VLS_thisSlot } = __VLS_530.slots;
-    const __VLS_551 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_581.slots;
+    const __VLS_602 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_552 = __VLS_asFunctionalComponent(__VLS_551, new __VLS_551({
+    const __VLS_603 = __VLS_asFunctionalComponent(__VLS_602, new __VLS_602({
         ...{ 'onClick': {} },
     }));
-    const __VLS_553 = __VLS_552({
+    const __VLS_604 = __VLS_603({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_552));
-    let __VLS_555;
-    let __VLS_556;
-    let __VLS_557;
-    const __VLS_558 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_603));
+    let __VLS_606;
+    let __VLS_607;
+    let __VLS_608;
+    const __VLS_609 = {
         onClick: (...[$event]) => {
             __VLS_ctx.templateSaveVisible = false;
         }
     };
-    __VLS_554.slots.default;
-    var __VLS_554;
-    const __VLS_559 = {}.ElButton;
+    __VLS_605.slots.default;
+    var __VLS_605;
+    const __VLS_610 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_560 = __VLS_asFunctionalComponent(__VLS_559, new __VLS_559({
+    const __VLS_611 = __VLS_asFunctionalComponent(__VLS_610, new __VLS_610({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.templateSaving),
     }));
-    const __VLS_561 = __VLS_560({
+    const __VLS_612 = __VLS_611({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.templateSaving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_560));
-    let __VLS_563;
-    let __VLS_564;
-    let __VLS_565;
-    const __VLS_566 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_611));
+    let __VLS_614;
+    let __VLS_615;
+    let __VLS_616;
+    const __VLS_617 = {
         onClick: (__VLS_ctx.saveActiveComponentAsAsset)
     };
-    __VLS_562.slots.default;
-    var __VLS_562;
+    __VLS_613.slots.default;
+    var __VLS_613;
 }
-var __VLS_530;
-const __VLS_567 = {}.ElDialog;
+var __VLS_581;
+const __VLS_618 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_568 = __VLS_asFunctionalComponent(__VLS_567, new __VLS_567({
+const __VLS_619 = __VLS_asFunctionalComponent(__VLS_618, new __VLS_618({
     modelValue: (__VLS_ctx.shareVisible),
     title: "分享数据大屏",
     width: "520px",
     destroyOnClose: true,
 }));
-const __VLS_569 = __VLS_568({
+const __VLS_620 = __VLS_619({
     modelValue: (__VLS_ctx.shareVisible),
     title: "分享数据大屏",
     width: "520px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_568));
-__VLS_570.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_619));
+__VLS_621.slots.default;
 if (__VLS_ctx.isPublished) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "share-block" },
@@ -4096,306 +4281,306 @@ if (__VLS_ctx.isPublished) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "share-label" },
     });
-    const __VLS_571 = {}.ElInput;
+    const __VLS_622 = {}.ElInput;
     /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
     // @ts-ignore
-    const __VLS_572 = __VLS_asFunctionalComponent(__VLS_571, new __VLS_571({
+    const __VLS_623 = __VLS_asFunctionalComponent(__VLS_622, new __VLS_622({
         modelValue: (__VLS_ctx.shareLink),
         readonly: true,
     }));
-    const __VLS_573 = __VLS_572({
+    const __VLS_624 = __VLS_623({
         modelValue: (__VLS_ctx.shareLink),
         readonly: true,
-    }, ...__VLS_functionalComponentArgsRest(__VLS_572));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_623));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "share-tip" },
     });
 }
 else {
-    const __VLS_575 = {}.ElAlert;
+    const __VLS_626 = {}.ElAlert;
     /** @type {[typeof __VLS_components.ElAlert, typeof __VLS_components.elAlert, ]} */ ;
     // @ts-ignore
-    const __VLS_576 = __VLS_asFunctionalComponent(__VLS_575, new __VLS_575({
+    const __VLS_627 = __VLS_asFunctionalComponent(__VLS_626, new __VLS_626({
         title: "当前数据大屏尚未正式发布",
         type: "warning",
         closable: (false),
         description: "请先设置发布状态、访问角色和正式分享链接，再对外分享。",
     }));
-    const __VLS_577 = __VLS_576({
+    const __VLS_628 = __VLS_627({
         title: "当前数据大屏尚未正式发布",
         type: "warning",
         closable: (false),
         description: "请先设置发布状态、访问角色和正式分享链接，再对外分享。",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_576));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_627));
 }
 {
-    const { footer: __VLS_thisSlot } = __VLS_570.slots;
-    const __VLS_579 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_621.slots;
+    const __VLS_630 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_580 = __VLS_asFunctionalComponent(__VLS_579, new __VLS_579({
+    const __VLS_631 = __VLS_asFunctionalComponent(__VLS_630, new __VLS_630({
         ...{ 'onClick': {} },
     }));
-    const __VLS_581 = __VLS_580({
+    const __VLS_632 = __VLS_631({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_580));
-    let __VLS_583;
-    let __VLS_584;
-    let __VLS_585;
-    const __VLS_586 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_631));
+    let __VLS_634;
+    let __VLS_635;
+    let __VLS_636;
+    const __VLS_637 = {
         onClick: (...[$event]) => {
             __VLS_ctx.shareVisible = false;
         }
     };
-    __VLS_582.slots.default;
-    var __VLS_582;
+    __VLS_633.slots.default;
+    var __VLS_633;
     if (!__VLS_ctx.isPublished) {
-        const __VLS_587 = {}.ElButton;
+        const __VLS_638 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_588 = __VLS_asFunctionalComponent(__VLS_587, new __VLS_587({
+        const __VLS_639 = __VLS_asFunctionalComponent(__VLS_638, new __VLS_638({
             ...{ 'onClick': {} },
             type: "primary",
         }));
-        const __VLS_589 = __VLS_588({
+        const __VLS_640 = __VLS_639({
             ...{ 'onClick': {} },
             type: "primary",
-        }, ...__VLS_functionalComponentArgsRest(__VLS_588));
-        let __VLS_591;
-        let __VLS_592;
-        let __VLS_593;
-        const __VLS_594 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_639));
+        let __VLS_642;
+        let __VLS_643;
+        let __VLS_644;
+        const __VLS_645 = {
             onClick: (__VLS_ctx.openPublishDialog)
         };
-        __VLS_590.slots.default;
-        var __VLS_590;
+        __VLS_641.slots.default;
+        var __VLS_641;
     }
     else {
-        const __VLS_595 = {}.ElButton;
+        const __VLS_646 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_596 = __VLS_asFunctionalComponent(__VLS_595, new __VLS_595({
+        const __VLS_647 = __VLS_asFunctionalComponent(__VLS_646, new __VLS_646({
             ...{ 'onClick': {} },
         }));
-        const __VLS_597 = __VLS_596({
+        const __VLS_648 = __VLS_647({
             ...{ 'onClick': {} },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_596));
-        let __VLS_599;
-        let __VLS_600;
-        let __VLS_601;
-        const __VLS_602 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_647));
+        let __VLS_650;
+        let __VLS_651;
+        let __VLS_652;
+        const __VLS_653 = {
             onClick: (...[$event]) => {
                 if (!!(!__VLS_ctx.isPublished))
                     return;
                 __VLS_ctx.openPreview(true);
             }
         };
-        __VLS_598.slots.default;
-        var __VLS_598;
-        const __VLS_603 = {}.ElButton;
+        __VLS_649.slots.default;
+        var __VLS_649;
+        const __VLS_654 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_604 = __VLS_asFunctionalComponent(__VLS_603, new __VLS_603({
+        const __VLS_655 = __VLS_asFunctionalComponent(__VLS_654, new __VLS_654({
             ...{ 'onClick': {} },
             type: "primary",
         }));
-        const __VLS_605 = __VLS_604({
+        const __VLS_656 = __VLS_655({
             ...{ 'onClick': {} },
             type: "primary",
-        }, ...__VLS_functionalComponentArgsRest(__VLS_604));
-        let __VLS_607;
-        let __VLS_608;
-        let __VLS_609;
-        const __VLS_610 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_655));
+        let __VLS_658;
+        let __VLS_659;
+        let __VLS_660;
+        const __VLS_661 = {
             onClick: (__VLS_ctx.copyShareLink)
         };
-        __VLS_606.slots.default;
-        var __VLS_606;
+        __VLS_657.slots.default;
+        var __VLS_657;
     }
 }
-var __VLS_570;
-const __VLS_611 = {}.ElDialog;
+var __VLS_621;
+const __VLS_662 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_612 = __VLS_asFunctionalComponent(__VLS_611, new __VLS_611({
+const __VLS_663 = __VLS_asFunctionalComponent(__VLS_662, new __VLS_662({
     modelValue: (__VLS_ctx.publishVisible),
     title: "发布数据大屏",
     width: "560px",
     destroyOnClose: true,
 }));
-const __VLS_613 = __VLS_612({
+const __VLS_664 = __VLS_663({
     modelValue: (__VLS_ctx.publishVisible),
     title: "发布数据大屏",
     width: "560px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_612));
-__VLS_614.slots.default;
-const __VLS_615 = {}.ElForm;
+}, ...__VLS_functionalComponentArgsRest(__VLS_663));
+__VLS_665.slots.default;
+const __VLS_666 = {}.ElForm;
 /** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
-const __VLS_616 = __VLS_asFunctionalComponent(__VLS_615, new __VLS_615({
+const __VLS_667 = __VLS_asFunctionalComponent(__VLS_666, new __VLS_666({
     labelWidth: "120px",
 }));
-const __VLS_617 = __VLS_616({
+const __VLS_668 = __VLS_667({
     labelWidth: "120px",
-}, ...__VLS_functionalComponentArgsRest(__VLS_616));
-__VLS_618.slots.default;
-const __VLS_619 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_667));
+__VLS_669.slots.default;
+const __VLS_670 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_620 = __VLS_asFunctionalComponent(__VLS_619, new __VLS_619({
+const __VLS_671 = __VLS_asFunctionalComponent(__VLS_670, new __VLS_670({
     label: "发布状态",
 }));
-const __VLS_621 = __VLS_620({
+const __VLS_672 = __VLS_671({
     label: "发布状态",
-}, ...__VLS_functionalComponentArgsRest(__VLS_620));
-__VLS_622.slots.default;
-const __VLS_623 = {}.ElSwitch;
+}, ...__VLS_functionalComponentArgsRest(__VLS_671));
+__VLS_673.slots.default;
+const __VLS_674 = {}.ElSwitch;
 /** @type {[typeof __VLS_components.ElSwitch, typeof __VLS_components.elSwitch, ]} */ ;
 // @ts-ignore
-const __VLS_624 = __VLS_asFunctionalComponent(__VLS_623, new __VLS_623({
+const __VLS_675 = __VLS_asFunctionalComponent(__VLS_674, new __VLS_674({
     modelValue: (__VLS_ctx.publishForm.published),
     activeText: "已发布",
     inactiveText: "草稿",
 }));
-const __VLS_625 = __VLS_624({
+const __VLS_676 = __VLS_675({
     modelValue: (__VLS_ctx.publishForm.published),
     activeText: "已发布",
     inactiveText: "草稿",
-}, ...__VLS_functionalComponentArgsRest(__VLS_624));
-var __VLS_622;
-const __VLS_627 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_675));
+var __VLS_673;
+const __VLS_678 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_628 = __VLS_asFunctionalComponent(__VLS_627, new __VLS_627({
+const __VLS_679 = __VLS_asFunctionalComponent(__VLS_678, new __VLS_678({
     label: "允许匿名链接",
 }));
-const __VLS_629 = __VLS_628({
+const __VLS_680 = __VLS_679({
     label: "允许匿名链接",
-}, ...__VLS_functionalComponentArgsRest(__VLS_628));
-__VLS_630.slots.default;
-const __VLS_631 = {}.ElSwitch;
+}, ...__VLS_functionalComponentArgsRest(__VLS_679));
+__VLS_681.slots.default;
+const __VLS_682 = {}.ElSwitch;
 /** @type {[typeof __VLS_components.ElSwitch, typeof __VLS_components.elSwitch, ]} */ ;
 // @ts-ignore
-const __VLS_632 = __VLS_asFunctionalComponent(__VLS_631, new __VLS_631({
+const __VLS_683 = __VLS_asFunctionalComponent(__VLS_682, new __VLS_682({
     modelValue: (__VLS_ctx.publishForm.allowAnonymousAccess),
     activeText: "允许",
     inactiveText: "关闭",
 }));
-const __VLS_633 = __VLS_632({
+const __VLS_684 = __VLS_683({
     modelValue: (__VLS_ctx.publishForm.allowAnonymousAccess),
     activeText: "允许",
     inactiveText: "关闭",
-}, ...__VLS_functionalComponentArgsRest(__VLS_632));
-var __VLS_630;
-const __VLS_635 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_683));
+var __VLS_681;
+const __VLS_686 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_636 = __VLS_asFunctionalComponent(__VLS_635, new __VLS_635({
+const __VLS_687 = __VLS_asFunctionalComponent(__VLS_686, new __VLS_686({
     label: "允许访问角色",
 }));
-const __VLS_637 = __VLS_636({
+const __VLS_688 = __VLS_687({
     label: "允许访问角色",
-}, ...__VLS_functionalComponentArgsRest(__VLS_636));
-__VLS_638.slots.default;
-const __VLS_639 = {}.ElCheckboxGroup;
+}, ...__VLS_functionalComponentArgsRest(__VLS_687));
+__VLS_689.slots.default;
+const __VLS_690 = {}.ElCheckboxGroup;
 /** @type {[typeof __VLS_components.ElCheckboxGroup, typeof __VLS_components.elCheckboxGroup, typeof __VLS_components.ElCheckboxGroup, typeof __VLS_components.elCheckboxGroup, ]} */ ;
 // @ts-ignore
-const __VLS_640 = __VLS_asFunctionalComponent(__VLS_639, new __VLS_639({
+const __VLS_691 = __VLS_asFunctionalComponent(__VLS_690, new __VLS_690({
     modelValue: (__VLS_ctx.publishForm.allowedRoles),
 }));
-const __VLS_641 = __VLS_640({
+const __VLS_692 = __VLS_691({
     modelValue: (__VLS_ctx.publishForm.allowedRoles),
-}, ...__VLS_functionalComponentArgsRest(__VLS_640));
-__VLS_642.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_691));
+__VLS_693.slots.default;
 for (const [role] of __VLS_getVForSourceType((__VLS_ctx.roleOptions))) {
-    const __VLS_643 = {}.ElCheckbox;
+    const __VLS_694 = {}.ElCheckbox;
     /** @type {[typeof __VLS_components.ElCheckbox, typeof __VLS_components.elCheckbox, typeof __VLS_components.ElCheckbox, typeof __VLS_components.elCheckbox, ]} */ ;
     // @ts-ignore
-    const __VLS_644 = __VLS_asFunctionalComponent(__VLS_643, new __VLS_643({
+    const __VLS_695 = __VLS_asFunctionalComponent(__VLS_694, new __VLS_694({
         key: (role),
         label: (role),
     }));
-    const __VLS_645 = __VLS_644({
+    const __VLS_696 = __VLS_695({
         key: (role),
         label: (role),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_644));
-    __VLS_646.slots.default;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_695));
+    __VLS_697.slots.default;
     (role);
-    var __VLS_646;
+    var __VLS_697;
 }
-var __VLS_642;
-var __VLS_638;
-const __VLS_647 = {}.ElFormItem;
+var __VLS_693;
+var __VLS_689;
+const __VLS_698 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_648 = __VLS_asFunctionalComponent(__VLS_647, new __VLS_647({
+const __VLS_699 = __VLS_asFunctionalComponent(__VLS_698, new __VLS_698({
     label: "正式分享链接",
 }));
-const __VLS_649 = __VLS_648({
+const __VLS_700 = __VLS_699({
     label: "正式分享链接",
-}, ...__VLS_functionalComponentArgsRest(__VLS_648));
-__VLS_650.slots.default;
-const __VLS_651 = {}.ElInput;
+}, ...__VLS_functionalComponentArgsRest(__VLS_699));
+__VLS_701.slots.default;
+const __VLS_702 = {}.ElInput;
 /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
-const __VLS_652 = __VLS_asFunctionalComponent(__VLS_651, new __VLS_651({
+const __VLS_703 = __VLS_asFunctionalComponent(__VLS_702, new __VLS_702({
     modelValue: (__VLS_ctx.draftPublishedLink),
     readonly: true,
 }));
-const __VLS_653 = __VLS_652({
+const __VLS_704 = __VLS_703({
     modelValue: (__VLS_ctx.draftPublishedLink),
     readonly: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_652));
-var __VLS_650;
-var __VLS_618;
+}, ...__VLS_functionalComponentArgsRest(__VLS_703));
+var __VLS_701;
+var __VLS_669;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "share-tip" },
 });
 {
-    const { footer: __VLS_thisSlot } = __VLS_614.slots;
-    const __VLS_655 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_665.slots;
+    const __VLS_706 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_656 = __VLS_asFunctionalComponent(__VLS_655, new __VLS_655({
+    const __VLS_707 = __VLS_asFunctionalComponent(__VLS_706, new __VLS_706({
         ...{ 'onClick': {} },
     }));
-    const __VLS_657 = __VLS_656({
+    const __VLS_708 = __VLS_707({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_656));
-    let __VLS_659;
-    let __VLS_660;
-    let __VLS_661;
-    const __VLS_662 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_707));
+    let __VLS_710;
+    let __VLS_711;
+    let __VLS_712;
+    const __VLS_713 = {
         onClick: (...[$event]) => {
             __VLS_ctx.publishVisible = false;
         }
     };
-    __VLS_658.slots.default;
-    var __VLS_658;
-    const __VLS_663 = {}.ElButton;
+    __VLS_709.slots.default;
+    var __VLS_709;
+    const __VLS_714 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_664 = __VLS_asFunctionalComponent(__VLS_663, new __VLS_663({
+    const __VLS_715 = __VLS_asFunctionalComponent(__VLS_714, new __VLS_714({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.publishSaving),
     }));
-    const __VLS_665 = __VLS_664({
+    const __VLS_716 = __VLS_715({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.publishSaving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_664));
-    let __VLS_667;
-    let __VLS_668;
-    let __VLS_669;
-    const __VLS_670 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_715));
+    let __VLS_718;
+    let __VLS_719;
+    let __VLS_720;
+    const __VLS_721 = {
         onClick: (__VLS_ctx.savePublishSettings)
     };
-    __VLS_666.slots.default;
-    var __VLS_666;
+    __VLS_717.slots.default;
+    var __VLS_717;
 }
-var __VLS_614;
+var __VLS_665;
 /** @type {__VLS_StyleScopedClasses['screen-root']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-left-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-head']} */ ;
@@ -4491,6 +4676,8 @@ var __VLS_614;
 /** @type {__VLS_StyleScopedClasses['canvas-tb-controls']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-tb-sep']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-tb-tip']} */ ;
+/** @type {__VLS_StyleScopedClasses['canvas-tb-zoom']} */ ;
+/** @type {__VLS_StyleScopedClasses['zoom-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-tb-overlay-ctrl']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-work-area']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-ruler-row']} */ ;
@@ -4527,10 +4714,10 @@ var __VLS_614;
 /** @type {__VLS_StyleScopedClasses['stage-card-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['remove-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card-body']} */ ;
+/** @type {__VLS_StyleScopedClasses['filter-button-wrapper']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
 /** @type {__VLS_StyleScopedClasses['chart-placeholder']} */ ;
 /** @type {__VLS_StyleScopedClasses['warning']} */ ;
-/** @type {__VLS_StyleScopedClasses['chart-placeholder']} */ ;
 /** @type {__VLS_StyleScopedClasses['chart-canvas']} */ ;
 /** @type {__VLS_StyleScopedClasses['resize-handle']} */ ;
 /** @type {__VLS_StyleScopedClasses['resize-handle--n']} */ ;
@@ -4588,12 +4775,14 @@ const __VLS_self = (await import('vue')).defineComponent({
             Close: Close,
             Delete: Delete,
             Download: Download,
+            Filter: Filter,
             Plus: Plus,
             Promotion: Promotion,
             Refresh: Refresh,
             Search: Search,
             Share: Share,
             View: View,
+            ComponentDataFallback: ComponentDataFallback,
             EditorComponentInspector: EditorComponentInspector,
             chartTypeLabel: chartTypeLabel,
             SCREEN_CANVAS_PRESETS: SCREEN_CANVAS_PRESETS,
@@ -4612,6 +4801,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             currentDashboard: currentDashboard,
             components: components,
             datasetMap: datasetMap,
+            componentDataMap: componentDataMap,
             canvasRef: canvasRef,
             activeCompId: activeCompId,
             dashboardSearch: dashboardSearch,
@@ -4655,6 +4845,13 @@ const __VLS_self = (await import('vue')).defineComponent({
             getComponentChartConfig: getComponentChartConfig,
             matchedBgPreset: matchedBgPreset,
             canvasWorkWidth: canvasWorkWidth,
+            canvasScale: canvasScale,
+            SCALE_MIN: SCALE_MIN,
+            SCALE_MAX: SCALE_MAX,
+            zoomIn: zoomIn,
+            zoomOut: zoomOut,
+            zoomReset: zoomReset,
+            zoomFit: zoomFit,
             canvasMinHeight: canvasMinHeight,
             hRulerMarks: hRulerMarks,
             vRulerMarks: vRulerMarks,
@@ -4664,6 +4861,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectDashboard: selectDashboard,
             loadComponents: loadComponents,
             isTableChart: isTableChart,
+            isFilterButtonChart: isFilterButtonChart,
             isRenderableChart: isRenderableChart,
             showNoField: showNoField,
             getTableColumns: getTableColumns,

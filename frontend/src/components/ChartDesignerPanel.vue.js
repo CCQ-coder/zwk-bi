@@ -233,7 +233,7 @@ const onDatasetChange = async (dsId) => {
     previewLoading.value = true;
     try {
         const ds = datasets.value.find((d) => d.id === dsId);
-        if (ds) {
+        if (ds && ds.datasourceId) {
             const r = await previewDatasetSql({ datasourceId: ds.datasourceId, sqlText: ds.sqlText });
             previewColumns.value = r.columns;
         }

@@ -660,6 +660,21 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
     supportsBarStyle: false,
     stablePreview: false,
   },
+  filter_button: {
+    label: '筛选按钮',
+    description: '可绑定数据列的筛选控件，预览时点击弹出下拉选择。',
+    requiresDimension: true,
+    allowsOptionalDimension: false,
+    requiresMetric: false,
+    allowsGroup: false,
+    supportsLegend: false,
+    supportsAxisNames: false,
+    supportsGrid: false,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: false,
+    stablePreview: true,
+  },
 }
 
 export const COMPONENT_PRESETS: ComponentPreset[] = [
@@ -921,6 +936,7 @@ export const chartTypeLabel = (type: string) => ({
   treemap: '矩形树图',
   heatmap: '热力图',
   map: '地图',
+  filter_button: '筛选按钮',
 }[type] ?? (type || '未知类型'))
 
 const sumValues = (left: unknown, right: unknown) => {

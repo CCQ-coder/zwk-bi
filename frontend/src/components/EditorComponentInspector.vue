@@ -126,6 +126,9 @@
                     <el-option label="仪表盘" value="gauge" />
                     <el-option label="表格" value="table" />
                   </el-option-group>
+                  <el-option-group label="交互控件">
+                    <el-option label="筛选按钮" value="filter_button" />
+                  </el-option-group>
                 </el-select>
                 <div class="helper-text">{{ currentChartMeta.description }}</div>
               </el-form-item>

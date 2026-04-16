@@ -1,3 +1,11 @@
 {
-    "java.compile.nullAnalysis.mode": "disabled"
+    "java.compile.nullAnalysis.mode": "disabled",
+    "java.jdt.ls.java.home": "C:/Users/the/.jdks/ms-17.0.18",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-17",
+            "path": "C:/Users/the/.jdks/ms-17.0.18",
+            "default": true
+        }
+    ]
 }

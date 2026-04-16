@@ -1,9 +1,10 @@
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { createTemplate, deleteTemplate, getTemplateList, updateTemplate } from '../api/chart-template';
 import { getChartList } from '../api/chart';
-import { getDatasetFields, getDatasetList } from '../api/dataset';
-import { COLOR_THEMES, chartTypeLabel, normalizeComponentAssetConfig } from '../utils/component-config';
+import { getDatasetFields, getDatasetList, getDatasetPreviewData } from '../api/dataset';
+import * as echarts from 'echarts';
+import { buildComponentOption, COLOR_THEMES, chartTypeLabel, isCanvasRenderableChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config';
 const loading = ref(false);
 const saving = ref(false);
 const keyword = ref('');
@@ -248,6 +249,53 @@ const handleDelete = async (item) => {
     ElMessage.success(`已删除组件资产：${item.name}`);
     await loadAll();
 };
+// ─── 图表预览 ────────────────────────────────────────────────────────────────
+const previewChartRef = ref(null);
+let previewChartInstance = null;
+const previewLoading = ref(false);
+const isPreviewRenderable = computed(() => !!form.datasetId && !!form.xField && !!form.yField && isCanvasRenderableChartType(form.chartType));
+let previewTimer = null;
+const updatePreview = () => {
+    if (previewTimer)
+        clearTimeout(previewTimer);
+    previewTimer = setTimeout(async () => {
+        if (!isPreviewRenderable.value) {
+            previewChartInstance?.clear();
+            return;
+        }
+        await nextTick();
+        if (!previewChartRef.value)
+            return;
+        previewLoading.value = true;
+        try {
+            const result = await getDatasetPreviewData(form.datasetId);
+            const config = normalizeComponentAssetConfig(JSON.stringify(buildPayloadConfig()));
+            const data = materializeChartData(result.rows, result.columns, config.chart);
+            if (!previewChartInstance) {
+                previewChartInstance = echarts.init(previewChartRef.value, null, { renderer: 'canvas' });
+            }
+            else {
+                previewChartInstance.resize();
+            }
+            const option = buildComponentOption(data, config.chart, config.style);
+            previewChartInstance.setOption(option, true);
+        }
+        catch {
+            // 预览失败时静默处理
+        }
+        finally {
+            previewLoading.value = false;
+        }
+    }, 400);
+};
+watch(() => [form.datasetId, form.chartType, form.xField, form.yField, form.groupField,
+    form.theme, form.showLegend, form.showLabel, form.showGrid, form.smooth, form.areaFill], updatePreview);
+onUnmounted(() => {
+    if (previewTimer)
+        clearTimeout(previewTimer);
+    previewChartInstance?.dispose();
+    previewChartInstance = null;
+});
 onMounted(loadAll);
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
@@ -1204,8 +1252,24 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "preview-title" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.pre, __VLS_intrinsicElements.pre)({});
-(__VLS_ctx.previewConfigJson);
+if (__VLS_ctx.previewLoading) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ style: {} },
+    });
+}
+if (__VLS_ctx.isPreviewRenderable) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
+        ref: "previewChartRef",
+        ...{ style: {} },
+    });
+    /** @type {typeof __VLS_ctx.previewChartRef} */ ;
+}
+else {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.pre, __VLS_intrinsicElements.pre)({
+        ...{ style: {} },
+    });
+    (__VLS_ctx.previewConfigJson);
+}
 var __VLS_115;
 {
     const { footer: __VLS_thisSlot } = __VLS_111.slots;
@@ -1296,6 +1360,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             cloneTemplate: cloneTemplate,
             handleSubmit: handleSubmit,
             handleDelete: handleDelete,
+            previewChartRef: previewChartRef,
+            previewLoading: previewLoading,
+            isPreviewRenderable: isPreviewRenderable,
         };
     },
 });

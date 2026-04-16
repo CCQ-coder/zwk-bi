@@ -1,12 +1,12 @@
 server:
-  port: 8081
+  port: ${AI_BI_SERVER_PORT:8081}
 
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/ai_bi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
-    username: root
-    password: 123456
+    url: "${AI_BI_DB_URL:jdbc:mysql://localhost:3306/ai_bi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}"
+    username: "${AI_BI_DB_USERNAME:root}"
+    password: "${AI_BI_DB_PASSWORD:123456}"
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -19,13 +19,13 @@ mybatis:
 
 clickhouse:
   datasource:
-    url: jdbc:clickhouse://localhost:8123/ai_bi
-    username: default
-    password: ""
+    url: "${AI_BI_CLICKHOUSE_URL:jdbc:clickhouse://localhost:8123/ai_bi}"
+    username: "${AI_BI_CLICKHOUSE_USERNAME:default}"
+    password: "${AI_BI_CLICKHOUSE_PASSWORD:}"
 
 app:
   jwt:
-    secret: AI_BI_JWT_SECRET_2026_CHANGE_ME_TO_A_LONG_RANDOM_VALUE
-    expire-hours: 12
+    secret: "${AI_BI_JWT_SECRET:AI_BI_JWT_SECRET_2026_CHANGE_ME_TO_A_LONG_RANDOM_VALUE}"
+    expire-hours: ${AI_BI_JWT_EXPIRE_HOURS:12}
   upload:
-    path: D:/bi/jpg
+    path: "${AI_BI_UPLOAD_PATH:D:/bi/jpg}"

@@ -545,6 +545,21 @@ export const CHART_TYPE_META = {
         supportsBarStyle: false,
         stablePreview: false,
     },
+    filter_button: {
+        label: '筛选按钮',
+        description: '可绑定数据列的筛选控件，预览时点击弹出下拉选择。',
+        requiresDimension: true,
+        allowsOptionalDimension: false,
+        requiresMetric: false,
+        allowsGroup: false,
+        supportsLegend: false,
+        supportsAxisNames: false,
+        supportsGrid: false,
+        supportsSmooth: false,
+        supportsAreaFill: false,
+        supportsBarStyle: false,
+        stablePreview: true,
+    },
 };
 export const COMPONENT_PRESETS = [
     { id: 'trend-line', name: '时间趋势', description: '自动切为折线图，优先匹配时间列和指标列。', chartType: 'line' },
@@ -794,6 +809,7 @@ export const chartTypeLabel = (type) => ({
     treemap: '矩形树图',
     heatmap: '热力图',
     map: '地图',
+    filter_button: '筛选按钮',
 }[type] ?? (type || '未知类型'));
 const sumValues = (left, right) => {
     const leftNumber = Number(left ?? 0);

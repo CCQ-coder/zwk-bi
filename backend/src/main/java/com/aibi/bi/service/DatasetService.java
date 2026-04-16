@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -87,8 +88,12 @@ public class DatasetService {
         }
 
         // Add virtual root for uncategorized datasets
+        // Include datasets with null folderId AND orphaned datasets whose folderId
+        // points to a non-existent folder
+        Set<Long> existingFolderIds = folderMap.keySet();
         List<BiDataset> uncategorized = allDatasets.stream()
-                .filter(d -> d.getFolderId() == null)
+                .filter(d -> d.getFolderId() == null ||
+                        !existingFolderIds.contains(d.getFolderId()))
                 .collect(Collectors.toList());
         if (!uncategorized.isEmpty()) {
             BiDatasetFolder uncatFolder = new BiDatasetFolder();

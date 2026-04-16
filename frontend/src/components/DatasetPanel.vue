@@ -229,8 +229,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, defineComponent, h, onMounted, reactive, ref, withDirectives, vShow, type VNode } from 'vue'
+import { ElMessage, ElMessageBox, ElIcon, ElTooltip, ElButton } from 'element-plus'
 import { ArrowRight, DataLine, Delete, Edit, Folder, FolderAdd, Grid, Loading, Plus } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
@@ -257,10 +257,9 @@ import {
   type TableInfo
 } from '../api/datasource'
 
-// ---- Tree Node Component ----
-const TreeNode = defineComponent({
+// ---- Tree Node Component (render function, no runtime compiler needed) ----
+const TreeNode: ReturnType<typeof defineComponent> = defineComponent({
   name: 'TreeNode',
-  components: { ArrowRight, DataLine, Delete, Edit, Folder, FolderAdd, Plus },
   props: {
     node: { type: Object as () => DatasetFolder, required: true },
     selectedId: { type: Number as unknown as () => number | null, default: null }
@@ -270,53 +269,86 @@ const TreeNode = defineComponent({
     const expanded = ref(true)
     const hover = ref(false)
     const hoverDataset = ref<number | null>(null)
-    return { expanded, hover, hoverDataset, emit }
-  },
-  template: `
-    <div class="tree-folder">
-      <div class="folder-row" @mouseenter="hover=true" @mouseleave="hover=false" @click="expanded=!expanded">
-        <el-icon class="expand-icon" :style="{transform: expanded ? 'rotate(90deg)' : ''}"><ArrowRight /></el-icon>
-        <el-icon class="folder-icon" style="color:#e6a43c;margin-right:4px"><Folder /></el-icon>
-        <span class="folder-name">{{ node.name }}</span>
-        <div v-show="hover" class="node-actions" @click.stop>
-          <el-tooltip content="在此文件夹新建数据集"><el-button link :icon="Plus" @click="emit('add-dataset', node.id)" /></el-tooltip>
-          <el-tooltip content="新建子文件夹"><el-button link :icon="FolderAdd" @click="emit('add-folder', node.id)" /></el-tooltip>
-          <el-tooltip content="重命名"><el-button link :icon="Edit" @click="emit('rename-folder', node)" /></el-tooltip>
-          <el-tooltip v-if="node.id > 0" content="删除文件夹"><el-button link :icon="Delete" style="color:#f56c6c" @click="emit('delete-folder', node.id)" /></el-tooltip>
-        </div>
-      </div>
-      <div v-show="expanded" class="folder-children">
-        <TreeNode
-          v-for="child in node.children"
-          :key="child.id"
-          :node="child"
-          :selected-id="selectedId"
-          @select="(id) => emit('select', id)"
-          @add-dataset="(id) => emit('add-dataset', id)"
-          @add-folder="(id) => emit('add-folder', id)"
-          @rename-folder="(n) => emit('rename-folder', n)"
-          @delete-folder="(id) => emit('delete-folder', id)"
-          @delete-dataset="(id) => emit('delete-dataset', id)"
-        />
-        <div
-          v-for="ds in node.datasets"
-          :key="'ds-' + ds.id"
-          class="dataset-row"
-          :class="{ selected: selectedId === ds.id }"
-          @mouseenter="hoverDataset = ds.id"
-          @mouseleave="hoverDataset = null"
-          @click="emit('select', ds.id)"
-        >
-          <el-icon style="color:#409eff;margin-right:4px;font-size:12px"><DataLine /></el-icon>
-          <span class="dataset-name">{{ ds.name }}</span>
-          <div v-show="hoverDataset === ds.id && !!ds.datasourceId" class="node-actions" @click.stop>
-            <el-tooltip content="删除"><el-button link :icon="Delete" style="color:#f56c6c" @click="emit('delete-dataset', ds.id)" /></el-tooltip>
-          </div>
-        </div>
-        <div v-if="!node.children.length && !node.datasets.length" class="empty-folder">空文件夹</div>
-      </div>
-    </div>
-  `
+
+    return () => {
+      const node = props.node
+
+      // Folder row
+      const folderRow = h('div', {
+        class: 'folder-row',
+        onMouseenter: () => { hover.value = true },
+        onMouseleave: () => { hover.value = false },
+        onClick: () => { expanded.value = !expanded.value }
+      }, [
+        h(ElIcon, { class: 'expand-icon', style: { transform: expanded.value ? 'rotate(90deg)' : '' } }, () => h(ArrowRight)),
+        h(ElIcon, { class: 'folder-icon', style: 'color:#e6a43c;margin-right:4px' }, () => h(Folder)),
+        h('span', { class: 'folder-name' }, node.name),
+        withDirectives(h('div', { class: 'node-actions', onClick: (e: Event) => e.stopPropagation() }, [
+          h(ElTooltip, { content: '在此文件夹新建数据集' }, () =>
+            h(ElButton, { link: true, icon: Plus, onClick: () => emit('add-dataset', node.id) })
+          ),
+          h(ElTooltip, { content: '新建子文件夹' }, () =>
+            h(ElButton, { link: true, icon: FolderAdd, onClick: () => emit('add-folder', node.id) })
+          ),
+          h(ElTooltip, { content: '重命名' }, () =>
+            h(ElButton, { link: true, icon: Edit, onClick: () => emit('rename-folder', node) })
+          ),
+          ...(node.id > 0 ? [
+            h(ElTooltip, { content: '删除文件夹' }, () =>
+              h(ElButton, { link: true, icon: Delete, style: 'color:#f56c6c', onClick: () => emit('delete-folder', node.id) })
+            )
+          ] : [])
+        ]), [[vShow, hover.value]])
+      ])
+
+      // Child folders (recursive)
+      const childFolders = (node.children || []).map((child: DatasetFolder) =>
+        h(TreeNode, {
+          key: child.id,
+          node: child,
+          selectedId: props.selectedId,
+          onSelect: (id: number) => emit('select', id),
+          'onAdd-dataset': (id: number) => emit('add-dataset', id),
+          'onAdd-folder': (id: number) => emit('add-folder', id),
+          'onRename-folder': (n: DatasetFolder) => emit('rename-folder', n),
+          'onDelete-folder': (id: number) => emit('delete-folder', id),
+          'onDelete-dataset': (id: number) => emit('delete-dataset', id),
+        })
+      )
+
+      // Dataset rows
+      const datasetRows = (node.datasets || []).map((ds: Dataset) =>
+        h('div', {
+          key: 'ds-' + ds.id,
+          class: ['dataset-row', { selected: props.selectedId === ds.id }],
+          onMouseenter: () => { hoverDataset.value = ds.id },
+          onMouseleave: () => { hoverDataset.value = null },
+          onClick: () => emit('select', ds.id)
+        }, [
+          h(ElIcon, { style: 'color:#409eff;margin-right:4px;font-size:12px' }, () => h(DataLine)),
+          h('span', { class: 'dataset-name' }, ds.name),
+          withDirectives(h('div', { class: 'node-actions', onClick: (e: Event) => e.stopPropagation() }, [
+            h(ElTooltip, { content: '删除' }, () =>
+              h(ElButton, { link: true, icon: Delete, style: 'color:#f56c6c', onClick: () => emit('delete-dataset', ds.id) })
+            )
+          ]), [[vShow, hoverDataset.value === ds.id && !!ds.datasourceId]])
+        ])
+      )
+
+      // Empty folder hint
+      const emptyHint = (!node.children?.length && !node.datasets?.length)
+        ? [h('div', { class: 'empty-folder' }, '空文件夹')]
+        : []
+
+      // Children container
+      const childrenContainer = withDirectives(
+        h('div', { class: 'folder-children' }, [...childFolders, ...datasetRows, ...emptyHint]),
+        [[vShow, expanded.value]]
+      )
+
+      return h('div', { class: 'tree-folder' }, [folderRow, childrenContainer])
+    }
+  }
 })
 
 const folderTree = ref<DatasetFolder[]>([])
@@ -359,12 +391,12 @@ const filteredTables = computed(() =>
     : tables.value
 )
 
-// Flatten all folders for the folder selector
+// Flatten all folders for the folder selector (exclude virtual "未分类" folder)
 const allFoldersFlat = computed(() => {
   const result: DatasetFolder[] = []
   const flatten = (nodes: DatasetFolder[]) => {
     for (const n of nodes) {
-      result.push(n)
+      if (n.id > 0) result.push(n)
       if (n.children?.length) flatten(n.children)
     }
   }
@@ -575,6 +607,8 @@ const handleFolderSubmit = async () => {
     }
     folderDialogVisible.value = false
     await loadTree()
+  } catch {
+    // error already shown by request interceptor
   } finally {
     folderSaving.value = false
   }

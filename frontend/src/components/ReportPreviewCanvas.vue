@@ -1,7 +1,7 @@
 <template>
-  <div class="preview-shell" v-loading="loading || chartLoading">
+  <div class="preview-shell" :class="{ 'preview-shell--immersive': isImmersiveScreen }" v-loading="loading || chartLoading">
     <!-- 筛选条件 — 可折叠，仅在有筛选定义时显示 -->
-    <div v-if="filterDefinitions.length" class="filter-panel" :class="{ 'filter-panel--collapsed': filterCollapsed }">
+    <div v-if="showFilterPanelOutside" class="filter-panel" :class="{ 'filter-panel--collapsed': filterCollapsed }">
       <div class="filter-head" @click="filterCollapsed = !filterCollapsed">
         <div class="filter-head-left">
           <span class="filter-toggle-icon">{{ filterCollapsed ? '▶' : '▼' }}</span>
@@ -46,22 +46,66 @@
 
     <el-empty v-if="!loading && !dashboard" description="未找到对应报告" :image-size="88" />
 
-    <div v-else class="preview-stage-shell">
-      <div
-        ref="canvasRef"
-        class="preview-stage"
-        :class="`preview-stage--${scene}`"
-        :style="scene === 'screen'
-          ? { width: `${canvasConfig.width}px`, minHeight: `${canvasMinHeight}px`, height: `${canvasMinHeight}px` }
-          : { minHeight: `${canvasMinHeight}px` }"
-      >
+    <div v-else class="preview-stage-shell" :class="{ 'preview-stage-shell--immersive': isImmersiveScreen }">
+      <div class="preview-stage-host" :style="stageHostStyle">
+        <div
+          ref="canvasRef"
+          class="preview-stage"
+          :class="[`preview-stage--${scene}`, { 'preview-stage--immersive': isImmersiveScreen }]"
+          :style="stageStyle"
+        >
+      <div v-if="showFilterPanelInside" class="filter-panel filter-panel--floating" :class="{ 'filter-panel--collapsed': filterCollapsed }">
+        <div class="filter-head" @click="filterCollapsed = !filterCollapsed">
+          <div class="filter-head-left">
+            <span class="filter-toggle-icon">{{ filterCollapsed ? '▶' : '▼' }}</span>
+            <span class="filter-title">筛选条件</span>
+            <span v-if="activeFilterEntries.length" class="filter-active-badge">{{ activeFilterEntries.length }}</span>
+          </div>
+          <el-button v-if="!filterCollapsed && activeFilterEntries.length" link type="primary" size="small" @click.stop="clearFilters">清空</el-button>
+        </div>
+        <div v-show="!filterCollapsed" class="filter-body">
+          <div class="filter-grid">
+            <div v-for="definition in filterDefinitions" :key="definition.field" class="filter-item">
+              <div class="filter-item-label">{{ definition.field }}</div>
+              <el-select
+                :model-value="activeFilters[definition.field] || ''"
+                placeholder="全部"
+                clearable
+                filterable
+                @change="updateFilter(definition.field, $event)"
+              >
+                <el-option
+                  v-for="value in definition.values"
+                  :key="`${definition.field}-${value}`"
+                  :label="String(value)"
+                  :value="String(value)"
+                />
+              </el-select>
+            </div>
+          </div>
+          <div v-if="activeFilterEntries.length" class="filter-tags">
+            <el-tag
+              v-for="entry in activeFilterEntries"
+              :key="entry.field"
+              closable
+              effect="plain"
+              @close="clearSingleFilter(entry.field)"
+            >
+              {{ entry.field }}: {{ entry.value }}
+            </el-tag>
+          </div>
+        </div>
+      </div>
+
+      <!-- 背景板（幕布） -->
+      <div v-if="overlayStyle" :style="overlayStyle" />
       <div
         v-for="component in components"
         :key="component.id"
         class="preview-card"
         :style="getCardStyle(component)"
       >
-        <div class="preview-card-head">
+        <div v-if="!isFilterButtonChart(component)" class="preview-card-head">
           <div>
             <div class="preview-card-title">{{ getComponentChartConfig(component).name || '图表组件' }}</div>
             <div class="preview-card-meta">
@@ -72,7 +116,27 @@
         </div>
 
         <div class="preview-card-body">
-          <div v-if="isTableChart(component)" class="table-wrapper">
+          <!-- 筛选按钮 -->
+          <div v-if="isFilterButtonChart(component)" class="filter-button-preview">
+            <el-select
+              :model-value="activeFilters[getComponentChartConfig(component).xField] || ''"
+              :placeholder="getComponentChartConfig(component).name || '筛选'"
+              filterable
+              clearable
+              size="default"
+              style="width:100%"
+              @change="updateFilter(getComponentChartConfig(component).xField, $event)"
+            >
+              <el-option
+                v-for="val in getFilterButtonOptions(component)"
+                :key="val"
+                :label="val"
+                :value="val"
+              />
+            </el-select>
+          </div>
+
+          <div v-else-if="isTableChart(component)" class="table-wrapper">
             <el-table
               :data="getTableRows(component.id)"
               size="small"
@@ -113,9 +177,13 @@
             该组件缺少必要字段，暂时无法生成预览内容。
           </div>
 
-          <div v-else-if="!isRenderableChart(component)" class="preview-placeholder">
-            当前预览暂未支持 {{ chartTypeLabel(getComponentChartConfig(component).chartType) }} 的渲染。
-          </div>
+          <ComponentDataFallback
+            v-else-if="!isRenderableChart(component)"
+            :chart-type="getComponentChartConfig(component).chartType"
+            :chart-config="getComponentChartConfig(component)"
+            :data="componentDataMap.get(component.id) ?? null"
+            :dark="scene === 'screen'"
+          />
 
           <div
             v-else
@@ -130,6 +198,7 @@
         description="当前报告暂无组件"
         class="preview-empty"
       />
+        </div>
       </div>
     </div>
   </div>
@@ -138,6 +207,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import * as echarts from 'echarts'
+import ComponentDataFallback from './ComponentDataFallback.vue'
 import { getChartData, getChartList, type Chart, type ChartDataResult } from '../api/chart'
 import { getDashboardById, getDashboardComponents, type Dashboard, type DashboardComponent } from '../api/dashboard'
 import {
@@ -154,8 +224,9 @@ import {
   materializeChartData,
   mergeComponentRequestFilters,
   normalizeComponentConfig,
+  postProcessChartOption,
 } from '../utils/component-config'
-import { normalizeCanvasConfig, parseReportConfig } from '../utils/report-config'
+import { normalizeCanvasConfig, parseReportConfig, type CanvasOverlay } from '../utils/report-config'
 
 const props = defineProps<{
   dashboardId: number
@@ -166,7 +237,7 @@ const props = defineProps<{
 
 const loading = ref(false)
 const chartLoading = ref(false)
-const filterCollapsed = ref(false)
+const filterCollapsed = ref(props.scene === 'screen')
 const dashboard = ref<Dashboard | null>(null)
 const components = ref<DashboardComponent[]>([])
 const charts = ref<Chart[]>([])
@@ -176,6 +247,10 @@ const activeFilters = reactive<Record<string, string>>({})
 const canvasRef = ref<HTMLElement | null>(null)
 const chartRefs = new Map<number, HTMLElement>()
 const chartInstances = new Map<number, echarts.ECharts>()
+const viewportSize = reactive({
+  width: typeof window === 'undefined' ? 1920 : window.innerWidth,
+  height: typeof window === 'undefined' ? 1080 : window.innerHeight,
+})
 
 const MIN_CARD_WIDTH = 320
 const MIN_CARD_HEIGHT = 220
@@ -183,13 +258,47 @@ const LEGACY_GRID_COL_PX = 42
 const LEGACY_GRID_ROW_PX = 70
 const renderedChartCount = computed(() => components.value.filter((item) => isRenderableChart(item)).length)
 const isPublicPreview = computed(() => props.accessMode === 'public' && Boolean(props.shareToken))
+const isImmersiveScreen = computed(() => props.scene === 'screen')
 const getComponentConfig = (component: DashboardComponent) => normalizeComponentConfig(component.configJson, chartMap.value.get(component.chartId))
 const getComponentChartConfig = (component: DashboardComponent) => getComponentConfig(component).chart
 const getComponentInteractionConfig = (component: DashboardComponent) => getComponentConfig(component).interaction
 const canvasConfig = computed(() => normalizeCanvasConfig(parseReportConfig(dashboard.value?.configJson).canvas, props.scene))
+
+const overlayConfig = computed<CanvasOverlay | null>(() => {
+  const overlay = canvasConfig.value.overlay
+  if (!overlay || !overlay.show) return null
+  return overlay
+})
+
+const overlayStyle = computed(() => {
+  const ov = overlayConfig.value
+  if (!ov) return null
+  let background: string
+  if (ov.bgType === 'gradient') {
+    background = `linear-gradient(${ov.gradientAngle ?? 135}deg, ${ov.gradientStart ?? '#0d1b2a'}, ${ov.gradientEnd ?? '#1b3a5c'})`
+  } else if (ov.bgType === 'image' && ov.bgImage) {
+    background = `url(${ov.bgImage}) center/cover no-repeat, ${ov.bgColor}`
+  } else {
+    background = ov.bgColor
+  }
+  return {
+    position: 'absolute' as const,
+    left: `${isImmersiveScreen.value ? 0 : ov.x}px`,
+    top: `${isImmersiveScreen.value ? 0 : ov.y}px`,
+    width: `${ov.w}px`,
+    height: `${ov.h}px`,
+    background,
+    opacity: String(ov.opacity),
+    zIndex: '0',
+    pointerEvents: 'none' as const,
+    overflow: 'hidden' as const,
+  }
+})
 const activeFilterEntries = computed(() => Object.entries(activeFilters)
   .filter(([, value]) => Boolean(value))
   .map(([field, value]) => ({ field, value })))
+
+const hasFilterButtons = computed(() => components.value.some((c) => getComponentChartConfig(c).chartType === 'filter_button'))
 
 const filterDefinitions = computed(() => {
   const definitions = new Map<string, Set<string>>()
@@ -220,6 +329,77 @@ const canvasMinHeight = computed(() => {
   return Math.max(props.scene === 'screen' ? canvasConfig.value.height : 620, occupied)
 })
 
+const previewViewport = computed(() => {
+  if (isImmersiveScreen.value) {
+    const overlay = overlayConfig.value
+    if (overlay) {
+      return {
+        left: overlay.x,
+        top: overlay.y,
+        width: overlay.w,
+        height: overlay.h,
+      }
+    }
+
+    return {
+      left: 0,
+      top: 0,
+      width: canvasConfig.value.width,
+      height: canvasConfig.value.height,
+    }
+  }
+
+  return {
+    left: 0,
+    top: 0,
+    width: canvasConfig.value.width,
+    height: canvasMinHeight.value,
+  }
+})
+
+const previewScale = computed(() => {
+  if (!isImmersiveScreen.value) return 1
+  const scaleX = viewportSize.width / Math.max(previewViewport.value.width, 1)
+  const scaleY = viewportSize.height / Math.max(previewViewport.value.height, 1)
+  const resolved = Math.min(scaleX, scaleY)
+  return Number.isFinite(resolved) && resolved > 0 ? resolved : 1
+})
+
+const stageHostStyle = computed(() => {
+  if (!isImmersiveScreen.value) return undefined
+  return {
+    width: `${Math.round(previewViewport.value.width * previewScale.value)}px`,
+    height: `${Math.round(previewViewport.value.height * previewScale.value)}px`,
+  }
+})
+
+const stageStyle = computed(() => {
+  if (isImmersiveScreen.value) {
+    return {
+      width: `${previewViewport.value.width}px`,
+      minHeight: `${previewViewport.value.height}px`,
+      height: `${previewViewport.value.height}px`,
+      transform: `scale(${previewScale.value})`,
+      transformOrigin: 'top left',
+    }
+  }
+
+  if (props.scene === 'screen') {
+    return {
+      width: `${canvasConfig.value.width}px`,
+      minHeight: `${canvasMinHeight.value}px`,
+      height: `${canvasMinHeight.value}px`,
+    }
+  }
+
+  return {
+    minHeight: `${canvasMinHeight.value}px`,
+  }
+})
+
+const showFilterPanelOutside = computed(() => !isImmersiveScreen.value && filterDefinitions.value.length && !hasFilterButtons.value)
+const showFilterPanelInside = computed(() => isImmersiveScreen.value && filterDefinitions.value.length && !hasFilterButtons.value)
+
 const normalizeLayout = (component: DashboardComponent) => {
   if (component.width <= 24) component.width = Math.max(MIN_CARD_WIDTH, component.width * LEGACY_GRID_COL_PX)
   if (component.height <= 12) component.height = Math.max(MIN_CARD_HEIGHT, component.height * LEGACY_GRID_ROW_PX)
@@ -237,9 +417,11 @@ const getCardStyle = (component: DashboardComponent) => {
   const shadow = style.shadowShow
     ? `0 4px ${style.shadowBlur ?? 12}px ${style.shadowColor ?? 'rgba(0,0,0,0.4)'}`
     : undefined
+  const offsetLeft = isImmersiveScreen.value ? previewViewport.value.left : 0
+  const offsetTop = isImmersiveScreen.value ? previewViewport.value.top : 0
   return {
-    left: `${component.posX}px`,
-    top: `${component.posY}px`,
+    left: `${component.posX - offsetLeft}px`,
+    top: `${component.posY - offsetTop}px`,
     width: `${component.width}px`,
     height: `${component.height}px`,
     opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
@@ -254,6 +436,21 @@ const setChartRef = (el: HTMLElement | null, componentId: number) => {
 }
 
 const isTableChart = (component: DashboardComponent) => ['table', 'table_summary', 'table_pivot'].includes(getComponentChartConfig(component).chartType)
+
+const isFilterButtonChart = (component: DashboardComponent) => getComponentChartConfig(component).chartType === 'filter_button'
+
+const getFilterButtonOptions = (component: DashboardComponent): string[] => {
+  const field = getComponentChartConfig(component).xField
+  if (!field) return []
+  const data = componentDataMap.value.get(component.id)
+  if (!data) return []
+  const values = new Set<string>()
+  ;(data.rawRows ?? []).forEach((row) => {
+    if (row[field] != null) values.add(String(row[field]))
+  })
+  data.labels.forEach((label) => values.add(String(label)))
+  return Array.from(values).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+}
 
 const showNoField = (component: DashboardComponent) => getMissingChartFields(getComponentChartConfig(component)).length > 0
 
@@ -275,7 +472,9 @@ const renderChart = (component: DashboardComponent, data: ChartDataResult) => {
     instance.on('click', (params) => handleChartClick(component.id, params))
   }
   const resolved = getComponentConfig(component)
-  instance.setOption(buildComponentOption(data, resolved.chart, resolved.style), true)
+  const option = buildComponentOption(data, resolved.chart, resolved.style)
+  postProcessChartOption(option, resolved.style, resolved.chart.name)
+  instance.setOption(option, true)
 }
 
 const handleChartClick = (componentId: number, params: { name?: string; seriesName?: string }) => {
@@ -387,6 +586,8 @@ const loadAll = async () => {
 }
 
 const handleResize = () => {
+  viewportSize.width = window.innerWidth
+  viewportSize.height = window.innerHeight
   chartInstances.forEach((instance) => instance.resize())
 }
 
@@ -406,6 +607,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .preview-shell {
   min-height: 100%;
+}
+
+.preview-shell--immersive {
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  background: #050b14;
 }
 
 /* ─── 筛选条件栏 ─────────────────────────── */
@@ -504,6 +712,24 @@ onBeforeUnmount(() => {
   overflow: auto;
 }
 
+.preview-stage-shell--immersive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(52, 126, 215, 0.14), transparent 28%),
+    radial-gradient(circle at 80% 10%, rgba(83, 196, 145, 0.12), transparent 24%),
+    #050b14;
+}
+
+.preview-stage-host {
+  position: relative;
+  flex: 0 0 auto;
+}
+
 .preview-stage--dashboard {
   background: linear-gradient(180deg, #f7fafe 0%, #eff4fb 100%);
 }
@@ -512,10 +738,17 @@ onBeforeUnmount(() => {
   background-color: #081b32;
   background-image:
     radial-gradient(circle at 20% 20%, rgba(20, 116, 214, 0.18), transparent 32%),
-    radial-gradient(circle at 80% 0%, rgba(66, 185, 131, 0.14), transparent 24%),
-    linear-gradient(rgba(129, 170, 215, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(129, 170, 215, 0.08) 1px, transparent 1px);
-  background-size: auto, auto, 26px 26px, 26px 26px;
+    radial-gradient(circle at 80% 0%, rgba(66, 185, 131, 0.14), transparent 24%);
+}
+
+.preview-stage--immersive {
+  border: none;
+  border-radius: 0;
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.42);
+}
+
+.preview-stage--screen.preview-stage--immersive {
+  background: transparent;
 }
 
 .preview-card {
@@ -623,6 +856,53 @@ onBeforeUnmount(() => {
 
 .preview-placeholder.warning {
   color: #d39a12;
+}
+
+.filter-button-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  height: 100%;
+}
+
+.filter-panel--floating {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 12;
+  width: min(360px, calc(100% - 40px));
+  margin-bottom: 0;
+  border-color: rgba(124, 170, 219, 0.24);
+  background: rgba(7, 22, 38, 0.82);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+}
+
+.filter-panel--floating .filter-head:hover {
+  background: rgba(96, 174, 255, 0.08);
+}
+
+.filter-panel--floating .filter-title,
+.filter-panel--floating .filter-item-label,
+.filter-panel--floating .filter-toggle-icon {
+  color: rgba(236, 245, 255, 0.82);
+}
+
+.filter-panel--floating :deep(.el-select__wrapper) {
+  background: rgba(9, 28, 48, 0.72);
+  box-shadow: 0 0 0 1px rgba(116, 166, 226, 0.16) inset;
+}
+
+.filter-panel--floating :deep(.el-select__placeholder),
+.filter-panel--floating :deep(.el-select__selected-item) {
+  color: #eef5ff;
+}
+
+.filter-panel--floating :deep(.el-tag) {
+  border-color: rgba(116, 166, 226, 0.22);
+  background: rgba(9, 28, 48, 0.72);
+  color: #eef5ff;
 }
 
 .preview-empty {

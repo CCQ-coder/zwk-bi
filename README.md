@@ -39,6 +39,13 @@ cd backend
 mvn spring-boot:run
 ```
 
+后端支持通过环境变量覆盖默认运行配置，避免把本机账号、密码和密钥写死在代码里：
+
+- `AI_BI_DB_URL` / `AI_BI_DB_USERNAME` / `AI_BI_DB_PASSWORD`
+- `AI_BI_CLICKHOUSE_URL` / `AI_BI_CLICKHOUSE_USERNAME` / `AI_BI_CLICKHOUSE_PASSWORD`
+- `AI_BI_JWT_SECRET` / `AI_BI_JWT_EXPIRE_HOURS`
+- `AI_BI_UPLOAD_PATH` / `AI_BI_SERVER_PORT`
+
 3. 启动前端
 
 ```bash

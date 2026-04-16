@@ -337,6 +337,13 @@
               />
             </div>
             <span class="canvas-tb-tip">{{ components.length }} 组件 · 双击左侧加入 · 拖标题移动 · 点击背景版编辑样式</span>
+            <!-- 缩放控制 -->
+            <div class="canvas-tb-zoom">
+              <el-tooltip content="缩小"><el-button link size="small" @click="zoomOut" :disabled="canvasScale <= SCALE_MIN">−</el-button></el-tooltip>
+              <span class="zoom-label" @click="zoomReset">{{ Math.round(canvasScale * 100) }}%</span>
+              <el-tooltip content="放大"><el-button link size="small" @click="zoomIn" :disabled="canvasScale >= SCALE_MAX">+</el-button></el-tooltip>
+              <el-tooltip content="适应屏幕"><el-button link size="small" @click="zoomFit">适应</el-button></el-tooltip>
+            </div>
             <!-- 背景版快速颜色控制 -->
             <div class="canvas-tb-overlay-ctrl">
               <span style="color:#8899aa;font-size:12px;margin-right:4px">背景:</span>
@@ -371,7 +378,7 @@
               ref="canvasRef"
               class="screen-stage"
               :class="{ 'screen-stage--drop': stageDropActive }"
-              :style="{ width: `${canvasWorkWidth}px`, minHeight: `${canvasMinHeight}px`, height: `${canvasMinHeight}px` }"
+              :style="{ width: `${canvasWorkWidth}px`, minHeight: `${canvasMinHeight}px`, height: `${canvasMinHeight}px`, transform: `scale(${canvasScale})`, transformOrigin: '0 0' }"
               @dragover.prevent="onStageDragOver"
               @dragleave="onStageDragLeave"
               @drop.prevent="onStageDrop"
@@ -420,7 +427,13 @@
                 </div>
 
                 <div class="stage-card-body">
-                  <div v-if="isTableChart(component)" class="table-wrapper">
+                  <div v-if="isFilterButtonChart(component)" class="filter-button-wrapper">
+                    <el-button size="small" type="primary" style="width:100%;height:100%">
+                      <el-icon style="margin-right:4px"><Filter /></el-icon>
+                      {{ getComponentConfig(component).chart.name || '筛选' }}
+                    </el-button>
+                  </div>
+                  <div v-else-if="isTableChart(component)" class="table-wrapper">
                     <el-table
                       :data="getTableRows(component.id)"
                       height="100%"
@@ -459,9 +472,13 @@
                   <div v-else-if="showNoField(component)" class="chart-placeholder warning">
                     当前组件缺少必要字段，请先在右侧组件属性中完成配置。
                   </div>
-                  <div v-else-if="!isRenderableChart(component)" class="chart-placeholder">
-                    当前图表类型为 {{ chartTypeLabel(getComponentChartConfig(component).chartType) }}，请前往仪表板预览或切换为表格、柱线、饼图等可视化类型
-                  </div>
+                  <ComponentDataFallback
+                    v-else-if="!isRenderableChart(component)"
+                    :chart-type="getComponentChartConfig(component).chartType"
+                    :chart-config="getComponentChartConfig(component)"
+                    :data="componentDataMap.get(component.id) ?? null"
+                    dark
+                  />
                   <div
                     v-else
                     :ref="(el) => setChartRef(el as HTMLElement | null, component.id)"
@@ -672,8 +689,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import ComponentDataFallback from './ComponentDataFallback.vue'
 import EditorComponentInspector from './EditorComponentInspector.vue'
 import {
   addDashboardComponent,
@@ -729,6 +747,7 @@ interface ChartCategory { label: string; types: ChartTypeItem[] }
 const makeBarComboIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="18" width="6" height="10" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="18" fill="currentColor" rx="1"/><rect x="20" y="14" width="6" height="14" fill="currentColor" rx="1"/><rect x="28" y="6" width="6" height="22" fill="currentColor" rx="1"/><polyline points="7,12 15,8 23,11 31,4" fill="none" stroke="currentColor" stroke-width="2" opacity=".7" stroke-linecap="round"/></svg>`
 const makeHeatmapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="7" height="7" fill="currentColor" opacity=".9" rx="1"/><rect x="13" y="4" width="7" height="7" fill="currentColor" opacity=".5" rx="1"/><rect x="22" y="4" width="7" height="7" fill="currentColor" opacity=".2" rx="1"/><rect x="31" y="4" width="7" height="7" fill="currentColor" opacity=".7" rx="1"/><rect x="4" y="13" width="7" height="7" fill="currentColor" opacity=".3" rx="1"/><rect x="13" y="13" width="7" height="7" fill="currentColor" opacity=".8" rx="1"/><rect x="22" y="13" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="31" y="13" width="7" height="7" fill="currentColor" opacity=".15" rx="1"/><rect x="4" y="22" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="13" y="22" width="7" height="7" fill="currentColor" opacity=".25" rx="1"/><rect x="22" y="22" width="7" height="7" fill="currentColor" opacity=".95" rx="1"/><rect x="31" y="22" width="7" height="7" fill="currentColor" opacity=".4" rx="1"/></svg>`
 const makeMapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M5,6 L15,4 L25,8 L35,5 L35,26 L25,23 L15,27 L5,25 Z" fill="currentColor" opacity=".3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M15,4 L15,27" stroke="currentColor" stroke-width="1" opacity=".5"/><path d="M25,8 L25,23" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="22" cy="13" r="3" fill="currentColor" opacity=".8"/></svg>`
+const makeFilterButtonIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="8" width="32" height="16" rx="4" fill="currentColor" opacity=".2" stroke="currentColor" stroke-width="1.2"/><path d="M10,14 L14,18 L14,22" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M10,14 L18,14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="28" cy="18" r="1.5" fill="currentColor"/><circle cx="23" cy="18" r="1.5" fill="currentColor"/><circle cx="33" cy="18" r="1.5" fill="currentColor" opacity=".4"/></svg>`
 const makeBarWaterfallIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="16" width="6" height="12" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="12" y="16" width="6" height="6" fill="currentColor" rx="1"/><rect x="20" y="6" width="6" height="4" fill="currentColor" opacity=".5" rx="1"/><rect x="20" y="10" width="6" height="12" fill="currentColor" rx="1"/><rect x="28" y="4" width="6" height="24" fill="currentColor" opacity=".7" rx="1"/></svg>`
 const makeBarProgressIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="30" height="5" fill="currentColor" opacity=".2" rx="2.5"/><rect x="4" y="6" width="22" height="5" fill="currentColor" rx="2.5"/><rect x="4" y="14" width="30" height="5" fill="currentColor" opacity=".2" rx="2.5"/><rect x="4" y="14" width="30" height="5" fill="currentColor" opacity=".5" rx="2.5"/><rect x="4" y="22" width="30" height="5" fill="currentColor" opacity=".2" rx="2.5"/><rect x="4" y="22" width="14" height="5" fill="currentColor" opacity=".8" rx="2.5"/></svg>`
 const makeBarSymmetricIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="4" width="14" height="6" fill="currentColor" rx="1"/><rect x="6" y="4" width="14" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="20" y="13" width="8" height="6" fill="currentColor" rx="1"/><rect x="12" y="13" width="8" height="6" fill="currentColor" opacity=".5" rx="1"/><rect x="20" y="22" width="16" height="6" fill="currentColor" rx="1"/><rect x="4" y="22" width="16" height="6" fill="currentColor" opacity=".5" rx="1"/></svg>`
@@ -824,6 +843,12 @@ const CHART_CATEGORIES: ChartCategory[] = [
     label: '地图',
     types: [
       { type: 'map', label: '地图', svgIcon: makeMapIcon() },
+    ],
+  },
+  {
+    label: '交互控件',
+    types: [
+      { type: 'filter_button', label: '筛选按钮', svgIcon: makeFilterButtonIcon() },
     ],
   },
 ]
@@ -1023,8 +1048,9 @@ const startCurtainDrag = (e: MouseEvent) => {
   const ox = overlayConfig.x
   const oy = overlayConfig.y
   const onMove = (ev: MouseEvent) => {
-    overlayConfig.x = Math.max(0, Math.round(ox + ev.clientX - startX))
-    overlayConfig.y = Math.max(0, Math.round(oy + ev.clientY - startY))
+    const scale = canvasScale.value || 1
+    overlayConfig.x = Math.max(0, Math.round(ox + (ev.clientX - startX) / scale))
+    overlayConfig.y = Math.max(0, Math.round(oy + (ev.clientY - startY) / scale))
   }
   const onUp = () => {
     document.removeEventListener('mousemove', onMove)
@@ -1044,8 +1070,9 @@ const startCurtainResize = (e: MouseEvent, handle: string) => {
   const ox = overlayConfig.x; const ow = overlayConfig.w
   const oy = overlayConfig.y; const oh = overlayConfig.h
   const onMove = (ev: MouseEvent) => {
-    const dx = ev.clientX - startX
-    const dy = ev.clientY - startY
+    const scale = canvasScale.value || 1
+    const dx = (ev.clientX - startX) / scale
+    const dy = (ev.clientY - startY) / scale
     if (handle.includes('e')) overlayConfig.w = Math.max(100, Math.round(ow + dx))
     if (handle.includes('s')) overlayConfig.h = Math.max(60, Math.round(oh + dy))
     if (handle.includes('w')) {
@@ -1091,6 +1118,7 @@ const chartTypeOptions = [
   { label: '散点图', value: 'scatter' },
   { label: '雷达图', value: 'radar' },
   { label: '矩形树图', value: 'treemap' },
+  { label: '筛选按钮', value: 'filter_button' },
 ]
 
 const filteredCharts = computed(() => {
@@ -1147,6 +1175,23 @@ const matchedBgPreset = computed(() => SCREEN_CANVAS_PRESETS.find(
 )?.id ?? 'custom')
 
 const canvasWorkWidth = computed(() => Math.max(overlayConfig.w + 400, 2400))
+
+// ─── 缩放控制 ───────────────────────────────────────────────────────────
+const canvasScale = ref(1)
+const SCALE_MIN = 0.25
+const SCALE_MAX = 2
+const SCALE_STEP = 0.1
+
+const zoomIn = () => { canvasScale.value = Math.min(SCALE_MAX, +(canvasScale.value + SCALE_STEP).toFixed(2)) }
+const zoomOut = () => { canvasScale.value = Math.max(SCALE_MIN, +(canvasScale.value - SCALE_STEP).toFixed(2)) }
+const zoomReset = () => { canvasScale.value = 1 }
+const zoomFit = () => {
+  const scrollEl = document.querySelector('.screen-stage-scroll') as HTMLElement | null
+  if (!scrollEl) return
+  const fitW = (scrollEl.clientWidth - 40) / canvasWorkWidth.value
+  const fitH = (scrollEl.clientHeight - 40) / canvasMinHeight.value
+  canvasScale.value = Math.max(SCALE_MIN, Math.min(SCALE_MAX, +Math.min(fitW, fitH).toFixed(2)))
+}
 
 const canvasMinHeight = computed(() => {
   const bgBottom = overlayConfig.y + overlayConfig.h + 200
@@ -1313,6 +1358,8 @@ const renderChart = (component: DashboardComponent, data: ChartDataResult) => {
 
 const isTableChart = (component: DashboardComponent) => ['table', 'table_summary', 'table_pivot'].includes(getComponentChartConfig(component).chartType)
 
+const isFilterButtonChart = (component: DashboardComponent) => getComponentChartConfig(component).chartType === 'filter_button'
+
 const isRenderableChart = (component: DashboardComponent) => {
   const type = getComponentChartConfig(component).chartType ?? ''
   return isCanvasRenderableChartType(type)
@@ -1415,8 +1462,9 @@ const applyInteractionFrame = () => {
   const component = findComponent(interaction.compId)
   if (!component) return
 
-  const dx = pendingPointer.x - interaction.startMouseX
-  const dy = pendingPointer.y - interaction.startMouseY
+  const scale = canvasScale.value || 1
+  const dx = (pendingPointer.x - interaction.startMouseX) / scale
+  const dy = (pendingPointer.y - interaction.startMouseY) / scale
 
   if (interaction.mode === 'move') {
     const maxX = Math.max(0, getCanvasWidth() - component.width)
@@ -1813,17 +1861,15 @@ const quickAddTemplate = async (template: ChartTemplate) => {
 
 const resolveDropPlacement = (width: number, height: number, point?: { clientX: number; clientY: number }) => {
   if (!point || !canvasRef.value) {
-    const lastY = components.value.reduce((max, item) => Math.max(max, item.posY + item.height), 0)
-    return {
-      posX: 16,
-      posY: lastY + 16,
-      width,
-      height,
-    }
+    // 无拖拽坐标时，放在背景板顶部中间
+    const cx = Math.max(0, Math.round((overlayConfig.w - width) / 2) + overlayConfig.x)
+    const cy = overlayConfig.y + 16
+    return { posX: cx, posY: cy, width, height }
   }
   const rect = canvasRef.value.getBoundingClientRect()
-  const posX = Math.max(0, Math.min(getCanvasWidth() - width, point.clientX - rect.left - width / 2))
-  const posY = Math.max(0, point.clientY - rect.top - 28)
+  const scale = canvasScale.value || 1
+  const posX = Math.max(0, Math.min(getCanvasWidth() - width, (point.clientX - rect.left) / scale - width / 2))
+  const posY = Math.max(0, (point.clientY - rect.top) / scale - 28)
   return {
     posX: Math.round(posX),
     posY: Math.round(posY),
@@ -1843,8 +1889,8 @@ const addChartToScreen = async (
     return
   }
   const nextSize = size ?? {
-    width: chart.chartType === 'table' ? 760 : 520,
-    height: chart.chartType === 'table' ? 340 : 320,
+    width: chart.chartType === 'table' ? 760 : chart.chartType === 'filter_button' ? 200 : 520,
+    height: chart.chartType === 'table' ? 340 : chart.chartType === 'filter_button' ? 60 : 320,
   }
   const placement = resolveDropPlacement(nextSize.width, nextSize.height, point)
   const component = await addDashboardComponent(currentDashboard.value.id, {
@@ -2217,6 +2263,7 @@ onBeforeUnmount(() => {
 
 .screen-main {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2464,6 +2511,34 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 
+.canvas-tb-zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.canvas-tb-zoom :deep(.el-button) {
+  color: rgba(255,255,255,0.6);
+  font-size: 16px;
+  font-weight: 700;
+  padding: 2px 6px;
+}
+
+.zoom-label {
+  font-size: 12px;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  min-width: 40px;
+  text-align: center;
+  user-select: none;
+}
+
+.zoom-label:hover {
+  color: rgba(255,255,255,0.9);
+}
+
 /* ─── 幕布 (Canvas Curtain Overlay) ─────────────────────────────── */
 .canvas-curtain {
   position: absolute;
@@ -2707,6 +2782,14 @@ onBeforeUnmount(() => {
   color: #ffd77d;
 }
 
+.filter-button-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 4px 8px;
+}
+
 .remove-btn {
   color: rgba(219, 231, 246, 0.68);
   cursor: pointer;
@@ -2877,6 +2960,9 @@ onBeforeUnmount(() => {
   grid-template-columns: v-bind("sidebarCollapsed ? '60px' : leftPanelWidth + 'px'") 1fr 300px;
   grid-template-rows: 1fr;
   gap: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .screen-root--editor .screen-toolbar {

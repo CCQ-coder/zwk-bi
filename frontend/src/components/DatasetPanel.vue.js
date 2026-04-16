@@ -1,12 +1,11 @@
-import { computed, defineComponent, onMounted, reactive, ref } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { computed, defineComponent, h, onMounted, reactive, ref, withDirectives, vShow } from 'vue';
+import { ElMessage, ElMessageBox, ElIcon, ElTooltip, ElButton } from 'element-plus';
 import { ArrowRight, DataLine, Delete, Edit, Folder, FolderAdd, Grid, Loading, Plus } from '@element-plus/icons-vue';
 import { createDataset, createDatasetFolder, deleteDataset, deleteDatasetFolder, getDatasetFolderTree, getDatasetPreviewData, previewDatasetSql, renameDatasetFolder, updateDataset } from '../api/dataset';
 import { getDatasourceList, getDatasourceTables, getTableColumns } from '../api/datasource';
-// ---- Tree Node Component ----
+// ---- Tree Node Component (render function, no runtime compiler needed) ----
 const TreeNode = defineComponent({
     name: 'TreeNode',
-    components: { ArrowRight, DataLine, Delete, Edit, Folder, FolderAdd, Plus },
     props: {
         node: { type: Object, required: true },
         selectedId: { type: Number, default: null }
@@ -16,53 +15,62 @@ const TreeNode = defineComponent({
         const expanded = ref(true);
         const hover = ref(false);
         const hoverDataset = ref(null);
-        return { expanded, hover, hoverDataset, emit };
-    },
-    template: `
-    <div class="tree-folder">
-      <div class="folder-row" @mouseenter="hover=true" @mouseleave="hover=false" @click="expanded=!expanded">
-        <el-icon class="expand-icon" :style="{transform: expanded ? 'rotate(90deg)' : ''}"><ArrowRight /></el-icon>
-        <el-icon class="folder-icon" style="color:#e6a43c;margin-right:4px"><Folder /></el-icon>
-        <span class="folder-name">{{ node.name }}</span>
-        <div v-show="hover" class="node-actions" @click.stop>
-          <el-tooltip content="在此文件夹新建数据集"><el-button link :icon="Plus" @click="emit('add-dataset', node.id)" /></el-tooltip>
-          <el-tooltip content="新建子文件夹"><el-button link :icon="FolderAdd" @click="emit('add-folder', node.id)" /></el-tooltip>
-          <el-tooltip content="重命名"><el-button link :icon="Edit" @click="emit('rename-folder', node)" /></el-tooltip>
-          <el-tooltip v-if="node.id > 0" content="删除文件夹"><el-button link :icon="Delete" style="color:#f56c6c" @click="emit('delete-folder', node.id)" /></el-tooltip>
-        </div>
-      </div>
-      <div v-show="expanded" class="folder-children">
-        <TreeNode
-          v-for="child in node.children"
-          :key="child.id"
-          :node="child"
-          :selected-id="selectedId"
-          @select="(id) => emit('select', id)"
-          @add-dataset="(id) => emit('add-dataset', id)"
-          @add-folder="(id) => emit('add-folder', id)"
-          @rename-folder="(n) => emit('rename-folder', n)"
-          @delete-folder="(id) => emit('delete-folder', id)"
-          @delete-dataset="(id) => emit('delete-dataset', id)"
-        />
-        <div
-          v-for="ds in node.datasets"
-          :key="'ds-' + ds.id"
-          class="dataset-row"
-          :class="{ selected: selectedId === ds.id }"
-          @mouseenter="hoverDataset = ds.id"
-          @mouseleave="hoverDataset = null"
-          @click="emit('select', ds.id)"
-        >
-          <el-icon style="color:#409eff;margin-right:4px;font-size:12px"><DataLine /></el-icon>
-          <span class="dataset-name">{{ ds.name }}</span>
-          <div v-show="hoverDataset === ds.id && ds.datasourceId !== 0" class="node-actions" @click.stop>
-            <el-tooltip content="删除"><el-button link :icon="Delete" style="color:#f56c6c" @click="emit('delete-dataset', ds.id)" /></el-tooltip>
-          </div>
-        </div>
-        <div v-if="!node.children.length && !node.datasets.length" class="empty-folder">空文件夹</div>
-      </div>
-    </div>
-  `
+        return () => {
+            const node = props.node;
+            // Folder row
+            const folderRow = h('div', {
+                class: 'folder-row',
+                onMouseenter: () => { hover.value = true; },
+                onMouseleave: () => { hover.value = false; },
+                onClick: () => { expanded.value = !expanded.value; }
+            }, [
+                h(ElIcon, { class: 'expand-icon', style: { transform: expanded.value ? 'rotate(90deg)' : '' } }, () => h(ArrowRight)),
+                h(ElIcon, { class: 'folder-icon', style: 'color:#e6a43c;margin-right:4px' }, () => h(Folder)),
+                h('span', { class: 'folder-name' }, node.name),
+                withDirectives(h('div', { class: 'node-actions', onClick: (e) => e.stopPropagation() }, [
+                    h(ElTooltip, { content: '在此文件夹新建数据集' }, () => h(ElButton, { link: true, icon: Plus, onClick: () => emit('add-dataset', node.id) })),
+                    h(ElTooltip, { content: '新建子文件夹' }, () => h(ElButton, { link: true, icon: FolderAdd, onClick: () => emit('add-folder', node.id) })),
+                    h(ElTooltip, { content: '重命名' }, () => h(ElButton, { link: true, icon: Edit, onClick: () => emit('rename-folder', node) })),
+                    ...(node.id > 0 ? [
+                        h(ElTooltip, { content: '删除文件夹' }, () => h(ElButton, { link: true, icon: Delete, style: 'color:#f56c6c', onClick: () => emit('delete-folder', node.id) }))
+                    ] : [])
+                ]), [[vShow, hover.value]])
+            ]);
+            // Child folders (recursive)
+            const childFolders = (node.children || []).map((child) => h(TreeNode, {
+                key: child.id,
+                node: child,
+                selectedId: props.selectedId,
+                onSelect: (id) => emit('select', id),
+                'onAdd-dataset': (id) => emit('add-dataset', id),
+                'onAdd-folder': (id) => emit('add-folder', id),
+                'onRename-folder': (n) => emit('rename-folder', n),
+                'onDelete-folder': (id) => emit('delete-folder', id),
+                'onDelete-dataset': (id) => emit('delete-dataset', id),
+            }));
+            // Dataset rows
+            const datasetRows = (node.datasets || []).map((ds) => h('div', {
+                key: 'ds-' + ds.id,
+                class: ['dataset-row', { selected: props.selectedId === ds.id }],
+                onMouseenter: () => { hoverDataset.value = ds.id; },
+                onMouseleave: () => { hoverDataset.value = null; },
+                onClick: () => emit('select', ds.id)
+            }, [
+                h(ElIcon, { style: 'color:#409eff;margin-right:4px;font-size:12px' }, () => h(DataLine)),
+                h('span', { class: 'dataset-name' }, ds.name),
+                withDirectives(h('div', { class: 'node-actions', onClick: (e) => e.stopPropagation() }, [
+                    h(ElTooltip, { content: '删除' }, () => h(ElButton, { link: true, icon: Delete, style: 'color:#f56c6c', onClick: () => emit('delete-dataset', ds.id) }))
+                ]), [[vShow, hoverDataset.value === ds.id && !!ds.datasourceId]])
+            ]));
+            // Empty folder hint
+            const emptyHint = (!node.children?.length && !node.datasets?.length)
+                ? [h('div', { class: 'empty-folder' }, '空文件夹')]
+                : [];
+            // Children container
+            const childrenContainer = withDirectives(h('div', { class: 'folder-children' }, [...childFolders, ...datasetRows, ...emptyHint]), [[vShow, expanded.value]]);
+            return h('div', { class: 'tree-folder' }, [folderRow, childrenContainer]);
+        };
+    }
 });
 const folderTree = ref([]);
 const treeLoading = ref(false);
@@ -95,12 +103,13 @@ const folderParentId = ref(null);
 const filteredTables = computed(() => tableSearch.value
     ? tables.value.filter(t => t.tableName.toLowerCase().includes(tableSearch.value.toLowerCase()))
     : tables.value);
-// Flatten all folders for the folder selector
+// Flatten all folders for the folder selector (exclude virtual "未分类" folder)
 const allFoldersFlat = computed(() => {
     const result = [];
     const flatten = (nodes) => {
         for (const n of nodes) {
-            result.push(n);
+            if (n.id > 0)
+                result.push(n);
             if (n.children?.length)
                 flatten(n.children);
         }
@@ -229,7 +238,7 @@ const openCreate = (folderId) => {
 const openEdit = (row) => {
     editId.value = row.id;
     form.name = row.name;
-    form.datasourceId = row.datasourceId;
+    form.datasourceId = row.datasourceId ?? '';
     form.sqlText = row.sqlText;
     form.folderId = row.folderId;
     Object.assign(formPreview, { columns: [], rows: [], rowCount: 0 });
@@ -313,6 +322,9 @@ const handleFolderSubmit = async () => {
         }
         folderDialogVisible.value = false;
         await loadTree();
+    }
+    catch {
+        // error already shown by request interceptor
     }
     finally {
         folderSaving.value = false;
@@ -529,7 +541,7 @@ if (__VLS_ctx.selectedDataset) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "content-actions" },
     });
-    if (__VLS_ctx.selectedDataset.datasourceId !== 0) {
+    if (__VLS_ctx.selectedDataset.datasourceId) {
         const __VLS_50 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
@@ -550,7 +562,7 @@ if (__VLS_ctx.selectedDataset) {
             onClick: (...[$event]) => {
                 if (!(__VLS_ctx.selectedDataset))
                     return;
-                if (!(__VLS_ctx.selectedDataset.datasourceId !== 0))
+                if (!(__VLS_ctx.selectedDataset.datasourceId))
                     return;
                 __VLS_ctx.openEdit(__VLS_ctx.selectedDataset);
             }
@@ -558,7 +570,7 @@ if (__VLS_ctx.selectedDataset) {
         __VLS_53.slots.default;
         var __VLS_53;
     }
-    if (__VLS_ctx.selectedDataset.datasourceId !== 0) {
+    if (__VLS_ctx.selectedDataset.datasourceId) {
         const __VLS_58 = {}.ElPopconfirm;
         /** @type {[typeof __VLS_components.ElPopconfirm, typeof __VLS_components.elPopconfirm, typeof __VLS_components.ElPopconfirm, typeof __VLS_components.elPopconfirm, ]} */ ;
         // @ts-ignore
@@ -577,7 +589,7 @@ if (__VLS_ctx.selectedDataset) {
             onConfirm: (...[$event]) => {
                 if (!(__VLS_ctx.selectedDataset))
                     return;
-                if (!(__VLS_ctx.selectedDataset.datasourceId !== 0))
+                if (!(__VLS_ctx.selectedDataset.datasourceId))
                     return;
                 __VLS_ctx.handleDeleteDataset(__VLS_ctx.selectedDataset.id);
             }
@@ -601,7 +613,7 @@ if (__VLS_ctx.selectedDataset) {
         }
         var __VLS_61;
     }
-    if (__VLS_ctx.selectedDataset.datasourceId === 0) {
+    if (!__VLS_ctx.selectedDataset.datasourceId) {
         const __VLS_70 = {}.ElTag;
         /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
         // @ts-ignore
@@ -628,7 +640,7 @@ if (__VLS_ctx.selectedDataset) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "info-val" },
     });
-    (__VLS_ctx.selectedDataset.datasourceId === 0 ? '内置演示' : __VLS_ctx.selectedDataset.datasourceId);
+    (!__VLS_ctx.selectedDataset.datasourceId ? '内置演示' : __VLS_ctx.selectedDataset.datasourceId);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "info-row" },
     });
@@ -1376,6 +1388,9 @@ var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
+            ElIcon: ElIcon,
+            ElTooltip: ElTooltip,
+            ElButton: ElButton,
             FolderAdd: FolderAdd,
             Grid: Grid,
             Loading: Loading,
