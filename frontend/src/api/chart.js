@@ -9,3 +9,5 @@ export const getChartData = (id, options) => request.get(`/charts/${id}/data`, {
         ...(options?.configJson ? { configJson: options.configJson } : {}),
     }
 });
+export const queryChartDataset = (data) => request.post('/charts/query/dataset', data);
+export const queryChartPageSql = (data) => request.post('/charts/query/page-sql', data);

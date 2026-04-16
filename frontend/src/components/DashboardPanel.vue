@@ -90,7 +90,7 @@
             @mousedown="focusComponent(comp)"
           >
             <div class="chart-card-header" @mousedown.stop.prevent="startDrag($event, comp)">
-              <span class="chart-card-name">{{ getComponentChartConfig(comp).name || '图表' }}</span>
+              <span class="chart-card-name" style="display:none">{{ getComponentChartConfig(comp).name || '图表' }}</span>
               <div class="chart-card-actions">
                 <el-tag size="small" type="info" style="margin-right:6px">
                   {{ chartTypeLabel(getComponentChartConfig(comp).chartType) }}
@@ -102,14 +102,22 @@
                 </el-popconfirm>
               </div>
             </div>
+            <div v-if="isStaticWidget(comp)" class="chart-canvas">
+              <ComponentStaticPreview
+                :chart-type="getComponentChartConfig(comp).chartType"
+                :chart-config="getComponentChartConfig(comp)"
+                :show-title="getComponentConfig(comp).style.showTitle"
+              />
+            </div>
             <div
+              v-else
               :ref="(el) => setChartRef(el as HTMLElement | null, comp.id)"
               class="chart-canvas"
             />
             <div v-if="showNoField(comp)" class="no-field-tip">
               尚未配置完整字段，请在右侧组件属性中补充后再预览
             </div>
-            <div v-else-if="!isRenderableChart(comp)" class="no-field-tip">
+            <div v-else-if="!isStaticWidget(comp) && !isRenderableChart(comp)" class="no-field-tip">
               当前仪表板暂未支持 {{ chartTypeLabel(getComponentChartConfig(comp).chartType) }} 的实时渲染
             </div>
             <div
@@ -234,6 +242,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'v
 import { ElMessage } from 'element-plus'
 import { Close, Delete, Download, Fold, Grid, PieChart, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import ComponentStaticPreview from './ComponentStaticPreview.vue'
 import EditorComponentInspector from './EditorComponentInspector.vue'
 import {
   addDashboardComponent,
@@ -256,6 +265,7 @@ import {
   chartTypeLabel,
   getMissingChartFields,
   isCanvasRenderableChartType,
+  isStaticWidgetChartType,
   mergeComponentRequestFilters,
   materializeChartData,
   normalizeComponentConfig,
@@ -328,7 +338,8 @@ const activeChart = computed(() => activeComponent.value ? chartMap.value.get(ac
 
 const getComponentConfig = (comp: DashboardComponent) => normalizeComponentConfig(comp.configJson, chartMap.value.get(comp.chartId))
 const getComponentChartConfig = (comp: DashboardComponent) => getComponentConfig(comp).chart
-const showNoField = (comp: DashboardComponent) => getMissingChartFields(getComponentChartConfig(comp)).length > 0
+const isStaticWidget = (comp: DashboardComponent) => isStaticWidgetChartType(getComponentChartConfig(comp).chartType ?? '')
+const showNoField = (comp: DashboardComponent) => isStaticWidget(comp) ? false : getMissingChartFields(getComponentChartConfig(comp)).length > 0
 const isRenderableChart = (comp: DashboardComponent) => isCanvasRenderableChartType(getComponentChartConfig(comp).chartType ?? '')
 
 // echarts instances

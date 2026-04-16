@@ -81,9 +81,10 @@
             </el-select>
           </el-form-item>
           <el-form-item label="数据集" prop="datasetId">
-            <el-select v-model="form.datasetId" filterable style="width: 100%" @change="loadDatasetFields">
+            <el-select v-model="form.datasetId" filterable style="width: 100%" :clearable="isStaticAssetType" @change="loadDatasetFields">
               <el-option v-for="dataset in datasets" :key="dataset.id" :label="dataset.name" :value="dataset.id" />
             </el-select>
+            <div style="font-size:12px;color:#909399;margin-top:6px">{{ isStaticAssetType ? '静态资产可不绑定数据集。' : '数据驱动资产需要绑定数据集。' }}</div>
           </el-form-item>
           <el-form-item label="维度字段">
             <el-select v-model="form.xField" clearable filterable style="width: 100%">
@@ -152,13 +153,13 @@ import { createTemplate, deleteTemplate, getTemplateList, updateTemplate, type C
 import { getChartList, type Chart } from '../api/chart'
 import { getDatasetFields, getDatasetList, getDatasetPreviewData, type Dataset, type DatasetField } from '../api/dataset'
 import * as echarts from 'echarts'
-import { buildComponentOption, COLOR_THEMES, chartTypeLabel, isCanvasRenderableChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config'
+import { buildComponentOption, COLOR_THEMES, chartTypeLabel, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config'
 
 interface TemplateFormState {
   name: string
   description: string
   sourceChartId: number | null
-  datasetId: number | ''
+  datasetId: number | '' | null
   chartType: string
   xField: string
   yField: string
@@ -187,6 +188,13 @@ const editingId = ref<number | null>(null)
 const currentTemplate = ref<ChartTemplate | null>(null)
 const formRef = ref<FormInstance>()
 const themeOptions = Object.keys(COLOR_THEMES)
+const staticChartTypeValues = [
+  'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
+  'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',
+  'hyperlink', 'image_list', 'text_list', 'clock_display', 'word_cloud', 'qr_code',
+  'business_trend', 'metric_indicator', 'icon_arrow_trend', 'icon_warning_badge',
+  'icon_location_pin', 'icon_data_signal', 'icon_user_badge', 'icon_chart_mark',
+]
 const chartTypeOptions = [
   { label: '基础柱状图', value: 'bar' },
   { label: '堆叠柱状图', value: 'bar_stack' },
@@ -206,6 +214,7 @@ const chartTypeOptions = [
   { label: '散点图', value: 'scatter' },
   { label: '矩形树图', value: 'treemap' },
   { label: '表格', value: 'table' },
+  ...staticChartTypeValues.map((value) => ({ label: chartTypeLabel(value), value })),
 ]
 
 const form = reactive<TemplateFormState>({
@@ -218,7 +227,7 @@ const form = reactive<TemplateFormState>({
   yField: '',
   groupField: '',
   theme: themeOptions[0] || '默认蓝',
-  bgColor: '#ffffff',
+  bgColor: 'rgba(0,0,0,0)',
   showLegend: true,
   showLabel: true,
   showGrid: true,
@@ -228,10 +237,21 @@ const form = reactive<TemplateFormState>({
   height: 320,
 })
 
+const isStaticAssetType = computed(() => isStaticWidgetChartType(form.chartType))
+
 const rules: FormRules<TemplateFormState> = {
   name: [{ required: true, message: '请输入组件名称', trigger: 'blur' }],
   chartType: [{ required: true, message: '请选择图表类型', trigger: 'change' }],
-  datasetId: [{ required: true, message: '请选择数据集', trigger: 'change' }],
+  datasetId: [{
+    validator: (_rule, value, callback) => {
+      if (isStaticWidgetChartType(form.chartType) || value) {
+        callback()
+        return
+      }
+      callback(new Error('请选择数据集'))
+    },
+    trigger: 'change'
+  }],
   width: [{ required: true, message: '请输入组件宽度', trigger: 'change' }],
   height: [{ required: true, message: '请输入组件高度', trigger: 'change' }],
 }
@@ -262,7 +282,7 @@ const resetForm = () => {
     yField: '',
     groupField: '',
     theme: themeOptions[0] || '默认蓝',
-    bgColor: '#ffffff',
+    bgColor: 'rgba(0,0,0,0)',
     showLegend: true,
     showLabel: true,
     showGrid: true,
@@ -316,7 +336,9 @@ const getTemplateSummary = (item: ChartTemplate) => {
   const parsed = normalizeComponentAssetConfig(item.configJson)
   const dataset = datasets.value.find((entry) => entry.id === parsed.chart.datasetId)
   return {
-    datasetName: dataset ? `${dataset.name} / ${parsed.chart.xField || '-'} → ${parsed.chart.yField || '-'}` : '未绑定数据集',
+    datasetName: dataset
+      ? `${dataset.name} / ${parsed.chart.xField || '-'} → ${parsed.chart.yField || '-'}`
+      : (isStaticWidgetChartType(parsed.chart.chartType || item.chartType) ? '静态组件' : '未绑定数据集'),
     sizeText: `${parsed.layout.width} x ${parsed.layout.height}`,
   }
 }
@@ -337,7 +359,7 @@ const loadAll = async () => {
   }
 }
 
-const loadDatasetFields = async (datasetId: number | '') => {
+const loadDatasetFields = async (datasetId: number | '' | null | undefined) => {
   datasetFields.value = []
   if (!datasetId) return
   datasetFields.value = await getDatasetFields(datasetId)
@@ -347,7 +369,7 @@ const applySourceChart = async (chartId: number | null) => {
   if (!chartId) return
   const selected = charts.value.find((item) => item.id === chartId)
   if (!selected) return
-  form.datasetId = selected.datasetId
+  form.datasetId = selected.datasetId ?? ''
   form.chartType = selected.chartType
   form.xField = selected.xField
   form.yField = selected.yField

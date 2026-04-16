@@ -3,8 +3,11 @@ package com.aibi.bi.controller;
 import com.aibi.bi.common.ApiResponse;
 import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiChart;
+import com.aibi.bi.model.request.ChartDatasetQueryRequest;
 import com.aibi.bi.model.request.CreateChartRequest;
+import com.aibi.bi.model.request.DatasetPreviewRequest;
 import com.aibi.bi.model.request.UpdateChartRequest;
+import com.aibi.bi.model.response.DatasetPreviewResponse;
 import com.aibi.bi.service.ChartService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -68,6 +71,18 @@ public class ChartController {
                                                                    @RequestParam(required = false) String filterJson,
                                                                    @RequestParam(required = false) String configJson) {
         return ApiResponse.ok(chartService.getChartData(id, filterJson, configJson));
+    }
+
+    @PostMapping("/query/dataset")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<DatasetPreviewResponse> queryDataset(@Valid @RequestBody ChartDatasetQueryRequest request) {
+        return ApiResponse.ok(chartService.queryDataset(request.getDatasetId()));
+    }
+
+    @PostMapping("/query/page-sql")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<DatasetPreviewResponse> queryPageSql(@Valid @RequestBody DatasetPreviewRequest request) {
+        return ApiResponse.ok(chartService.queryPageSql(request));
     }
 }
 

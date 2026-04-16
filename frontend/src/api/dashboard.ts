@@ -10,7 +10,7 @@ export interface DashboardKpi {
 export interface DashboardChart {
   id: number
   name: string
-  datasetId: number
+  datasetId: number | null
   chartType: string
   xField: string
   yField: string

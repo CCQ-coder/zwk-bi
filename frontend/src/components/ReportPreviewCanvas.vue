@@ -105,16 +105,6 @@
         class="preview-card"
         :style="getCardStyle(component)"
       >
-        <div v-if="!isFilterButtonChart(component)" class="preview-card-head">
-          <div>
-            <div class="preview-card-title">{{ getComponentChartConfig(component).name || '图表组件' }}</div>
-            <div class="preview-card-meta">
-              <el-tag size="small" type="info">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }}</el-tag>
-              <span>{{ getComponentChartConfig(component).datasetId ? `数据集 #${getComponentChartConfig(component).datasetId}` : '未关联数据集' }}</span>
-            </div>
-          </div>
-        </div>
-
         <div class="preview-card-body">
           <!-- 筛选按钮 -->
           <div v-if="isFilterButtonChart(component)" class="filter-button-preview">
@@ -173,6 +163,15 @@
             </el-table>
           </div>
 
+          <ComponentStaticPreview
+            v-else-if="isStaticWidget(component)"
+            :chart-type="getComponentChartConfig(component).chartType"
+            :chart-config="getComponentChartConfig(component)"
+            :data="componentDataMap.get(component.id) ?? null"
+            :dark="scene === 'screen'"
+            :show-title="getComponentConfig(component).style.showTitle"
+          />
+
           <div v-else-if="showNoField(component)" class="preview-placeholder warning">
             该组件缺少必要字段，暂时无法生成预览内容。
           </div>
@@ -208,6 +207,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import ComponentDataFallback from './ComponentDataFallback.vue'
+import ComponentStaticPreview from './ComponentStaticPreview.vue'
 import { getChartData, getChartList, type Chart, type ChartDataResult } from '../api/chart'
 import { getDashboardById, getDashboardComponents, type Dashboard, type DashboardComponent } from '../api/dashboard'
 import {
@@ -221,6 +221,7 @@ import {
   chartTypeLabel,
   getMissingChartFields,
   isCanvasRenderableChartType,
+  isStaticWidgetChartType,
   materializeChartData,
   mergeComponentRequestFilters,
   normalizeComponentConfig,
@@ -452,7 +453,16 @@ const getFilterButtonOptions = (component: DashboardComponent): string[] => {
   return Array.from(values).sort((a, b) => a.localeCompare(b, 'zh-CN'))
 }
 
-const showNoField = (component: DashboardComponent) => getMissingChartFields(getComponentChartConfig(component)).length > 0
+const isStaticWidget = (component: DashboardComponent) => {
+  const type = getComponentChartConfig(component).chartType ?? ''
+  return isStaticWidgetChartType(type)
+}
+
+const showNoField = (component: DashboardComponent) => {
+  const type = getComponentChartConfig(component).chartType ?? ''
+  if (isStaticWidgetChartType(type)) return false
+  return getMissingChartFields(getComponentChartConfig(component)).length > 0
+}
 
 const isRenderableChart = (component: DashboardComponent) => {
   const type = getComponentChartConfig(component).chartType ?? ''
@@ -756,55 +766,21 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 14px;
-  border-radius: 18px;
+  padding: 0;
+  border-radius: 0;
 }
 
 .preview-stage--dashboard .preview-card {
-  background: #fff;
-  border: 1px solid #deebf7;
-  box-shadow: 0 8px 20px rgba(29, 93, 155, 0.08);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .preview-stage--screen .preview-card {
-  background: linear-gradient(180deg, rgba(9, 30, 53, 0.95) 0%, rgba(7, 20, 36, 0.96) 100%);
-  border: 1px solid rgba(124, 170, 219, 0.18);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
-  backdrop-filter: blur(10px);
-}
-
-.preview-card-head {
-  margin-bottom: 10px;
-}
-
-.preview-card-title {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.preview-stage--dashboard .preview-card-title {
-  color: #1d3555;
-}
-
-.preview-stage--screen .preview-card-title {
-  color: #eef5ff;
-}
-
-.preview-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 6px;
-  font-size: 12px;
-}
-
-.preview-stage--dashboard .preview-card-meta {
-  color: #6e8098;
-}
-
-.preview-stage--screen .preview-card-meta {
-  color: rgba(220, 232, 245, 0.76);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .preview-card-body,

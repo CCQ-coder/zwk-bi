@@ -4,7 +4,7 @@ import { createTemplate, deleteTemplate, getTemplateList, updateTemplate } from 
 import { getChartList } from '../api/chart';
 import { getDatasetFields, getDatasetList, getDatasetPreviewData } from '../api/dataset';
 import * as echarts from 'echarts';
-import { buildComponentOption, COLOR_THEMES, chartTypeLabel, isCanvasRenderableChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config';
+import { buildComponentOption, COLOR_THEMES, chartTypeLabel, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config';
 const loading = ref(false);
 const saving = ref(false);
 const keyword = ref('');
@@ -18,6 +18,13 @@ const editingId = ref(null);
 const currentTemplate = ref(null);
 const formRef = ref();
 const themeOptions = Object.keys(COLOR_THEMES);
+const staticChartTypeValues = [
+    'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
+    'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',
+    'hyperlink', 'image_list', 'text_list', 'clock_display', 'word_cloud', 'qr_code',
+    'business_trend', 'metric_indicator', 'icon_arrow_trend', 'icon_warning_badge',
+    'icon_location_pin', 'icon_data_signal', 'icon_user_badge', 'icon_chart_mark',
+];
 const chartTypeOptions = [
     { label: '基础柱状图', value: 'bar' },
     { label: '堆叠柱状图', value: 'bar_stack' },
@@ -37,6 +44,7 @@ const chartTypeOptions = [
     { label: '散点图', value: 'scatter' },
     { label: '矩形树图', value: 'treemap' },
     { label: '表格', value: 'table' },
+    ...staticChartTypeValues.map((value) => ({ label: chartTypeLabel(value), value })),
 ];
 const form = reactive({
     name: '',
@@ -57,10 +65,20 @@ const form = reactive({
     width: 520,
     height: 320,
 });
+const isStaticAssetType = computed(() => isStaticWidgetChartType(form.chartType));
 const rules = {
     name: [{ required: true, message: '请输入组件名称', trigger: 'blur' }],
     chartType: [{ required: true, message: '请选择图表类型', trigger: 'change' }],
-    datasetId: [{ required: true, message: '请选择数据集', trigger: 'change' }],
+    datasetId: [{
+            validator: (_rule, value, callback) => {
+                if (isStaticWidgetChartType(form.chartType) || value) {
+                    callback();
+                    return;
+                }
+                callback(new Error('请选择数据集'));
+            },
+            trigger: 'change'
+        }],
     width: [{ required: true, message: '请输入组件宽度', trigger: 'change' }],
     height: [{ required: true, message: '请输入组件高度', trigger: 'change' }],
 };
@@ -140,7 +158,9 @@ const getTemplateSummary = (item) => {
     const parsed = normalizeComponentAssetConfig(item.configJson);
     const dataset = datasets.value.find((entry) => entry.id === parsed.chart.datasetId);
     return {
-        datasetName: dataset ? `${dataset.name} / ${parsed.chart.xField || '-'} → ${parsed.chart.yField || '-'}` : '未绑定数据集',
+        datasetName: dataset
+            ? `${dataset.name} / ${parsed.chart.xField || '-'} → ${parsed.chart.yField || '-'}`
+            : (isStaticWidgetChartType(parsed.chart.chartType || item.chartType) ? '静态组件' : '未绑定数据集'),
         sizeText: `${parsed.layout.width} x ${parsed.layout.height}`,
     };
 };
@@ -172,7 +192,7 @@ const applySourceChart = async (chartId) => {
     const selected = charts.value.find((item) => item.id === chartId);
     if (!selected)
         return;
-    form.datasetId = selected.datasetId;
+    form.datasetId = selected.datasetId ?? '';
     form.chartType = selected.chartType;
     form.xField = selected.xField;
     form.yField = selected.yField;
@@ -875,12 +895,14 @@ const __VLS_159 = __VLS_asFunctionalComponent(__VLS_158, new __VLS_158({
     modelValue: (__VLS_ctx.form.datasetId),
     filterable: true,
     ...{ style: {} },
+    clearable: (__VLS_ctx.isStaticAssetType),
 }));
 const __VLS_160 = __VLS_159({
     ...{ 'onChange': {} },
     modelValue: (__VLS_ctx.form.datasetId),
     filterable: true,
     ...{ style: {} },
+    clearable: (__VLS_ctx.isStaticAssetType),
 }, ...__VLS_functionalComponentArgsRest(__VLS_159));
 let __VLS_162;
 let __VLS_163;
@@ -905,6 +927,10 @@ for (const [dataset] of __VLS_getVForSourceType((__VLS_ctx.datasets))) {
     }, ...__VLS_functionalComponentArgsRest(__VLS_167));
 }
 var __VLS_161;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ style: {} },
+});
+(__VLS_ctx.isStaticAssetType ? '静态资产可不绑定数据集。' : '数据驱动资产需要绑定数据集。');
 var __VLS_157;
 const __VLS_170 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
@@ -1348,6 +1374,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             themeOptions: themeOptions,
             chartTypeOptions: chartTypeOptions,
             form: form,
+            isStaticAssetType: isStaticAssetType,
             rules: rules,
             filteredTemplates: filteredTemplates,
             previewConfigJson: previewConfigJson,

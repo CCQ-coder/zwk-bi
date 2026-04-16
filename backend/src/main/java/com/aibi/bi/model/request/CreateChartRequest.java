@@ -1,14 +1,12 @@
 package com.aibi.bi.model.request;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 public class CreateChartRequest {
 
     @NotBlank(message = "name is required")
     private String name;
 
-    @NotNull(message = "datasetId is required")
     private Long datasetId;
 
     @NotBlank(message = "chartType is required")

@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS bi_dataset_field (
 CREATE TABLE IF NOT EXISTS bi_chart (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(128) NOT NULL,
-  dataset_id BIGINT NOT NULL,
+  dataset_id BIGINT NULL COMMENT '数据驱动组件绑定数据集，静态组件可为空',
   chart_type VARCHAR(32) NOT NULL,
   x_field VARCHAR(128) NOT NULL DEFAULT '',
   y_field VARCHAR(128) NOT NULL DEFAULT '',

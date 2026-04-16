@@ -19,120 +19,161 @@
 
       <!-- 折叠状态下的图标快捷菜单 -->
       <div v-if="sidebarCollapsed" class="lp-icon-menu">
-        <el-tooltip content="模板库" placement="right">
-          <div class="lp-icon-item" :class="{ active: libraryTab === 'templates' }" @click="libraryTab = 'templates'; sidebarCollapsed = false">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+        <el-tooltip content="组件" placement="right">
+          <div class="lp-icon-item" @click="sidebarCollapsed = false">
+            <el-icon><Grid /></el-icon>
           </div>
         </el-tooltip>
-        <el-tooltip content="图表源" placement="right">
-          <div class="lp-icon-item" :class="{ active: libraryTab === 'charts' }" @click="libraryTab = 'charts'; sidebarCollapsed = false">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <el-tooltip content="图层" placement="right">
+          <div class="lp-icon-item" @click="sidebarCollapsed = false">
+            <el-icon><Operation /></el-icon>
           </div>
-        </el-tooltip>
-        <el-tooltip v-for="cat in CHART_CATEGORIES" :key="cat.label" :content="cat.label" placement="right">
-          <div class="lp-icon-item" @click="sidebarCollapsed = false" v-html="cat.types[0]?.svgIcon ?? '⬛'" />
         </el-tooltip>
       </div>
 
       <!-- 展开状态下的完整内容 -->
-      <template v-if="!sidebarCollapsed">
-        <!-- 搜索栏 -->
-        <div class="lp-search">
-          <el-input v-model="assetSearch" placeholder="搜索组件名称..." clearable size="small" :prefix-icon="Search" />
-        </div>
+      <div v-if="!sidebarCollapsed" class="lp-shell lp-shell--dual">
+        <div class="lp-pane lp-pane--components">
+          <div class="lp-pane-head">
+            <div class="lp-pane-title">组件</div>
+            <div class="lp-pane-subtitle">图表组件、装饰组件、文字组件和矢量图标组件都在这里</div>
+          </div>
 
-        <!-- 分类折叠列表 -->
-        <div class="lp-cat-scroll">
-          <div v-for="cat in CHART_CATEGORIES" :key="cat.label" class="lp-cat-section">
-            <div
-              class="lp-cat-header"
-              :class="{ 'lp-cat-header--open': expandedCats.has(cat.label) }"
-              @click="toggleCategory(cat.label)"
-            >
-              <span class="lp-cat-label">{{ cat.label }}</span>
-              <el-icon class="lp-cat-arrow" :class="{ 'lp-cat-arrow--open': expandedCats.has(cat.label) }">
-                <ArrowRight />
-              </el-icon>
-            </div>
-            <div v-if="expandedCats.has(cat.label)" class="lp-type-grid">
+          <!-- 搜索栏 -->
+          <div class="lp-search">
+            <el-input v-model="assetSearch" placeholder="搜索组件名称..." clearable size="small" :prefix-icon="Search" />
+          </div>
+
+          <!-- 分类折叠列表 -->
+          <div class="lp-cat-scroll">
+            <div v-for="cat in CHART_CATEGORIES" :key="cat.label" class="lp-cat-section">
               <div
-                v-for="item in cat.types"
-                :key="item.type"
-                class="lp-type-chip"
-                :class="{ 'lp-type-chip--active': assetType === item.type }"
-                :title="item.label"
-                @click="assetType = item.type"
+                class="lp-cat-header"
+                :class="{ 'lp-cat-header--open': expandedCats.has(cat.label) }"
+                @click="toggleCategory(cat.label)"
               >
-                <span class="lp-type-icon" v-html="item.svgIcon" />
-                <span class="lp-type-label">{{ item.label }}</span>
+                <span class="lp-cat-label">{{ cat.label }}</span>
+                <el-icon class="lp-cat-arrow" :class="{ 'lp-cat-arrow--open': expandedCats.has(cat.label) }">
+                  <ArrowRight />
+                </el-icon>
+              </div>
+              <div v-if="expandedCats.has(cat.label)" class="lp-type-grid">
+                <div
+                  v-for="item in cat.types"
+                  :key="item.type"
+                  class="lp-type-chip"
+                  :class="{ 'lp-type-chip--active': assetType === item.type }"
+                  :title="item.label"
+                  @click="assetType = item.type"
+                >
+                  <span class="lp-type-icon" v-html="item.svgIcon" />
+                  <span class="lp-type-label">{{ item.label }}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- 分隔行 -->
-        <div class="lp-divider">
-          <span class="lp-divider-text">{{ assetType ? chartTypeLabel(assetType) : '全部组件' }}</span>
-          <el-button v-if="assetType" link size="small" style="font-size:11px;color:#4db3ff" @click="assetType = ''">清除</el-button>
-        </div>
+          <!-- 分隔行 -->
+          <div class="lp-divider">
+            <span class="lp-divider-text">{{ assetType ? chartTypeLabel(assetType) : '全部组件' }}</span>
+            <el-button v-if="assetType" link size="small" style="font-size:11px;color:#4db3ff" @click="assetType = ''">清除</el-button>
+          </div>
 
-        <!-- 组件列表 Tabs -->
-        <el-tabs v-model="libraryTab" class="lp-tabs">
-          <el-tab-pane label="模板库" name="templates">
-            <div class="lp-asset-scroll">
-              <div
-                v-for="template in filteredTemplates"
-                :key="template.id"
-                class="lp-asset-card"
-                :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
-                draggable="true"
-                @click="selectedTemplateId = template.id"
-                @dblclick="quickAddTemplate(template)"
-                @dragstart="onTemplateDragStart($event, template)"
-                @dragend="onTemplateDragEnd"
-              >
-                <div class="lp-ac-row">
-                  <span class="lp-ac-name">{{ template.name }}</span>
-                  <div class="lp-ac-tags">
-                    <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
-                    <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
+          <!-- 组件列表 Tabs -->
+          <el-tabs v-model="libraryTab" class="lp-tabs">
+            <el-tab-pane label="模板库" name="templates">
+              <div class="lp-asset-scroll">
+                <div
+                  v-for="template in filteredTemplates"
+                  :key="template.id"
+                  class="lp-asset-card"
+                  :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
+                  draggable="true"
+                  @click="selectedTemplateId = template.id"
+                  @dblclick="quickAddTemplate(template)"
+                  @dragstart="onTemplateDragStart($event, template)"
+                  @dragend="onTemplateDragEnd"
+                >
+                  <div class="lp-ac-row">
+                    <span class="lp-ac-name">{{ template.name }}</span>
+                    <div class="lp-ac-tags">
+                      <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
+                      <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
+                    </div>
+                  </div>
+                  <div class="lp-ac-foot">
+                    <span class="lp-ac-hint">拖入画布 · {{ getTemplateDatasetName(template) }}</span>
+                    <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddTemplate(template)">加入</el-button>
                   </div>
                 </div>
-                <div class="lp-ac-foot">
-                  <span class="lp-ac-hint">拖入画布 · {{ getTemplateDatasetName(template) }}</span>
-                  <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddTemplate(template)">加入</el-button>
-                </div>
+                <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
               </div>
-              <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
-            </div>
-          </el-tab-pane>
-          <el-tab-pane label="图表源" name="charts">
-            <div class="lp-asset-scroll">
-              <div
-                v-for="chart in filteredCharts"
-                :key="chart.id"
-                class="lp-asset-card"
-                :class="{ 'lp-asset-card--selected': selectedChartId === chart.id }"
-                draggable="true"
-                @click="selectedChartId = chart.id"
-                @dblclick="quickAddChart(chart)"
-                @dragstart="onChartDragStart($event, chart)"
-                @dragend="onChartDragEnd"
-              >
-                <div class="lp-ac-row">
-                  <span class="lp-ac-name">{{ chart.name }}</span>
-                  <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(chart.chartType) }}</el-tag>
+            </el-tab-pane>
+            <el-tab-pane label="图表源" name="charts">
+              <div class="lp-asset-scroll">
+                <div
+                  v-for="chart in filteredCharts"
+                  :key="chart.id"
+                  class="lp-asset-card"
+                  :class="{ 'lp-asset-card--selected': selectedChartId === chart.id }"
+                  draggable="true"
+                  @click="selectedChartId = chart.id"
+                  @dblclick="quickAddChart(chart)"
+                  @dragstart="onChartDragStart($event, chart)"
+                  @dragend="onChartDragEnd"
+                >
+                  <div class="lp-ac-row">
+                    <span class="lp-ac-name">{{ chart.name }}</span>
+                    <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(chart.chartType) }}</el-tag>
+                  </div>
+                  <div class="lp-ac-foot">
+                    <span class="lp-ac-hint">拖入画布 · {{ getChartDatasetName(chart.datasetId, chart.chartType) }}</span>
+                    <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddChart(chart)">加入</el-button>
+                  </div>
                 </div>
-                <div class="lp-ac-foot">
-                  <span class="lp-ac-hint">拖入画布 · {{ datasetMap.get(chart.datasetId)?.name ?? '未关联数据集' }}</span>
-                  <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddChart(chart)">加入</el-button>
-                </div>
+                <el-empty v-if="!filteredCharts.length && !loading" description="暂无匹配图表" :image-size="42" />
               </div>
-              <el-empty v-if="!filteredCharts.length && !loading" description="暂无匹配图表" :image-size="42" />
+            </el-tab-pane>
+          </el-tabs>
+        </div>
+
+        <div class="lp-pane lp-pane--layers">
+          <div class="lp-pane-head">
+            <div class="lp-pane-title">图层</div>
+            <div class="lp-pane-subtitle">按层级查看背景版与组件顺序</div>
+          </div>
+
+          <div class="lp-layer-order-tip">图层顺序从上到下显示，点击可直接选中。</div>
+
+          <div class="lp-layer-scroll">
+            <div class="lp-layer-item" :class="{ 'lp-layer-item--active': overlaySelected }" @click="selectOverlayLayer">
+              <div class="lp-layer-item-main">
+                <span class="lp-layer-name">背景版</span>
+                <span class="lp-layer-meta">固定底层 · {{ overlayConfig.w }} × {{ overlayConfig.h }}</span>
+              </div>
+              <span class="lp-layer-badge">背景</span>
             </div>
-          </el-tab-pane>
-        </el-tabs>
-      </template>
+
+            <div
+              v-for="component in layeredComponents"
+              :key="component.id"
+              class="lp-layer-item"
+              :class="{ 'lp-layer-item--active': activeCompId === component.id }"
+              @click="selectLayerComponent(component)"
+            >
+              <div class="lp-layer-item-main">
+                <span class="lp-layer-name">组件</span>
+                <span class="lp-layer-meta">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }} · Z{{ component.zIndex ?? 0 }}</span>
+              </div>
+              <div class="lp-layer-actions">
+                <el-button link size="small" @click.stop="bringSpecificComponentToFront(component)">置顶</el-button>
+              </div>
+            </div>
+
+            <el-empty v-if="!components.length" description="当前大屏还没有组件" :image-size="48" />
+          </div>
+        </div>
+      </div>
 
       <!-- 拖拽缩放手柄 (仅展开时可用) -->
       <div v-if="!sidebarCollapsed" class="lp-resize-handle" @mousedown.prevent="startPanelResize" />
@@ -263,7 +304,7 @@
                     <el-tag size="small" effect="dark">{{ chartTypeLabel(chart.chartType) }}</el-tag>
                   </div>
                 </div>
-                <div class="asset-card-meta">数据集: {{ datasetMap.get(chart.datasetId)?.name ?? '未关联' }}</div>
+                <div class="asset-card-meta">数据集: {{ getChartDatasetName(chart.datasetId, chart.chartType) }}</div>
                 <div class="asset-card-fields">
                   <span>X: {{ chart.xField || '未设' }}</span>
                   <span>Y: {{ chart.yField || '未设' }}</span>
@@ -412,25 +453,17 @@
                 @mousedown="focusComponent(component)"
               >
                 <div class="stage-card-header" @mousedown.stop.prevent="startDrag($event, component)">
-                  <div class="stage-card-header-main">
-                    <div class="stage-card-name">{{ getComponentChartConfig(component).name || '未命名组件' }}</div>
-                    <div class="stage-card-meta">
-                      <el-tag size="small" type="info">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }}</el-tag>
-                      <span>{{ datasetMap.get(Number(getComponentChartConfig(component).datasetId) || -1)?.name ?? '未关联数据集' }}</span>
-                    </div>
-                  </div>
-                  <el-popconfirm title="从大屏移除此组件？" @confirm="removeComponent(component.id)">
-                    <template #reference>
-                      <el-icon class="remove-btn"><Close /></el-icon>
-                    </template>
-                  </el-popconfirm>
+                  <div class="stage-card-header-main" />
+                  <el-button class="remove-btn" text size="small" @click.stop="confirmRemoveComponent(component)">
+                    <el-icon><Close /></el-icon>
+                  </el-button>
                 </div>
 
                 <div class="stage-card-body">
                   <div v-if="isFilterButtonChart(component)" class="filter-button-wrapper">
                     <el-button size="small" type="primary" style="width:100%;height:100%">
                       <el-icon style="margin-right:4px"><Filter /></el-icon>
-                      {{ getComponentConfig(component).chart.name || '筛选' }}
+                      筛选
                     </el-button>
                   </div>
                   <div v-else-if="isTableChart(component)" class="table-wrapper">
@@ -469,6 +502,14 @@
                       />
                     </el-table>
                   </div>
+                  <ComponentStaticPreview
+                    v-else-if="isStaticWidget(component)"
+                    :chart-type="getComponentChartConfig(component).chartType"
+                    :chart-config="getComponentChartConfig(component)"
+                    :data="componentDataMap.get(component.id) ?? null"
+                    :show-title="getComponentConfig(component).style.showTitle"
+                    dark
+                  />
                   <div v-else-if="showNoField(component)" class="chart-placeholder warning">
                     当前组件缺少必要字段，请先在右侧组件属性中完成配置。
                   </div>
@@ -688,10 +729,11 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Grid, Operation, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import ComponentDataFallback from './ComponentDataFallback.vue'
+import ComponentStaticPreview from './ComponentStaticPreview.vue'
 import EditorComponentInspector from './EditorComponentInspector.vue'
 import {
   addDashboardComponent,
@@ -716,6 +758,7 @@ import {
   chartTypeLabel,
   getMissingChartFields,
   isCanvasRenderableChartType,
+  isStaticWidgetChartType,
   materializeChartData,
   mergeComponentRequestFilters,
   normalizeComponentAssetConfig,
@@ -743,6 +786,12 @@ const emit = defineEmits<{ (e: 'back'): void }>()
 // ─── 分类组件类型选择器 ────────────────────────────────────────────────────────
 interface ChartTypeItem { type: string; label: string; svgIcon: string }
 interface ChartCategory { label: string; types: ChartTypeItem[] }
+interface StaticAssetSeed {
+  type: string
+  name: string
+  description: string
+  layout: { width: number; height: number }
+}
 
 const makeBarComboIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="18" width="6" height="10" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="18" fill="currentColor" rx="1"/><rect x="20" y="14" width="6" height="14" fill="currentColor" rx="1"/><rect x="28" y="6" width="6" height="22" fill="currentColor" rx="1"/><polyline points="7,12 15,8 23,11 31,4" fill="none" stroke="currentColor" stroke-width="2" opacity=".7" stroke-linecap="round"/></svg>`
 const makeHeatmapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="7" height="7" fill="currentColor" opacity=".9" rx="1"/><rect x="13" y="4" width="7" height="7" fill="currentColor" opacity=".5" rx="1"/><rect x="22" y="4" width="7" height="7" fill="currentColor" opacity=".2" rx="1"/><rect x="31" y="4" width="7" height="7" fill="currentColor" opacity=".7" rx="1"/><rect x="4" y="13" width="7" height="7" fill="currentColor" opacity=".3" rx="1"/><rect x="13" y="13" width="7" height="7" fill="currentColor" opacity=".8" rx="1"/><rect x="22" y="13" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="31" y="13" width="7" height="7" fill="currentColor" opacity=".15" rx="1"/><rect x="4" y="22" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="13" y="22" width="7" height="7" fill="currentColor" opacity=".25" rx="1"/><rect x="22" y="22" width="7" height="7" fill="currentColor" opacity=".95" rx="1"/><rect x="31" y="22" width="7" height="7" fill="currentColor" opacity=".4" rx="1"/></svg>`
@@ -767,96 +816,140 @@ const makeGaugeIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2
 const makeScatterIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="22" r="2.5" fill="currentColor"/><circle cx="16" cy="10" r="2.5" fill="currentColor"/><circle cx="22" cy="18" r="2.5" fill="currentColor"/><circle cx="28" cy="8" r="2.5" fill="currentColor"/><circle cx="32" cy="20" r="2.5" fill="currentColor"/></svg>`
 const makeTreemapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="20" height="18" fill="currentColor" opacity=".8" rx="1"/><rect x="25" y="3" width="12" height="10" fill="currentColor" opacity=".5" rx="1"/><rect x="25" y="15" width="12" height="6" fill="currentColor" opacity=".35" rx="1"/><rect x="3" y="23" width="34" height="6" fill="currentColor" opacity=".25" rx="1"/></svg>`
 const makeTableIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="32" height="7" fill="currentColor" rx="1"/><rect x="4" y="13" width="32" height="5" fill="currentColor" opacity=".4" rx="1"/><rect x="4" y="20" width="32" height="5" fill="currentColor" opacity=".25" rx="1"/><line x1="18" y1="4" x2="18" y2="25" stroke="white" stroke-width="1" opacity=".4"/></svg>`
+const makeDecorFrameIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M6 6H14V8H8V14H6V6ZM26 6H34V14H32V8H26V6ZM6 18H8V24H14V26H6V18ZM32 18H34V26H26V24H32V18Z" fill="currentColor"/><rect x="11" y="11" width="18" height="10" rx="2" fill="currentColor" opacity=".18"/></svg>`
+const makeTextBlockIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="5" width="28" height="22" rx="4" fill="currentColor" opacity=".12"/><rect x="10" y="10" width="20" height="3" rx="1.5" fill="currentColor"/><rect x="10" y="16" width="16" height="3" rx="1.5" fill="currentColor" opacity=".72"/><rect x="10" y="22" width="12" height="3" rx="1.5" fill="currentColor" opacity=".48"/></svg>`
+const makeMetricWidgetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="32" height="24" rx="5" fill="currentColor" opacity=".12"/><path d="M10 21V11H13.4L16.5 18.2L19.6 11H23V21H20.6V15.4L18.4 21H14.6L12.4 15.4V21H10Z" fill="currentColor"/><rect x="26" y="10" width="6" height="12" rx="2" fill="currentColor" opacity=".84"/></svg>`
+const makeListWidgetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="10" r="2" fill="currentColor"/><circle cx="9" cy="16" r="2" fill="currentColor" opacity=".72"/><circle cx="9" cy="22" r="2" fill="currentColor" opacity=".48"/><rect x="14" y="8.5" width="18" height="3" rx="1.5" fill="currentColor"/><rect x="14" y="14.5" width="15" height="3" rx="1.5" fill="currentColor" opacity=".72"/><rect x="14" y="20.5" width="12" height="3" rx="1.5" fill="currentColor" opacity=".48"/></svg>`
+const makeClockWidgetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M20 10V16L24 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="18" y="4" width="4" height="4" rx="1" fill="currentColor" opacity=".6"/></svg>`
+const makeQrWidgetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="6" width="8" height="8" fill="none" stroke="currentColor" stroke-width="2"/><rect x="9" y="9" width="2" height="2" fill="currentColor"/><rect x="26" y="6" width="8" height="8" fill="none" stroke="currentColor" stroke-width="2"/><rect x="29" y="9" width="2" height="2" fill="currentColor"/><rect x="6" y="18" width="8" height="8" fill="none" stroke="currentColor" stroke-width="2"/><rect x="9" y="21" width="2" height="2" fill="currentColor"/><rect x="24" y="18" width="3" height="3" fill="currentColor"/><rect x="29" y="18" width="5" height="3" fill="currentColor" opacity=".7"/><rect x="29" y="23" width="5" height="3" fill="currentColor" opacity=".45"/></svg>`
+const makeLinkWidgetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M14 20L10.5 23.5C8.6 25.4 8.6 28.6 10.5 30.5C12.4 32.4 15.6 32.4 17.5 30.5L21 27" transform="translate(0 -8)" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M26 12L29.5 8.5C31.4 6.6 34.6 6.6 36.5 8.5C38.4 10.4 38.4 13.6 36.5 15.5L33 19" transform="translate(-8 0)" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M15 20L25 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`
+const makeFrameWidgetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="5" width="32" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><rect x="4" y="5" width="32" height="5" rx="4" fill="currentColor" opacity=".2"/><circle cx="9" cy="7.5" r="1.2" fill="currentColor"/><circle cx="13" cy="7.5" r="1.2" fill="currentColor" opacity=".72"/><circle cx="17" cy="7.5" r="1.2" fill="currentColor" opacity=".48"/><rect x="9" y="14" width="9" height="8" rx="2" fill="currentColor" opacity=".22"/><rect x="21" y="14" width="10" height="3" rx="1.5" fill="currentColor"/><rect x="21" y="19" width="8" height="3" rx="1.5" fill="currentColor" opacity=".6"/></svg>`
+const makeWordCloudIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><text x="6" y="14" font-size="9" fill="currentColor" font-weight="700">BI</text><text x="17" y="13" font-size="6" fill="currentColor" opacity=".8">分析</text><text x="10" y="23" font-size="7" fill="currentColor" opacity=".58">趋势</text><text x="24" y="22" font-size="8" fill="currentColor" opacity=".92">指标</text></svg>`
+const makeTrendWidgetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="18" width="4" height="8" rx="1" fill="currentColor" opacity=".5"/><rect x="13" y="14" width="4" height="12" rx="1" fill="currentColor" opacity=".66"/><rect x="20" y="10" width="4" height="16" rx="1" fill="currentColor" opacity=".82"/><rect x="27" y="6" width="4" height="20" rx="1" fill="currentColor"/><path d="M7 12L15 10L22 13L30 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+const makeVectorGlyphIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M8 22L16 14L21 18L31 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 8H31V15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 
-const CHART_CATEGORIES: ChartCategory[] = [
-  {
-    label: '指标',
-    types: [
-      { type: 'gauge', label: '仪表盘', svgIcon: makeGaugeIcon() },
-    ],
-  },
-  {
-    label: '表格',
-    types: [
-      { type: 'table', label: '明细表', svgIcon: makeTableIcon() },
-      { type: 'table_summary', label: '汇总表', svgIcon: makeTableIcon() },
-      { type: 'table_pivot', label: '透视表', svgIcon: makeTableIcon() },
-    ],
-  },
-  {
-    label: '线/面图',
-    types: [
-      { type: 'line', label: '基础折线图', svgIcon: makeLineIcon() },
-      { type: 'area', label: '面积图', svgIcon: makeAreaIcon() },
-      { type: 'line_stack', label: '堆叠折线图', svgIcon: makeLineStackIcon() },
-    ],
-  },
-  {
-    label: '双轴图',
-    types: [
-      { type: 'bar_combo', label: '柱线组合图', svgIcon: makeBarComboIcon() },
-      { type: 'bar_combo_group', label: '分组柱线图', svgIcon: makeBarComboIcon() },
-      { type: 'bar_combo_stack', label: '堆叠柱线图', svgIcon: makeBarComboIcon() },
-    ],
-  },
-  {
-    label: '柱/条图',
-    types: [
-      { type: 'bar', label: '基础柱状图', svgIcon: makeBarIcon() },
-      { type: 'bar_stack', label: '堆叠柱状图', svgIcon: makeBarStackIcon() },
-      { type: 'bar_percent', label: '百分比柱状图', svgIcon: makeBarStackIcon() },
-      { type: 'bar_group', label: '分组柱状图', svgIcon: makeBarIcon() },
-      { type: 'bar_group_stack', label: '分组堆叠', svgIcon: makeBarGroupStackIcon() },
-      { type: 'bar_waterfall', label: '瀑布图', svgIcon: makeBarWaterfallIcon() },
-      { type: 'bar_horizontal', label: '基础条形图', svgIcon: makeBarHIcon() },
-      { type: 'bar_horizontal_stack', label: '堆叠条形图', svgIcon: makeBarHIcon() },
-      { type: 'bar_horizontal_percent', label: '百分比条形图', svgIcon: makeBarHIcon() },
-      { type: 'bar_horizontal_range', label: '区间条形图', svgIcon: makeBarSymmetricIcon() },
-      { type: 'bar_horizontal_symmetric', label: '对称条形图', svgIcon: makeBarSymmetricIcon() },
-      { type: 'bar_progress', label: '进度条', svgIcon: makeBarProgressIcon() },
-    ],
-  },
-  {
-    label: '分布图',
-    types: [
-      { type: 'pie', label: '饼图', svgIcon: makePieIcon() },
-      { type: 'doughnut', label: '环形图', svgIcon: makeDoughnutIcon() },
-      { type: 'rose', label: '玫瑰图', svgIcon: makeRoseIcon() },
-      { type: 'radar', label: '雷达图', svgIcon: makeRadarIcon() },
-      { type: 'funnel', label: '漏斗图', svgIcon: makeFunnelIcon() },
-      { type: 'treemap', label: '矩形树图', svgIcon: makeTreemapIcon() },
-    ],
-  },
-  {
-    label: '热力图',
-    types: [
-      { type: 'heatmap', label: '热力图', svgIcon: makeHeatmapIcon() },
-    ],
-  },
-  {
-    label: '关系图',
-    types: [
-      { type: 'scatter', label: '散点图', svgIcon: makeScatterIcon() },
-    ],
-  },
-  {
-    label: '地图',
-    types: [
-      { type: 'map', label: '地图', svgIcon: makeMapIcon() },
-    ],
-  },
-  {
-    label: '交互控件',
-    types: [
-      { type: 'filter_button', label: '筛选按钮', svgIcon: makeFilterButtonIcon() },
-    ],
-  },
+const createTypeItem = (type: string, svgIcon: string, label = chartTypeLabel(type)) => ({ type, label, svgIcon })
+
+const CHART_COMPONENT_ITEMS: ChartTypeItem[] = [
+  createTypeItem('bar', makeBarIcon()),
+  createTypeItem('bar_stack', makeBarStackIcon()),
+  createTypeItem('bar_percent', makeBarStackIcon()),
+  createTypeItem('bar_group', makeBarIcon()),
+  createTypeItem('bar_group_stack', makeBarGroupStackIcon()),
+  createTypeItem('bar_waterfall', makeBarWaterfallIcon()),
+  createTypeItem('bar_horizontal', makeBarHIcon()),
+  createTypeItem('bar_horizontal_stack', makeBarHIcon()),
+  createTypeItem('bar_horizontal_percent', makeBarHIcon()),
+  createTypeItem('bar_horizontal_range', makeBarSymmetricIcon()),
+  createTypeItem('bar_horizontal_symmetric', makeBarSymmetricIcon()),
+  createTypeItem('bar_progress', makeBarProgressIcon()),
+  createTypeItem('bar_combo', makeBarComboIcon()),
+  createTypeItem('bar_combo_group', makeBarComboIcon()),
+  createTypeItem('bar_combo_stack', makeBarComboIcon()),
+  createTypeItem('line', makeLineIcon()),
+  createTypeItem('area', makeAreaIcon()),
+  createTypeItem('line_stack', makeLineStackIcon()),
+  createTypeItem('pie', makePieIcon()),
+  createTypeItem('doughnut', makeDoughnutIcon()),
+  createTypeItem('rose', makeRoseIcon()),
+  createTypeItem('radar', makeRadarIcon()),
+  createTypeItem('funnel', makeFunnelIcon()),
+  createTypeItem('treemap', makeTreemapIcon()),
+  createTypeItem('heatmap', makeHeatmapIcon()),
+  createTypeItem('scatter', makeScatterIcon()),
+  createTypeItem('map', makeMapIcon()),
+  createTypeItem('gauge', makeGaugeIcon()),
+  createTypeItem('table', makeTableIcon()),
+  createTypeItem('table_summary', makeTableIcon()),
+  createTypeItem('table_pivot', makeTableIcon()),
+  createTypeItem('filter_button', makeFilterButtonIcon()),
 ]
 
-const activeCat = ref(CHART_CATEGORIES[0].label)
-const activeCategoryTypes = computed(() =>
-  CHART_CATEGORIES.find((c) => c.label === activeCat.value)?.types ?? []
-)
+const DECORATION_COMPONENT_ITEMS: ChartTypeItem[] = [
+  createTypeItem('decor_border_frame', makeDecorFrameIcon()),
+  createTypeItem('decor_border_corner', makeDecorFrameIcon()),
+  createTypeItem('decor_border_glow', makeDecorFrameIcon()),
+  createTypeItem('decor_border_grid', makeDecorFrameIcon()),
+]
+
+const TEXT_COMPONENT_ITEMS: ChartTypeItem[] = [
+  createTypeItem('text_block', makeTextBlockIcon()),
+  createTypeItem('single_field', makeMetricWidgetIcon()),
+  createTypeItem('number_flipper', makeMetricWidgetIcon()),
+  createTypeItem('table_rank', makeListWidgetIcon()),
+  createTypeItem('iframe_single', makeFrameWidgetIcon()),
+  createTypeItem('iframe_tabs', makeFrameWidgetIcon()),
+  createTypeItem('hyperlink', makeLinkWidgetIcon()),
+  createTypeItem('image_list', makeListWidgetIcon()),
+  createTypeItem('text_list', makeListWidgetIcon()),
+  createTypeItem('clock_display', makeClockWidgetIcon()),
+  createTypeItem('word_cloud', makeWordCloudIcon()),
+  createTypeItem('qr_code', makeQrWidgetIcon()),
+  createTypeItem('business_trend', makeTrendWidgetIcon()),
+  createTypeItem('metric_indicator', makeMetricWidgetIcon()),
+]
+
+const VECTOR_ICON_COMPONENT_ITEMS: ChartTypeItem[] = [
+  createTypeItem('icon_arrow_trend', makeVectorGlyphIcon()),
+  createTypeItem('icon_warning_badge', makeVectorGlyphIcon()),
+  createTypeItem('icon_location_pin', makeVectorGlyphIcon()),
+  createTypeItem('icon_data_signal', makeVectorGlyphIcon()),
+  createTypeItem('icon_user_badge', makeVectorGlyphIcon()),
+  createTypeItem('icon_chart_mark', makeVectorGlyphIcon()),
+]
+
+const CHART_CATEGORIES: ChartCategory[] = [
+  { label: '图表组件', types: CHART_COMPONENT_ITEMS },
+  { label: '装饰组件', types: DECORATION_COMPONENT_ITEMS },
+  { label: '文字组件', types: TEXT_COMPONENT_ITEMS },
+  { label: '矢量图标组件', types: VECTOR_ICON_COMPONENT_ITEMS },
+]
+
+const STATIC_TEMPLATE_LIBRARY: StaticAssetSeed[] = [
+  { type: 'decor_border_frame', name: '默认边框装饰', description: '适合用作区块包裹和背景版强调。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_corner', name: '角标边框', description: '四角强调型装饰边框。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_glow', name: '霓虹边框', description: '适合高亮核心指标区。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_grid', name: '网格边框', description: '适合信息密集型区域背景。', layout: { width: 520, height: 220 } },
+  { type: 'text_block', name: '文本组件', description: '用于公告、说明和长文本排版。', layout: { width: 420, height: 220 } },
+  { type: 'single_field', name: '单字段组件', description: '适合展示单值和摘要。', layout: { width: 320, height: 180 } },
+  { type: 'number_flipper', name: '数字翻牌器', description: '适合大屏 KPI 强调。', layout: { width: 320, height: 180 } },
+  { type: 'table_rank', name: '排名表格', description: '适合榜单和排名列表。', layout: { width: 420, height: 260 } },
+  { type: 'iframe_single', name: '单页 iframe', description: '嵌入单个外部页面。', layout: { width: 520, height: 320 } },
+  { type: 'iframe_tabs', name: '页签 iframe', description: '适合多页面切换展示。', layout: { width: 560, height: 340 } },
+  { type: 'hyperlink', name: '超级链接', description: '适合门户跳转和深链入口。', layout: { width: 420, height: 180 } },
+  { type: 'image_list', name: '图片列表', description: '适合图文卡片流。', layout: { width: 440, height: 260 } },
+  { type: 'text_list', name: '文字列表', description: '适合公告、列表和摘要。', layout: { width: 420, height: 240 } },
+  { type: 'clock_display', name: '显示时间', description: '实时展示当前日期与时间。', layout: { width: 360, height: 180 } },
+  { type: 'word_cloud', name: '词云图', description: '展示业务高频关键词。', layout: { width: 420, height: 260 } },
+  { type: 'qr_code', name: '二维码', description: '适合扫码跳转和分享。', layout: { width: 280, height: 280 } },
+  { type: 'business_trend', name: '业务趋势', description: '适合轻量趋势占位和摘要。', layout: { width: 420, height: 240 } },
+  { type: 'metric_indicator', name: '指标组件', description: '适合关键经营指标展示。', layout: { width: 320, height: 180 } },
+  { type: 'icon_arrow_trend', name: '趋势箭头图标', description: '用于强调涨跌趋势。', layout: { width: 220, height: 220 } },
+  { type: 'icon_warning_badge', name: '预警图标', description: '适合告警和异常提醒。', layout: { width: 220, height: 220 } },
+  { type: 'icon_location_pin', name: '定位图标', description: '适合地图和区域说明。', layout: { width: 220, height: 220 } },
+  { type: 'icon_data_signal', name: '数据信号图标', description: '适合状态和联通性提示。', layout: { width: 220, height: 220 } },
+  { type: 'icon_user_badge', name: '用户徽章图标', description: '适合人物、角色和身份展示。', layout: { width: 220, height: 220 } },
+  { type: 'icon_chart_mark', name: '图表标记图标', description: '适合图例和图表注记。', layout: { width: 220, height: 220 } },
+]
+
+const defaultChartTemplateLayout = (chartType: string) => {
+  if (chartType === 'table' || chartType === 'table_summary' || chartType === 'table_pivot') {
+    return { width: 760, height: 340 }
+  }
+  if (chartType === 'filter_button') {
+    return { width: 200, height: 60 }
+  }
+  return { width: 520, height: 320 }
+}
+
+const DEFAULT_CHART_TEMPLATE_LIBRARY: StaticAssetSeed[] = CHART_COMPONENT_ITEMS.map((item) => ({
+  type: item.type,
+  name: `${item.label}（默认）`,
+  description: '默认空组件，可先加入画布再绑定数据。',
+  layout: defaultChartTemplateLayout(item.type),
+}))
+
+const BUILTIN_TEMPLATE_LIBRARY: StaticAssetSeed[] = [...DEFAULT_CHART_TEMPLATE_LIBRARY, ...STATIC_TEMPLATE_LIBRARY]
 
 // ─── 左侧面板展开/折叠 & 拖拽缩放 ────────────────────────────────────────────
 const expandedCats = ref(new Set<string>(CHART_CATEGORIES.map((c) => c.label)))
@@ -865,7 +958,6 @@ const toggleCategory = (label: string) => {
   if (next.has(label)) { next.delete(label) } else { next.add(label) }
   expandedCats.value = next
 }
-const selectTypeFilter = (type: string) => { assetType.value = type }
 
 const sidebarCollapsed = ref(false)
 let sidebarHoverTimer: number | null = null
@@ -885,12 +977,12 @@ const hoverCollapseSidebar = () => {
   // Don't auto-collapse after hover-expand; user must click toggle or move away
 }
 
-const leftPanelWidth = ref(280)
+const leftPanelWidth = ref(520)
 const startPanelResize = (e: MouseEvent) => {
   const startX = e.clientX
   const startWidth = leftPanelWidth.value
   const onMove = (ev: MouseEvent) => {
-    leftPanelWidth.value = Math.max(200, Math.min(520, startWidth + ev.clientX - startX))
+    leftPanelWidth.value = Math.max(420, Math.min(880, startWidth + ev.clientX - startX))
   }
   const onUp = () => {
     document.removeEventListener('mousemove', onMove)
@@ -910,6 +1002,27 @@ const datasets = ref<Dataset[]>([])
 const templates = ref<ChartTemplate[]>([])
 const chartMap = computed(() => new Map(charts.value.map((item) => [item.id, item])))
 const datasetMap = computed(() => new Map(datasets.value.map((item) => [item.id, item])))
+const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LIBRARY.map((item, index) => ({
+  id: -(index + 1),
+  name: item.name,
+  description: item.description,
+  chartType: item.type,
+  configJson: buildComponentAssetConfig(undefined, undefined, {
+    chart: {
+      name: item.name,
+      chartType: item.type,
+      datasetId: '',
+      xField: '',
+      yField: '',
+      groupField: '',
+    },
+  }, item.layout),
+  builtIn: true,
+  sortOrder: index + 1,
+  createdBy: 'system',
+  createdAt: '',
+})))
+const templateAssets = computed(() => [...localStaticTemplates.value, ...templates.value])
 const dashboardCounts = ref(new Map<number, number>())
 const componentDataMap = ref(new Map<number, ChartDataResult>())
 const canvasRef = ref<HTMLElement | null>(null)
@@ -1095,31 +1208,15 @@ const startCurtainResize = (e: MouseEvent, handle: string) => {
   document.addEventListener('mouseup', onUp)
 }
 
-const MIN_CARD_WIDTH = 320
-const MIN_CARD_HEIGHT = 220
+const MIN_CARD_WIDTH = 160
+const MIN_CARD_HEIGHT = 120
 const LEGACY_GRID_COL_PX = 42
 const LEGACY_GRID_ROW_PX = 70
-const chartTypeOptions = [
-  { label: '基础柱状图', value: 'bar' },
-  { label: '堆叠柱状图', value: 'bar_stack' },
-  { label: '百分比柱状图', value: 'bar_percent' },
-  { label: '分组柱状图', value: 'bar_group' },
-  { label: '基础条形图', value: 'bar_horizontal' },
-  { label: '堆叠条形图', value: 'bar_horizontal_stack' },
-  { label: '基础折线图', value: 'line' },
-  { label: '面积图', value: 'area' },
-  { label: '堆叠折线图', value: 'line_stack' },
-  { label: '饼图', value: 'pie' },
-  { label: '环图', value: 'doughnut' },
-  { label: '玫瑰图', value: 'rose' },
-  { label: '表格', value: 'table' },
-  { label: '漏斗图', value: 'funnel' },
-  { label: '仪表盘', value: 'gauge' },
-  { label: '散点图', value: 'scatter' },
-  { label: '雷达图', value: 'radar' },
-  { label: '矩形树图', value: 'treemap' },
-  { label: '筛选按钮', value: 'filter_button' },
-]
+const chartTypeOptions = Array.from(new Map(
+  CHART_CATEGORIES
+    .flatMap((group) => group.types)
+    .map((item) => [item.type, { label: item.label, value: item.type }])
+).values())
 
 const filteredCharts = computed(() => {
   const keyword = assetSearch.value.trim().toLowerCase()
@@ -1132,7 +1229,7 @@ const filteredCharts = computed(() => {
 
 const filteredTemplates = computed(() => {
   const keyword = assetSearch.value.trim().toLowerCase()
-  return templates.value.filter((item) => {
+  return templateAssets.value.filter((item) => {
     const matchKeyword = !keyword
       || item.name.toLowerCase().includes(keyword)
       || item.description.toLowerCase().includes(keyword)
@@ -1142,7 +1239,7 @@ const filteredTemplates = computed(() => {
 })
 
 const selectedChartAsset = computed(() => charts.value.find((item) => item.id === selectedChartId.value) ?? null)
-const selectedTemplate = computed(() => templates.value.find((item) => item.id === selectedTemplateId.value) ?? null)
+const selectedTemplate = computed(() => templateAssets.value.find((item) => item.id === selectedTemplateId.value) ?? null)
 const selectedLibraryAsset = computed(() => libraryTab.value === 'templates' ? selectedTemplate.value : selectedChartAsset.value)
 const filteredDashboards = computed(() => {
   const keyword = dashboardSearch.value.trim().toLowerCase()
@@ -1164,6 +1261,11 @@ const activeComponent = computed(() => components.value.find((item) => item.id =
 const activeChart = computed(() => activeComponent.value ? chartMap.value.get(activeComponent.value.chartId) ?? null : null)
 const getComponentConfig = (component: DashboardComponent) => normalizeComponentConfig(component.configJson, chartMap.value.get(component.chartId))
 const getComponentChartConfig = (component: DashboardComponent) => getComponentConfig(component).chart
+const layeredComponents = computed(() => [...components.value].sort((left, right) => {
+  const zIndexDelta = (right.zIndex ?? 0) - (left.zIndex ?? 0)
+  if (zIndexDelta !== 0) return zIndexDelta
+  return right.id - left.id
+}))
 const currentCanvasConfig = computed(() => normalizeCanvasConfig(parseReportConfig(currentDashboard.value?.configJson).canvas, 'screen'))
 const matchedCanvasPreset = computed(() => SCREEN_CANVAS_PRESETS.find(
   (item) => item.width === currentCanvasConfig.value.width && item.height === currentCanvasConfig.value.height
@@ -1272,7 +1374,7 @@ const loadBaseData = async () => {
     charts.value = chartList
     datasets.value = datasetList
     templates.value = templateList
-    if (!selectedTemplateId.value && templateList.length) selectedTemplateId.value = templateList[0].id
+    if (!selectedTemplateId.value && templateAssets.value.length) selectedTemplateId.value = templateAssets.value[0].id
     if (!selectedChartId.value && chartList.length) selectedChartId.value = chartList[0].id
 
     if (props.screenId) {
@@ -1360,12 +1462,22 @@ const isTableChart = (component: DashboardComponent) => ['table', 'table_summary
 
 const isFilterButtonChart = (component: DashboardComponent) => getComponentChartConfig(component).chartType === 'filter_button'
 
+const isStaticWidget = (component: DashboardComponent) => {
+  const type = getComponentChartConfig(component).chartType ?? ''
+  return isStaticWidgetChartType(type)
+}
+
 const isRenderableChart = (component: DashboardComponent) => {
   const type = getComponentChartConfig(component).chartType ?? ''
   return isCanvasRenderableChartType(type)
 }
 
-const showNoField = (component: DashboardComponent) => getMissingChartFields(getComponentChartConfig(component)).length > 0
+const showNoField = (component: DashboardComponent) => {
+  const config = getComponentChartConfig(component)
+  const type = config.chartType ?? ''
+  if (isStaticWidgetChartType(type)) return false
+  return getMissingChartFields(config).length > 0
+}
 
 const getTableColumns = (componentId: number) => componentDataMap.value.get(componentId)?.columns ?? []
 const getTableRows = (componentId: number) => componentDataMap.value.get(componentId)?.rawRows ?? []
@@ -1373,9 +1485,20 @@ const getTableRows = (componentId: number) => componentDataMap.value.get(compone
 const getMaxZ = () => components.value.reduce((max, item) => Math.max(max, item.zIndex ?? 0), 0)
 
 const focusComponent = (component: DashboardComponent) => {
+  overlaySelected.value = false
   activeCompId.value = component.id
   const nextZ = getMaxZ() + 1
   if ((component.zIndex ?? 0) < nextZ) component.zIndex = nextZ
+}
+
+const selectOverlayLayer = () => {
+  overlaySelected.value = true
+  activeCompId.value = null
+}
+
+const selectLayerComponent = (component: DashboardComponent) => {
+  overlaySelected.value = false
+  activeCompId.value = component.id
 }
 
 const applyLayoutPatch = async (patch: Partial<DashboardComponent>) => {
@@ -1395,6 +1518,11 @@ const applyLayoutPatch = async (patch: Partial<DashboardComponent>) => {
 const bringComponentToFront = async () => {
   const component = activeComponent.value
   if (!component) return
+  await applyLayoutPatch({ zIndex: getMaxZ() + 1 })
+}
+
+const bringSpecificComponentToFront = async (component: DashboardComponent) => {
+  selectLayerComponent(component)
   await applyLayoutPatch({ zIndex: getMaxZ() + 1 })
 }
 
@@ -1775,9 +1903,15 @@ const exportScreenJson = () => {
   URL.revokeObjectURL(link.href)
 }
 
+const getChartDatasetName = (datasetId: number | '' | null | undefined, chartType: string) => {
+  const datasetName = datasetMap.value.get(Number(datasetId) || -1)?.name
+  if (datasetName) return datasetName
+  return isStaticWidgetChartType(chartType) ? '静态组件' : '未关联数据集'
+}
+
 const getTemplateDatasetName = (template: ChartTemplate) => {
   const asset = normalizeComponentAssetConfig(template.configJson)
-  return datasetMap.value.get(Number(asset.chart.datasetId) || -1)?.name ?? '未关联数据集'
+  return getChartDatasetName(asset.chart.datasetId, asset.chart.chartType || template.chartType)
 }
 
 const getTemplateLayoutText = (template: ChartTemplate) => {
@@ -1915,15 +2049,13 @@ const addChartToScreen = async (
 
 const addTemplateToScreen = async (template: ChartTemplate, point?: { clientX: number; clientY: number }) => {
   const asset = normalizeComponentAssetConfig(template.configJson)
+  const chartType = asset.chart.chartType || template.chartType
   const datasetId = Number(asset.chart.datasetId)
-  if (!Number.isFinite(datasetId) || datasetId <= 0) {
-    ElMessage.warning('该组件资产未绑定有效数据集，请先调整后再使用')
-    return
-  }
+  const hasDataset = Number.isFinite(datasetId) && datasetId > 0
   const createdChart = await createChart({
     name: asset.chart.name || template.name,
-    datasetId,
-    chartType: asset.chart.chartType || template.chartType,
+    datasetId: hasDataset ? datasetId : null,
+    chartType,
     xField: asset.chart.xField,
     yField: asset.chart.yField,
     groupField: asset.chart.groupField,
@@ -1956,6 +2088,24 @@ const removeComponent = async (componentId: number) => {
   if (activeCompId.value === componentId) activeCompId.value = null
   dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length)
   ElMessage.success('组件已移除')
+}
+
+const confirmRemoveComponent = async (component: DashboardComponent) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定从大屏中删除组件「${getComponentChartConfig(component).name || '组件'}」吗？`,
+      '删除组件',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        draggable: true,
+      }
+    )
+    await removeComponent(component.id)
+  } catch {
+    // 用户取消删除
+  }
 }
 
 const onTemplateDragStart = (event: DragEvent, template: ChartTemplate) => {
@@ -2700,49 +2850,33 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 12px;
+  padding: 0;
   border-radius: 18px;
-  border: 1px solid rgba(124, 170, 219, 0.18);
-  background: linear-gradient(180deg, rgba(9, 30, 53, 0.95) 0%, rgba(7, 20, 36, 0.96) 100%);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
-  backdrop-filter: blur(10px);
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
   user-select: none;
   will-change: transform, width, height;
 }
 
 .stage-card.active {
   border-color: rgba(64, 158, 255, 0.92);
-  box-shadow: 0 12px 28px rgba(64, 158, 255, 0.28);
+  box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.45);
 }
 
 .stage-card-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 0;
   cursor: move;
+  min-height: 0;
 }
 
 .stage-card-header-main {
-  min-width: 0;
-}
-
-.stage-card-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #eef5ff;
-}
-
-.stage-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  min-width: 0;
-  font-size: 12px;
-  color: rgba(220, 232, 245, 0.76);
-  flex-wrap: wrap;
+  display: none;
 }
 
 .stage-card-body {
@@ -2756,9 +2890,9 @@ onBeforeUnmount(() => {
 }
 
 .table-wrapper :deep(.el-table) {
-  --el-table-bg-color: rgba(7, 22, 38, 0.72);
+  --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: rgba(16, 41, 68, 0.94);
+  --el-table-header-bg-color: transparent;
   --el-table-border-color: rgba(104, 148, 194, 0.22);
   --el-table-text-color: #e6eef8;
   --el-table-header-text-color: #d8e8fb;
@@ -2791,8 +2925,10 @@ onBeforeUnmount(() => {
 }
 
 .remove-btn {
-  color: rgba(219, 231, 246, 0.68);
+  color: rgba(219, 231, 246, 0.76);
   cursor: pointer;
+  padding: 2px 8px;
+  min-height: 24px;
 }
 
 .remove-btn:hover {
@@ -3098,6 +3234,99 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 
+.lp-shell {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.95fr);
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(7, 18, 32, 0.18), rgba(7, 18, 32, 0.3));
+}
+
+.lp-shell--dual {
+  align-items: stretch;
+}
+
+.lp-primary-menu {
+  width: 68px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 8px;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  background: rgba(5, 12, 22, 0.28);
+}
+
+.lp-primary-item {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: rgba(255,255,255,0.45);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.lp-primary-item:hover,
+.lp-primary-item--active {
+  background: rgba(77,155,255,0.14);
+  color: #4db3ff;
+}
+
+.lp-primary-item-icon {
+  font-size: 16px;
+}
+
+.lp-primary-item-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.lp-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.lp-pane--components {
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+.lp-pane--layers {
+  background: rgba(3, 10, 20, 0.22);
+}
+
+.lp-pane-head {
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+
+.lp-pane-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.88);
+}
+
+.lp-pane-subtitle {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.34);
+}
+
 .lp-search {
   padding: 8px 10px 6px;
   flex-shrink: 0;
@@ -3175,7 +3404,7 @@ onBeforeUnmount(() => {
 
 .lp-type-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
   padding: 4px 8px 8px;
 }
@@ -3383,6 +3612,91 @@ onBeforeUnmount(() => {
 .lp-ac-add {
   font-size: 11px !important;
   flex-shrink: 0;
+}
+
+.lp-layer-order-tip {
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.34);
+}
+
+.lp-layer-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+
+.lp-layer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.lp-layer-item:hover {
+  background: rgba(77,179,255,0.06);
+  border-color: rgba(77,179,255,0.28);
+}
+
+.lp-layer-item--active {
+  background: rgba(77,179,255,0.12);
+  border-color: rgba(77,179,255,0.58);
+}
+
+.lp-layer-item-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lp-layer-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.86);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lp-layer-meta {
+  font-size: 11px;
+  color: rgba(255,255,255,0.38);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lp-layer-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 210, 80, 0.16);
+  color: #ffd250;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.lp-layer-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.lp-layer-actions :deep(.el-button) {
+  font-size: 11px;
 }
 
 /* 拖拽缩放手柄 */

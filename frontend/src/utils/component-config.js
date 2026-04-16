@@ -79,6 +79,37 @@ const DEFAULT_CHART_TYPE_META = {
     supportsBarStyle: false,
     stablePreview: true,
 };
+const STATIC_NO_FIELD_META = {
+    label: '静态组件',
+    description: '不依赖数据字段，可直接作为大屏装饰或信息承载区使用。',
+    requiresDimension: false,
+    allowsOptionalDimension: false,
+    requiresMetric: false,
+    allowsGroup: false,
+    supportsLegend: false,
+    supportsAxisNames: false,
+    supportsGrid: false,
+    supportsSmooth: false,
+    supportsAreaFill: false,
+    supportsBarStyle: false,
+    stablePreview: true,
+};
+const STATIC_DIMENSION_META = {
+    ...STATIC_NO_FIELD_META,
+    description: '依赖一个维度字段来展示主信息。',
+    requiresDimension: true,
+};
+const STATIC_METRIC_META = {
+    ...STATIC_NO_FIELD_META,
+    description: '依赖一个度量字段来展示数值信息。',
+    requiresMetric: true,
+};
+const STATIC_DIMENSION_METRIC_META = {
+    ...STATIC_NO_FIELD_META,
+    description: '同时依赖维度字段和度量字段展示排行或趋势内容。',
+    requiresDimension: true,
+    requiresMetric: true,
+};
 export const CHART_TYPE_META = {
     bar: {
         label: '柱状图',
@@ -560,6 +591,126 @@ export const CHART_TYPE_META = {
         supportsBarStyle: false,
         stablePreview: true,
     },
+    decor_border_frame: {
+        ...STATIC_NO_FIELD_META,
+        label: '边框装饰',
+        description: '基础外框装饰，适合承载标题区和模块边界。',
+    },
+    decor_border_corner: {
+        ...STATIC_NO_FIELD_META,
+        label: '角标边框',
+        description: '带角标强调的边框装饰，适合重点模块。',
+    },
+    decor_border_glow: {
+        ...STATIC_NO_FIELD_META,
+        label: '霓虹边框',
+        description: '带发光效果的边框装饰，适合深色大屏。',
+    },
+    decor_border_grid: {
+        ...STATIC_NO_FIELD_META,
+        label: '网格边框',
+        description: '包含刻度与网格肌理的装饰边框。',
+    },
+    text_block: {
+        ...STATIC_NO_FIELD_META,
+        label: '文本组件',
+        description: '用于展示标题、说明文案或公告信息。',
+    },
+    single_field: {
+        ...STATIC_DIMENSION_META,
+        label: '单字段组件',
+        description: '提取单个字段值并放大显示。',
+    },
+    number_flipper: {
+        ...STATIC_METRIC_META,
+        label: '数字翻牌器',
+        description: '适合核心指标的翻牌滚动展示。',
+    },
+    table_rank: {
+        ...STATIC_DIMENSION_METRIC_META,
+        label: '排名表格',
+        description: '按维度和指标生成排序榜单。',
+    },
+    iframe_single: {
+        ...STATIC_NO_FIELD_META,
+        label: 'iframe窗口',
+        description: '嵌入单个外部页面或业务系统窗口。',
+    },
+    iframe_tabs: {
+        ...STATIC_NO_FIELD_META,
+        label: '多iframe切换窗口',
+        description: '支持多个 iframe 页签切换展示。',
+    },
+    hyperlink: {
+        ...STATIC_NO_FIELD_META,
+        label: '超级链接',
+        description: '用于跳转外部链接或系统页面。',
+    },
+    image_list: {
+        ...STATIC_DIMENSION_META,
+        label: '图片列表',
+        description: '适合图片卡片、轮播封面等场景。',
+    },
+    text_list: {
+        ...STATIC_DIMENSION_META,
+        label: '文字列表',
+        description: '适合公告、消息和清单类信息展示。',
+    },
+    clock_display: {
+        ...STATIC_NO_FIELD_META,
+        label: '显示时间',
+        description: '展示当前日期与时间。',
+    },
+    word_cloud: {
+        ...STATIC_DIMENSION_METRIC_META,
+        label: '词云图',
+        description: '按词频或热度展示文字云。',
+    },
+    qr_code: {
+        ...STATIC_NO_FIELD_META,
+        label: '二维码',
+        description: '展示二维码入口或扫码信息。',
+    },
+    business_trend: {
+        ...STATIC_DIMENSION_METRIC_META,
+        label: '业务趋势',
+        description: '以轻量化趋势组件展示业务变化。',
+    },
+    metric_indicator: {
+        ...STATIC_METRIC_META,
+        label: '指标组件',
+        description: '聚焦 KPI 数值及状态变化。',
+    },
+    icon_arrow_trend: {
+        ...STATIC_NO_FIELD_META,
+        label: '趋势箭头',
+        description: '用于表达上涨、增长和方向趋势的矢量图标。',
+    },
+    icon_warning_badge: {
+        ...STATIC_NO_FIELD_META,
+        label: '告警徽标',
+        description: '用于风险、提示和告警态展示。',
+    },
+    icon_location_pin: {
+        ...STATIC_NO_FIELD_META,
+        label: '定位图标',
+        description: '用于地理位置和区域标记。',
+    },
+    icon_data_signal: {
+        ...STATIC_NO_FIELD_META,
+        label: '数据信号',
+        description: '用于链路、波形和数据传输状态表现。',
+    },
+    icon_user_badge: {
+        ...STATIC_NO_FIELD_META,
+        label: '用户徽标',
+        description: '用于身份、人员和角色识别。',
+    },
+    icon_chart_mark: {
+        ...STATIC_NO_FIELD_META,
+        label: '图表标识',
+        description: '用于概括图表、指标和分析模块。',
+    },
 };
 export const COMPONENT_PRESETS = [
     { id: 'trend-line', name: '时间趋势', description: '自动切为折线图，优先匹配时间列和指标列。', chartType: 'line' },
@@ -580,6 +731,22 @@ export const CANVAS_RENDERABLE_CHART_TYPES = new Set([
     'table_summary', 'table_pivot',
     'heatmap',
 ]);
+export const DECORATION_CHART_TYPES = new Set([
+    'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
+]);
+export const TEXT_WIDGET_CHART_TYPES = new Set([
+    'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',
+    'hyperlink', 'image_list', 'text_list', 'clock_display', 'word_cloud', 'qr_code',
+    'business_trend', 'metric_indicator',
+]);
+export const VECTOR_ICON_CHART_TYPES = new Set([
+    'icon_arrow_trend', 'icon_warning_badge', 'icon_location_pin', 'icon_data_signal', 'icon_user_badge', 'icon_chart_mark',
+]);
+export const PURE_STATIC_CHART_TYPES = new Set([
+    ...DECORATION_CHART_TYPES,
+    'text_block', 'iframe_single', 'iframe_tabs', 'hyperlink', 'clock_display', 'qr_code',
+    ...VECTOR_ICON_CHART_TYPES,
+]);
 export const DEFAULT_COMPONENT_ASSET_LAYOUT = {
     width: 520,
     height: 320,
@@ -592,6 +759,11 @@ export const getChartTypeMeta = (type) => CHART_TYPE_META[type] ?? {
     label: chartTypeLabel(type),
 };
 export const isCanvasRenderableChartType = (type) => CANVAS_RENDERABLE_CHART_TYPES.has(type);
+export const isDecorationChartType = (type) => DECORATION_CHART_TYPES.has(type);
+export const isTextWidgetChartType = (type) => TEXT_WIDGET_CHART_TYPES.has(type);
+export const isVectorIconChartType = (type) => VECTOR_ICON_CHART_TYPES.has(type);
+export const isStaticWidgetChartType = (type) => isDecorationChartType(type) || isTextWidgetChartType(type) || isVectorIconChartType(type);
+export const canRenderStaticWithoutFields = (type) => PURE_STATIC_CHART_TYPES.has(type);
 export const getMissingChartFields = (chartConfig) => {
     const meta = getChartTypeMeta(chartConfig.chartType);
     const issues = [];
@@ -647,6 +819,9 @@ export const buildPresetChartConfig = (preset, columns, currentChart) => {
 export const buildChartSnapshot = (chart) => ({
     name: chart?.name ?? '',
     datasetId: chart?.datasetId ?? '',
+    sourceMode: 'DATASET',
+    datasourceId: '',
+    sqlText: '',
     chartType: chart?.chartType ?? '',
     xField: chart?.xField ?? '',
     yField: chart?.yField ?? '',
@@ -674,6 +849,16 @@ export const parseComponentConfig = (configJson) => {
         chartPatch.name = parsed.name;
     if (typeof parsed.datasetId === 'number')
         chartPatch.datasetId = parsed.datasetId;
+    if (parsed.datasetId === null || parsed.datasetId === '')
+        chartPatch.datasetId = '';
+    if (parsed.sourceMode === 'DATASET' || parsed.sourceMode === 'PAGE_SQL')
+        chartPatch.sourceMode = parsed.sourceMode;
+    if (typeof parsed.datasourceId === 'number')
+        chartPatch.datasourceId = parsed.datasourceId;
+    if (parsed.datasourceId === null || parsed.datasourceId === '')
+        chartPatch.datasourceId = '';
+    if (typeof parsed.sqlText === 'string')
+        chartPatch.sqlText = parsed.sqlText;
     if (typeof parsed.chartType === 'string')
         chartPatch.chartType = parsed.chartType;
     if (typeof parsed.xField === 'string')
@@ -810,6 +995,30 @@ export const chartTypeLabel = (type) => ({
     heatmap: '热力图',
     map: '地图',
     filter_button: '筛选按钮',
+    decor_border_frame: '边框装饰',
+    decor_border_corner: '角标边框',
+    decor_border_glow: '霓虹边框',
+    decor_border_grid: '网格边框',
+    text_block: '文本组件',
+    single_field: '单字段组件',
+    number_flipper: '数字翻牌器',
+    table_rank: '排名表格',
+    iframe_single: 'iframe窗口',
+    iframe_tabs: '多iframe切换窗口',
+    hyperlink: '超级链接',
+    image_list: '图片列表',
+    text_list: '文字列表',
+    clock_display: '显示时间',
+    word_cloud: '词云图',
+    qr_code: '二维码',
+    business_trend: '业务趋势',
+    metric_indicator: '指标组件',
+    icon_arrow_trend: '趋势箭头',
+    icon_warning_badge: '告警徽标',
+    icon_location_pin: '定位图标',
+    icon_data_signal: '数据信号',
+    icon_user_badge: '用户徽标',
+    icon_chart_mark: '图表标识',
 }[type] ?? (type || '未知类型'));
 const sumValues = (left, right) => {
     const leftNumber = Number(left ?? 0);

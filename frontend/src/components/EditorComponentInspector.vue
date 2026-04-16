@@ -59,11 +59,11 @@
               </label>
               <label class="field-item">
                 <span>宽度</span>
-                <el-input-number :model-value="layoutForm.width" :min="320" controls-position="right" @change="handleWidthChange" />
+                <el-input-number :model-value="layoutForm.width" :min="160" controls-position="right" @change="handleWidthChange" />
               </label>
               <label class="field-item">
                 <span>高度</span>
-                <el-input-number :model-value="layoutForm.height" :min="220" controls-position="right" @change="handleHeightChange" />
+                <el-input-number :model-value="layoutForm.height" :min="120" controls-position="right" @change="handleHeightChange" />
               </label>
               <label class="field-item field-item--full">
                 <span>层级</span>
@@ -77,7 +77,7 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="数据" name="data">
+        <el-tab-pane v-if="!isDecorationComponentType" label="数据" name="data">
           <section class="inspector-section">
             <div class="section-title">数据绑定</div>
             <div class="preset-grid">
@@ -101,33 +101,43 @@
                   <el-option v-for="item in availableCharts" :key="item.id" :label="`${item.name} · ${chartTypeLabel(item.chartType)}`" :value="item.id" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="数据集">
-                <el-select v-model="configForm.chart.datasetId" placeholder="请选择数据集" style="width: 100%" filterable @change="onDatasetChange">
+              <el-form-item label="数据来源模式">
+                <el-switch
+                  :model-value="isUseDatasetMode"
+                  active-text="采用数据集"
+                  inactive-text="页面编写"
+                  @change="onSourceModeSwitch"
+                />
+              </el-form-item>
+              <el-form-item v-if="isUseDatasetMode" label="数据集">
+                <el-select v-model="configForm.chart.datasetId" placeholder="请选择数据集" style="width: 100%" filterable :clearable="isStaticComponentType" @change="onDatasetChange">
                   <el-option v-for="dataset in datasets" :key="dataset.id" :label="dataset.name" :value="dataset.id" />
                 </el-select>
+                <div class="helper-text">{{ isStaticComponentType ? '静态组件可不绑定数据集；需要数据驱动时再选择数据集即可。' : '数据驱动组件需要绑定数据集后才能保存。' }}</div>
               </el-form-item>
+              <template v-else>
+                <el-form-item label="数据库数据源">
+                  <el-select v-model="configForm.chart.datasourceId" placeholder="请选择数据源" style="width: 100%" filterable clearable>
+                    <el-option v-for="source in datasources" :key="source.id" :label="source.name" :value="source.id" />
+                  </el-select>
+                  <div class="helper-text">页面编写模式会直接执行下方 SQL，请确保已提前配置数据源。</div>
+                </el-form-item>
+                <el-form-item label="页面编写 SQL">
+                  <el-input
+                    v-model="configForm.chart.sqlText"
+                    type="textarea"
+                    :rows="5"
+                    placeholder="请输入查询 SQL（仅支持查询语句）"
+                  />
+                </el-form-item>
+                <div class="action-row">
+                  <el-button size="small" type="primary" :loading="previewLoading" @click="onPageSqlQuery">查询 SQL</el-button>
+                </div>
+              </template>
               <el-form-item label="图表类型">
                 <el-select v-model="configForm.chart.chartType" placeholder="请选择图表类型" style="width: 100%">
-                  <el-option-group label="比较类">
-                    <el-option label="柱状图" value="bar" />
-                    <el-option label="条形图" value="bar_horizontal" />
-                    <el-option label="折线图" value="line" />
-                    <el-option label="雷达图" value="radar" />
-                  </el-option-group>
-                  <el-option-group label="占比类">
-                    <el-option label="饼图" value="pie" />
-                    <el-option label="环图" value="doughnut" />
-                  </el-option-group>
-                  <el-option-group label="关系类">
-                    <el-option label="散点图" value="scatter" />
-                  </el-option-group>
-                  <el-option-group label="高级">
-                    <el-option label="漏斗图" value="funnel" />
-                    <el-option label="仪表盘" value="gauge" />
-                    <el-option label="表格" value="table" />
-                  </el-option-group>
-                  <el-option-group label="交互控件">
-                    <el-option label="筛选按钮" value="filter_button" />
+                  <el-option-group v-for="group in chartTypeGroups" :key="group.label" :label="group.label">
+                    <el-option v-for="item in group.items" :key="item.value" :label="item.label" :value="item.value" />
                   </el-option-group>
                 </el-select>
                 <div class="helper-text">{{ currentChartMeta.description }}</div>
@@ -180,7 +190,8 @@
               </div>
               <div class="ss-row">
                 <span class="ss-key">图表背景</span>
-                <el-color-picker v-model="configForm.style.bgColor" show-alpha size="small" />
+                <el-color-picker v-if="!isDecorationComponentType" v-model="configForm.style.bgColor" show-alpha size="small" />
+                <span v-else class="helper-text">装饰组件背景固定透明</span>
               </div>
             </div>
 
@@ -455,7 +466,7 @@
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="交互" name="interaction">
+        <el-tab-pane v-if="!isDecorationComponentType" label="交互" name="interaction">
           <section class="inspector-section">
             <div class="section-title">交互配置</div>
             <div class="layout-grid">
@@ -545,8 +556,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getChartList, type Chart } from '../api/chart'
-import { getDatasetList, getDatasetPreviewData, previewDatasetSql, type Dataset } from '../api/dataset'
+import { getChartList, queryChartDataset, queryChartPageSql, type Chart } from '../api/chart'
+import { getDatasourceList, type Datasource } from '../api/datasource'
+import { getDatasetList, type Dataset } from '../api/dataset'
 import type { DashboardComponent } from '../api/dashboard'
 import {
   buildChartSnapshot,
@@ -559,6 +571,8 @@ import {
   buildPresetChartConfig,
   getChartTypeMeta,
   getMissingChartFields,
+  isDecorationChartType,
+  isStaticWidgetChartType,
   normalizeComponentDataFilters,
   normalizeComponentConfig,
   suggestChartFields,
@@ -573,6 +587,85 @@ const props = defineProps<{
   chart: Chart | null
 }>()
 
+const chartTypeGroups = [
+  {
+    label: '图表组件',
+    items: [
+      { label: '柱状图', value: 'bar' },
+      { label: '堆叠柱状图', value: 'bar_stack' },
+      { label: '百分比柱状图', value: 'bar_percent' },
+      { label: '分组柱状图', value: 'bar_group' },
+      { label: '分组堆叠柱图', value: 'bar_group_stack' },
+      { label: '瀑布图', value: 'bar_waterfall' },
+      { label: '条形图', value: 'bar_horizontal' },
+      { label: '堆叠条形图', value: 'bar_horizontal_stack' },
+      { label: '百分比条形图', value: 'bar_horizontal_percent' },
+      { label: '区间条形图', value: 'bar_horizontal_range' },
+      { label: '对称条形图', value: 'bar_horizontal_symmetric' },
+      { label: '进度条', value: 'bar_progress' },
+      { label: '柱线组合图', value: 'bar_combo' },
+      { label: '分组柱线图', value: 'bar_combo_group' },
+      { label: '堆叠柱线图', value: 'bar_combo_stack' },
+      { label: '折线图', value: 'line' },
+      { label: '面积图', value: 'area' },
+      { label: '堆叠折线图', value: 'line_stack' },
+      { label: '饼图', value: 'pie' },
+      { label: '环图', value: 'doughnut' },
+      { label: '玫瑰图', value: 'rose' },
+      { label: '雷达图', value: 'radar' },
+      { label: '漏斗图', value: 'funnel' },
+      { label: '仪表盘', value: 'gauge' },
+      { label: '散点图', value: 'scatter' },
+      { label: '矩形树图', value: 'treemap' },
+      { label: '热力图', value: 'heatmap' },
+      { label: '地图', value: 'map' },
+      { label: '表格', value: 'table' },
+      { label: '汇总表', value: 'table_summary' },
+      { label: '透视表', value: 'table_pivot' },
+      { label: '筛选按钮', value: 'filter_button' },
+    ],
+  },
+  {
+    label: '装饰组件',
+    items: [
+      { label: '边框装饰', value: 'decor_border_frame' },
+      { label: '角标边框', value: 'decor_border_corner' },
+      { label: '霓虹边框', value: 'decor_border_glow' },
+      { label: '网格边框', value: 'decor_border_grid' },
+    ],
+  },
+  {
+    label: '文字组件',
+    items: [
+      { label: '文本组件', value: 'text_block' },
+      { label: '单字段组件', value: 'single_field' },
+      { label: '数字翻牌器', value: 'number_flipper' },
+      { label: '排名表格', value: 'table_rank' },
+      { label: '单页 iframe', value: 'iframe_single' },
+      { label: '页签 iframe', value: 'iframe_tabs' },
+      { label: '超级链接', value: 'hyperlink' },
+      { label: '图片列表', value: 'image_list' },
+      { label: '文字列表', value: 'text_list' },
+      { label: '显示时间', value: 'clock_display' },
+      { label: '词云图', value: 'word_cloud' },
+      { label: '二维码', value: 'qr_code' },
+      { label: '业务趋势', value: 'business_trend' },
+      { label: '指标组件', value: 'metric_indicator' },
+    ],
+  },
+  {
+    label: '矢量图标组件',
+    items: [
+      { label: '趋势箭头图标', value: 'icon_arrow_trend' },
+      { label: '预警图标', value: 'icon_warning_badge' },
+      { label: '定位图标', value: 'icon_location_pin' },
+      { label: '数据信号图标', value: 'icon_data_signal' },
+      { label: '用户徽章图标', value: 'icon_user_badge' },
+      { label: '图表标记图标', value: 'icon_chart_mark' },
+    ],
+  },
+]
+
 const emit = defineEmits<{
   (e: 'apply-layout', patch: Partial<DashboardComponent>): void
   (e: 'bring-front'): void
@@ -583,6 +676,7 @@ const emit = defineEmits<{
 
 const availableCharts = ref<Chart[]>([])
 const datasets = ref<Dataset[]>([])
+const datasources = ref<Datasource[]>([])
 const previewColumns = ref<string[]>([])
 const previewRows = ref<Record<string, unknown>[]>([])
 const previewRowCount = ref(0)
@@ -611,7 +705,10 @@ const configForm = reactive<ComponentInstanceConfig>({
 })
 
 const currentChartMeta = computed(() => getChartTypeMeta(configForm.chart.chartType))
-const missingFields = computed(() => getMissingChartFields(configForm.chart))
+const isDecorationComponentType = computed(() => isDecorationChartType(configForm.chart.chartType))
+const isStaticComponentType = computed(() => isStaticWidgetChartType(configForm.chart.chartType))
+const isUseDatasetMode = computed(() => configForm.chart.sourceMode !== 'PAGE_SQL')
+const missingFields = computed(() => isStaticComponentType.value ? [] : getMissingChartFields(configForm.chart))
 const suggestedFields = computed(() => suggestChartFields(previewColumns.value, configForm.chart.chartType))
 const suggestionSummary = computed(() => {
   const entries = [
@@ -635,7 +732,11 @@ const schemaPreview = computed(() => {
       zIndex: props.component.zIndex,
     },
     dataConfig: {
-      sourceId: configForm.chart.datasetId,
+      sourceMode: configForm.chart.sourceMode,
+      sourceId: configForm.chart.sourceMode === 'PAGE_SQL' ? configForm.chart.datasourceId : configForm.chart.datasetId,
+      datasetId: configForm.chart.datasetId,
+      datasourceId: configForm.chart.datasourceId,
+      sqlText: configForm.chart.sqlText,
       chartId: props.component.chartId,
       dimensions: configForm.chart.xField ? [configForm.chart.xField] : [],
       metrics: configForm.chart.yField ? [configForm.chart.yField] : [],
@@ -686,8 +787,10 @@ const syncFromProps = async () => {
   configForm.interaction = { ...normalized.interaction }
   selectedBaseChartId.value = props.component?.chartId ?? props.chart?.id ?? null
 
-  if (configForm.chart.datasetId) {
+  if (isUseDatasetMode.value && configForm.chart.datasetId) {
     await onDatasetChange(configForm.chart.datasetId)
+  } else if (!isUseDatasetMode.value && configForm.chart.datasourceId && configForm.chart.sqlText.trim()) {
+    await onPageSqlQuery()
   } else {
     previewColumns.value = []
     previewRows.value = []
@@ -699,26 +802,80 @@ const syncFromProps = async () => {
 
 watch(() => [props.component?.id, props.component?.configJson, props.chart?.id], syncFromProps, { immediate: true })
 watch(() => [configForm.chart, configForm.style, configForm.interaction, selectedBaseChartId.value], queuePreview, { deep: true })
+watch(isDecorationComponentType, (isDecoration) => {
+  if (!isDecoration) return
+  configForm.chart.datasetId = ''
+  configForm.chart.xField = ''
+  configForm.chart.yField = ''
+  configForm.chart.groupField = ''
+  configForm.style.bgColor = 'rgba(0,0,0,0)'
+  if (activeTab.value === 'data' || activeTab.value === 'interaction') {
+    activeTab.value = 'style'
+  }
+})
 
 const loadMeta = async () => {
-  const [chartList, datasetList] = await Promise.all([getChartList(), getDatasetList()])
+  const [chartList, datasetList, datasourceList] = await Promise.all([getChartList(), getDatasetList(), getDatasourceList()])
   availableCharts.value = chartList
   datasets.value = datasetList
+  datasources.value = datasourceList
 }
 
-const onDatasetChange = async (datasetId: number | '') => {
+const onSourceModeSwitch = async (useDataset: boolean) => {
+  configForm.chart.sourceMode = useDataset ? 'DATASET' : 'PAGE_SQL'
+  if (useDataset) {
+    configForm.chart.datasourceId = ''
+    configForm.chart.sqlText = ''
+    if (configForm.chart.datasetId) {
+      await onDatasetChange(configForm.chart.datasetId)
+      return
+    }
+  } else {
+    configForm.chart.datasetId = ''
+    previewColumns.value = []
+    previewRows.value = []
+    previewRowCount.value = 0
+    return
+  }
+  previewColumns.value = []
+  previewRows.value = []
+  previewRowCount.value = 0
+}
+
+const onDatasetChange = async (datasetId: number | '' | null | undefined) => {
+  if (!isUseDatasetMode.value) return
   previewColumns.value = []
   previewRows.value = []
   previewRowCount.value = 0
   if (!datasetId) return
-  const dataset = datasets.value.find((item) => item.id === datasetId)
-  if (!dataset) return
   previewLoading.value = true
   try {
-    // Demo datasets have null datasourceId — use the by-id preview endpoint
-    const preview = !dataset.datasourceId
-      ? await getDatasetPreviewData(dataset.id)
-      : await previewDatasetSql({ datasourceId: dataset.datasourceId, sqlText: dataset.sqlText })
+    const preview = await queryChartDataset({ datasetId: Number(datasetId) })
+    previewColumns.value = preview.columns
+    previewRows.value = preview.rows
+    previewRowCount.value = preview.rowCount
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+const onPageSqlQuery = async () => {
+  if (isUseDatasetMode.value) return
+  const datasourceId = Number(configForm.chart.datasourceId)
+  if (!Number.isFinite(datasourceId) || datasourceId <= 0) {
+    ElMessage.warning('请选择数据库数据源')
+    return
+  }
+  if (!configForm.chart.sqlText.trim()) {
+    ElMessage.warning('请输入页面编写 SQL')
+    return
+  }
+  previewColumns.value = []
+  previewRows.value = []
+  previewRowCount.value = 0
+  previewLoading.value = true
+  try {
+    const preview = await queryChartPageSql({ datasourceId, sqlText: configForm.chart.sqlText })
     previewColumns.value = preview.columns
     previewRows.value = preview.rows
     previewRowCount.value = preview.rowCount
@@ -744,6 +901,9 @@ const applyBaseChart = async (chartId: number) => {
   const selectedChart = availableCharts.value.find((item) => item.id === chartId)
   if (!selectedChart) return
   configForm.chart = { ...buildChartSnapshot(selectedChart) }
+  configForm.chart.sourceMode = 'DATASET'
+  configForm.chart.datasourceId = ''
+  configForm.chart.sqlText = ''
   await onDatasetChange(configForm.chart.datasetId)
 }
 
@@ -794,7 +954,14 @@ const applyPreset = (presetId: string) => {
 const saveComponentConfig = async () => {
   if (!props.component) return
   if (!configForm.chart.name.trim()) return ElMessage.warning('请输入组件名称')
-  if (!configForm.chart.datasetId) return ElMessage.warning('请选择数据集')
+  if (!isStaticComponentType.value && isUseDatasetMode.value && !configForm.chart.datasetId) {
+    return ElMessage.warning('请选择数据集')
+  }
+  if (!isStaticComponentType.value && !isUseDatasetMode.value) {
+    const datasourceId = Number(configForm.chart.datasourceId)
+    if (!Number.isFinite(datasourceId) || datasourceId <= 0) return ElMessage.warning('请选择数据库数据源')
+    if (!configForm.chart.sqlText.trim()) return ElMessage.warning('请输入页面编写 SQL')
+  }
   if (!configForm.chart.chartType) return ElMessage.warning('请选择图表类型')
   if (missingFields.value.length) return ElMessage.warning(`请补充${missingFields.value.join('、')}`)
   if (!selectedBaseChartId.value) return ElMessage.warning('请选择基础组件来源')

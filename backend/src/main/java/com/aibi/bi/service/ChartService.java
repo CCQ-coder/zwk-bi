@@ -6,6 +6,7 @@ import com.aibi.bi.domain.BiDatasource;
 import com.aibi.bi.mapper.BiChartMapper;
 import com.aibi.bi.mapper.BiDatasetMapper;
 import com.aibi.bi.mapper.BiDatasourceMapper;
+import com.aibi.bi.model.request.DatasetPreviewRequest;
 import com.aibi.bi.model.request.CreateChartRequest;
 import com.aibi.bi.model.request.UpdateChartRequest;
 import com.aibi.bi.model.response.DatasetPreviewResponse;
@@ -18,6 +19,33 @@ import java.util.*;
 
 @Service
 public class ChartService {
+
+    private static final Set<String> STATIC_WIDGET_TYPES = Set.of(
+            "decor_border_frame",
+            "decor_border_corner",
+            "decor_border_glow",
+            "decor_border_grid",
+            "text_block",
+            "single_field",
+            "number_flipper",
+            "table_rank",
+            "iframe_single",
+            "iframe_tabs",
+            "hyperlink",
+            "image_list",
+            "text_list",
+            "clock_display",
+            "word_cloud",
+            "qr_code",
+            "business_trend",
+            "metric_indicator",
+            "icon_arrow_trend",
+            "icon_warning_badge",
+            "icon_location_pin",
+            "icon_data_signal",
+            "icon_user_badge",
+            "icon_chart_mark"
+    );
 
     private final BiChartMapper biChartMapper;
     private final BiDatasetMapper biDatasetMapper;
@@ -49,6 +77,7 @@ public class ChartService {
     }
 
     public BiChart create(CreateChartRequest request) {
+        validateDatasetRequirement(request.getChartType(), request.getDatasetId());
         BiChart entity = new BiChart();
         entity.setName(request.getName());
         entity.setDatasetId(request.getDatasetId());
@@ -65,6 +94,7 @@ public class ChartService {
         if (entity == null) {
             throw new IllegalArgumentException("Chart not found: " + id);
         }
+        validateDatasetRequirement(request.getChartType(), request.getDatasetId());
         entity.setName(request.getName());
         entity.setDatasetId(request.getDatasetId());
         entity.setChartType(request.getChartType());
@@ -79,6 +109,24 @@ public class ChartService {
         biChartMapper.deleteById(id);
     }
 
+    public DatasetPreviewResponse queryDataset(Long datasetId) {
+        if (datasetId == null) {
+            throw new IllegalArgumentException("datasetId is required");
+        }
+        return datasetService.previewDataset(datasetId);
+    }
+
+    public DatasetPreviewResponse queryPageSql(DatasetPreviewRequest request) {
+        if (request.getDatasourceId() == null || request.getDatasourceId() == 0L) {
+            throw new IllegalArgumentException("datasourceId is required for page-sql query");
+        }
+        BiDatasource datasource = biDatasourceMapper.findById(request.getDatasourceId());
+        if (datasource == null) {
+            throw new IllegalArgumentException("Datasource not found: " + request.getDatasourceId());
+        }
+        return jdbcPreviewService.preview(datasource, request.getSqlText());
+    }
+
     /**
      * Execute the chart's dataset SQL and aggregate data for ECharts rendering.
      * Returns: { labels:[...], series:[{name, data:[...]}] }
@@ -88,19 +136,30 @@ public class ChartService {
         if (chart == null) throw new IllegalArgumentException("Chart not found: " + chartId);
 
         ResolvedChartConfig resolvedConfig = resolveChartConfig(chart, configJson);
-
-        BiDataset dataset = biDatasetMapper.findById(resolvedConfig.datasetId());
-        if (dataset == null) throw new IllegalArgumentException("Dataset not found");
-
-        DatasetPreviewResponse preview;
-        if (dataset.getDatasourceId() == null || dataset.getDatasourceId() == 0L) {
-            preview = datasetService.getDemoPreviewResponse(dataset.getSqlText());
-        } else {
-            BiDatasource datasource = biDatasourceMapper.findById(dataset.getDatasourceId());
-            if (datasource == null) throw new IllegalArgumentException("Datasource not found");
-            preview = jdbcPreviewService.preview(datasource, dataset.getSqlText());
-        }
         Map<String, String> filters = parseFilters(filterJson);
+
+        if ("DATASET".equalsIgnoreCase(resolvedConfig.sourceMode()) && resolvedConfig.datasetId() == null) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("chartType", resolvedConfig.chartType());
+            result.put("columns", List.of());
+            result.put("labels", List.of());
+            result.put("series", List.of());
+            result.put("rawRows", List.of());
+            result.put("filters", filters);
+            return result;
+        }
+
+        DatasetPreviewResponse preview = resolvePreviewData(resolvedConfig);
+        if (preview == null) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("chartType", resolvedConfig.chartType());
+            result.put("columns", List.of());
+            result.put("labels", List.of());
+            result.put("series", List.of());
+            result.put("rawRows", List.of());
+            result.put("filters", filters);
+            return result;
+        }
         List<Map<String, Object>> rows = applyFilters(preview.getRows(), filters);
 
         String xField = resolvedConfig.xField();
@@ -108,8 +167,9 @@ public class ChartService {
         String groupField = resolvedConfig.groupField();
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("columns", preview.getColumns());
         result.put("chartType", resolvedConfig.chartType());
+
+        result.put("columns", preview.getColumns());
 
         if (xField == null || xField.isEmpty() || yField == null || yField.isEmpty()) {
             // No field config: just return raw rows
@@ -170,15 +230,18 @@ public class ChartService {
         String xField = chart.getXField();
         String yField = chart.getYField();
         String groupField = chart.getGroupField();
+        String sourceMode = "DATASET";
+        Long datasourceId = null;
+        String sqlText = "";
 
         if (configJson == null || configJson.isBlank()) {
-            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField);
+            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText);
         }
 
         try {
             JsonNode chartNode = objectMapper.readTree(configJson).path("chart");
             if (!chartNode.isObject()) {
-                return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField);
+                return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText);
             }
 
             datasetId = readLong(chartNode.get("datasetId"), datasetId);
@@ -186,10 +249,45 @@ public class ChartService {
             xField = readText(chartNode.get("xField"), xField);
             yField = readText(chartNode.get("yField"), yField);
             groupField = readText(chartNode.get("groupField"), groupField);
-            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField);
+            sourceMode = readText(chartNode.get("sourceMode"), sourceMode);
+            datasourceId = readLong(chartNode.get("datasourceId"), datasourceId);
+            sqlText = readText(chartNode.get("sqlText"), sqlText);
+            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText);
         } catch (Exception ex) {
             throw new IllegalArgumentException("组件配置格式不正确");
         }
+    }
+
+    private DatasetPreviewResponse resolvePreviewData(ResolvedChartConfig resolvedConfig) {
+        if ("PAGE_SQL".equalsIgnoreCase(resolvedConfig.sourceMode())) {
+            if (resolvedConfig.datasourceId() == null || resolvedConfig.datasourceId() == 0L) {
+                return null;
+            }
+            if (resolvedConfig.sqlText() == null || resolvedConfig.sqlText().isBlank()) {
+                return null;
+            }
+            BiDatasource datasource = biDatasourceMapper.findById(resolvedConfig.datasourceId());
+            if (datasource == null) {
+                throw new IllegalArgumentException("Datasource not found: " + resolvedConfig.datasourceId());
+            }
+            return jdbcPreviewService.preview(datasource, resolvedConfig.sqlText());
+        }
+
+        if (resolvedConfig.datasetId() == null) {
+            return null;
+        }
+        BiDataset dataset = biDatasetMapper.findById(resolvedConfig.datasetId());
+        if (dataset == null) {
+            throw new IllegalArgumentException("Dataset not found");
+        }
+        if (dataset.getDatasourceId() == null || dataset.getDatasourceId() == 0L) {
+            return datasetService.getDemoPreviewResponse(dataset.getSqlText());
+        }
+        BiDatasource datasource = biDatasourceMapper.findById(dataset.getDatasourceId());
+        if (datasource == null) {
+            throw new IllegalArgumentException("Datasource not found");
+        }
+        return jdbcPreviewService.preview(datasource, dataset.getSqlText());
     }
 
     private Long readLong(JsonNode node, Long fallback) {
@@ -258,6 +356,16 @@ public class ChartService {
         return actual.toLowerCase(Locale.ROOT).contains(expectedValue.toLowerCase(Locale.ROOT));
     }
 
+    private void validateDatasetRequirement(String chartType, Long datasetId) {
+        if (datasetId != null) {
+            return;
+        }
+        // 允许图表先创建空组件，后续在编辑器中再绑定数据集。
+        if (chartType != null && STATIC_WIDGET_TYPES.contains(chartType)) {
+            return;
+        }
+    }
+
     private Object addNumbers(Object a, Object b) {
         try {
             double da = Double.parseDouble(String.valueOf(a));
@@ -273,7 +381,10 @@ public class ChartService {
                                        String chartType,
                                        String xField,
                                        String yField,
-                                       String groupField) {
+                                       String groupField,
+                                       String sourceMode,
+                                       Long datasourceId,
+                                       String sqlText) {
     }
 }
 

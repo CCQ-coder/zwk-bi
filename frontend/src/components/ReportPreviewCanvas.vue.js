@@ -1,10 +1,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import * as echarts from 'echarts';
 import ComponentDataFallback from './ComponentDataFallback.vue';
+import ComponentStaticPreview from './ComponentStaticPreview.vue';
 import { getChartData, getChartList } from '../api/chart';
 import { getDashboardById, getDashboardComponents } from '../api/dashboard';
 import { getPublicChartList, getPublicComponentData, getPublicDashboardById, getPublicDashboardComponents, } from '../api/report';
-import { buildComponentOption, chartTypeLabel, getMissingChartFields, isCanvasRenderableChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
+import { buildComponentOption, chartTypeLabel, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
 import { normalizeCanvasConfig, parseReportConfig } from '../utils/report-config';
 const props = defineProps();
 const loading = ref(false);
@@ -219,7 +220,16 @@ const getFilterButtonOptions = (component) => {
     data.labels.forEach((label) => values.add(String(label)));
     return Array.from(values).sort((a, b) => a.localeCompare(b, 'zh-CN'));
 };
-const showNoField = (component) => getMissingChartFields(getComponentChartConfig(component)).length > 0;
+const isStaticWidget = (component) => {
+    const type = getComponentChartConfig(component).chartType ?? '';
+    return isStaticWidgetChartType(type);
+};
+const showNoField = (component) => {
+    const type = getComponentChartConfig(component).chartType ?? '';
+    if (isStaticWidgetChartType(type))
+        return false;
+    return getMissingChartFields(getComponentChartConfig(component)).length > 0;
+};
 const isRenderableChart = (component) => {
     const type = getComponentChartConfig(component).chartType ?? '';
     return isCanvasRenderableChartType(type);
@@ -939,15 +949,10 @@ else {
             }
             var __VLS_79;
         }
-        else if (__VLS_ctx.showNoField(component)) {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "preview-placeholder warning" },
-            });
-        }
-        else if (!__VLS_ctx.isRenderableChart(component)) {
-            /** @type {[typeof ComponentDataFallback, ]} */ ;
+        else if (__VLS_ctx.isStaticWidget(component)) {
+            /** @type {[typeof ComponentStaticPreview, ]} */ ;
             // @ts-ignore
-            const __VLS_88 = __VLS_asFunctionalComponent(ComponentDataFallback, new ComponentDataFallback({
+            const __VLS_88 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
                 chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
                 data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
@@ -960,6 +965,27 @@ else {
                 dark: (__VLS_ctx.scene === 'screen'),
             }, ...__VLS_functionalComponentArgsRest(__VLS_88));
         }
+        else if (__VLS_ctx.showNoField(component)) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "preview-placeholder warning" },
+            });
+        }
+        else if (!__VLS_ctx.isRenderableChart(component)) {
+            /** @type {[typeof ComponentDataFallback, ]} */ ;
+            // @ts-ignore
+            const __VLS_91 = __VLS_asFunctionalComponent(ComponentDataFallback, new ComponentDataFallback({
+                chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
+                chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
+                data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
+                dark: (__VLS_ctx.scene === 'screen'),
+            }));
+            const __VLS_92 = __VLS_91({
+                chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
+                chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
+                data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
+                dark: (__VLS_ctx.scene === 'screen'),
+            }, ...__VLS_functionalComponentArgsRest(__VLS_91));
+        }
         else {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
                 ref: ((el) => __VLS_ctx.setChartRef(el, component.id)),
@@ -968,17 +994,17 @@ else {
         }
     }
     if (!__VLS_ctx.components.length && !__VLS_ctx.chartLoading) {
-        const __VLS_91 = {}.ElEmpty;
+        const __VLS_94 = {}.ElEmpty;
         /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
         // @ts-ignore
-        const __VLS_92 = __VLS_asFunctionalComponent(__VLS_91, new __VLS_91({
+        const __VLS_95 = __VLS_asFunctionalComponent(__VLS_94, new __VLS_94({
             description: "当前报告暂无组件",
             ...{ class: "preview-empty" },
         }));
-        const __VLS_93 = __VLS_92({
+        const __VLS_96 = __VLS_95({
             description: "当前报告暂无组件",
             ...{ class: "preview-empty" },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_92));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_95));
     }
 }
 /** @type {__VLS_StyleScopedClasses['preview-shell']} */ ;
@@ -1024,6 +1050,7 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             ComponentDataFallback: ComponentDataFallback,
+            ComponentStaticPreview: ComponentStaticPreview,
             chartTypeLabel: chartTypeLabel,
             loading: loading,
             chartLoading: chartLoading,
@@ -1048,6 +1075,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             isTableChart: isTableChart,
             isFilterButtonChart: isFilterButtonChart,
             getFilterButtonOptions: getFilterButtonOptions,
+            isStaticWidget: isStaticWidget,
             showNoField: showNoField,
             isRenderableChart: isRenderableChart,
             getTableColumns: getTableColumns,

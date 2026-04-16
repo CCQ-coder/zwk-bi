@@ -3,7 +3,7 @@ import request from './request'
 export interface Chart {
   id: number
   name: string
-  datasetId: number
+  datasetId: number | null
   chartType: string
   xField: string
   yField: string
@@ -13,7 +13,7 @@ export interface Chart {
 
 export interface ChartForm {
   name: string
-  datasetId: number | ''
+  datasetId: number | null | ''
   chartType: string
   xField: string
   yField: string
@@ -32,6 +32,15 @@ export interface ChartDataResult {
 export interface ChartDataQueryOptions {
   filters?: Record<string, string>
   configJson?: string
+}
+
+export interface ChartDatasetQueryRequest {
+  datasetId: number
+}
+
+export interface ChartPageSqlQueryRequest {
+  datasourceId: number
+  sqlText: string
 }
 
 export const getChartList = (): Promise<Chart[]> =>
@@ -53,4 +62,10 @@ export const getChartData = (id: number, options?: ChartDataQueryOptions): Promi
       ...(options?.configJson ? { configJson: options.configJson } : {}),
     }
   })
+
+export const queryChartDataset = (data: ChartDatasetQueryRequest): Promise<{ columns: string[]; rows: Record<string, unknown>[]; rowCount: number }> =>
+  request.post('/charts/query/dataset', data)
+
+export const queryChartPageSql = (data: ChartPageSqlQueryRequest): Promise<{ columns: string[]; rows: Record<string, unknown>[]; rowCount: number }> =>
+  request.post('/charts/query/page-sql', data)
 

@@ -307,7 +307,7 @@ interface StyleConfig {
 
 const styleConfig = reactive<StyleConfig>({
   theme: '默认蓝',
-  bgColor: '#ffffff',
+  bgColor: 'rgba(0,0,0,0)',
   showLabel: true,
   labelSize: 12,
   showXName: false,
@@ -534,7 +534,7 @@ const rules: FormRules = {
   chartType: [{ required: true, message: '请选择图表类型', trigger: 'change' }]
 }
 
-const onDatasetChange = async (dsId: number | '') => {
+const onDatasetChange = async (dsId: number | '' | null | undefined) => {
   previewColumns.value = []
   if (!dsId) return
   previewLoading.value = true
