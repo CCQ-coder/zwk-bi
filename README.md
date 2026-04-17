@@ -61,6 +61,9 @@ npm run dev
 ## 当前系统状态
 - 仪表盘和大屏组件已升级为实例级配置模型: 共享资产存放在 `bi_chart`，画布实例存放在 `bi_dashboard_component`
 - 每个组件实例都可以独立保存名称、数据集、图表类型、字段绑定、样式和交互配置
+- 大屏组件数据来源支持两条主链路: 数据集 / 页面编写；页面编写可切换数据库、API 接口、表格文本、JSON 静态数据四种来源
+- 数据源管理已支持四种正式类型: 数据库、API 接口、表格、JSON 静态数据；数据集仅允许绑定数据库型数据源
+- 数据大屏支持截图生成封面，图片保存到 `bi/index` 目录，并通过 `/uploads/index/**` 对外访问
 - 预览层支持发布控制、分享链接、查询组件筛选和图表点击联动
 - RBAC 已改为数据库驱动: 当前用户菜单来自 `sys_user_role -> sys_role_menu -> sys_menu`，前端导航按接口动态渲染
 - 数据集字段元数据已结构化入库到 `bi_dataset_field`，数据集创建/更新和应用启动时都会自动同步字段定义
@@ -68,12 +71,17 @@ npm run dev
 ## 本次改造对应的后端与数据库更新
 - 后端已支持组件实例配置持久化: `bi_dashboard_component.config_json`
 - 后端已支持预览查询联动: `GET /api/charts/{id}/data?filterJson=...`
+- 后端已支持页面编写多来源查询: `POST /api/charts/query/page-source`
+- 后端已支持数据源原始内容预览: `GET /api/datasources/{id}/preview-data`
+- 后端已支持大屏封面上传分类: `POST /api/upload/image?category=index`
 - 后端已支持按 ID 获取报告: `GET /api/dashboard/{id}`
 - 后端已支持获取当前登录用户菜单: `GET /api/menus/current`
 - 后端已正式接入 Flyway，启动时会自动执行 `backend/src/main/resources/db/migration` 下的版本化迁移
 - 数据库初始化脚本已更新: `database/mysql/init.sql`
+- 数据库初始化脚本已同步数据源种类字段: `bi_datasource.source_kind`、`bi_datasource.config_json`
 - 增量迁移脚本已新增: `database/mysql/migration_v6_component_config.sql`
 - 增量迁移脚本已新增: `database/mysql/migration_v8_rbac_menu_and_dataset_fields.sql`
+- 增量迁移脚本已新增: `database/mysql/migration_v17_datasource_source_kind_and_config.sql`
 
 默认情况下，不再需要手工记忆执行数据库升级脚本：
 
@@ -87,7 +95,14 @@ npm run dev
 SOURCE database/mysql/migration_v5.sql;
 SOURCE database/mysql/migration_v6_component_config.sql;
 SOURCE database/mysql/migration_v8_rbac_menu_and_dataset_fields.sql;
+SOURCE database/mysql/migration_v17_datasource_source_kind_and_config.sql;
 ```
+
+## 本次功能的全链路校验
+- 前端: 已接入四类数据源管理、页面编写多来源切换、数据集仅展示数据库型数据源、大屏封面截图与显示
+- 后端: 已存在并复用多类型数据源统一预览服务、页面来源查询接口、封面上传分类和静态映射，无需再新增接口
+- 数据库: 已确认 `database/mysql/init.sql` 与 `migration_v17_datasource_source_kind_and_config.sql` 覆盖数据源新字段，无需新增本轮表结构脚本
+- 数据集成: 已检查 `data-integration`，本次仅扩展 BI 配置和预览能力，不涉及 DataX / ETL 同步链路，因此无需变更
 
 ## 全链路同步要求
 - 任何功能变更都必须同时检查前端、后端、数据库、数据脚本四层是否受影响，不能只改一层
@@ -99,9 +114,13 @@ SOURCE database/mysql/migration_v8_rbac_menu_and_dataset_fields.sql;
 ## 后端 API（基础骨架）
 - POST `/api/auth/login`
 - GET `/api/datasources`
+- GET `/api/datasources/{id}/preview-data`
 - GET `/api/datasets`
 - GET `/api/charts`
 - GET `/api/charts/{id}/data`
+- POST `/api/charts/query/dataset`
+- POST `/api/charts/query/page-sql`
+- POST `/api/charts/query/page-source`
 - GET `/api/dashboard/default`
 - GET `/api/dashboard/{id}`
 - GET `/api/dashboard/{id}/components`

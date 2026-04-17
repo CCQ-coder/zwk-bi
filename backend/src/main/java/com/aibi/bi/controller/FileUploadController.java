@@ -11,6 +11,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.UUID;
 
@@ -23,22 +26,37 @@ public class FileUploadController {
 
     @PostMapping("/image")
     @RequireRoles({"ADMIN", "ANALYST"})
-    public ApiResponse<Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file) throws IOException {
+    public ApiResponse<Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file,
+                                                        @RequestParam(value = "category", required = false) String category) throws IOException {
         String originalFilename = file.getOriginalFilename();
         String ext = originalFilename != null && originalFilename.contains(".")
                 ? originalFilename.substring(originalFilename.lastIndexOf('.'))
                 : ".jpg";
         String fileName = UUID.randomUUID().toString().replace("-", "") + ext;
 
-        File dir = new File(uploadPath);
-        if (!dir.exists()) {
-            dir.mkdirs();
-        }
+        String normalizedCategory = normalizeCategory(category);
+        Path targetDir = resolveUploadDirectory(normalizedCategory);
+        Files.createDirectories(targetDir);
 
-        File dest = new File(dir, fileName);
+        File dest = targetDir.resolve(fileName).toFile();
         file.transferTo(dest);
 
-        String url = "/uploads/" + fileName;
+        String url = "index".equals(normalizedCategory)
+                ? "/uploads/index/" + fileName
+                : "/uploads/" + fileName;
         return ApiResponse.ok(Map.of("url", url, "fileName", fileName));
+    }
+
+    private String normalizeCategory(String category) {
+        return "index".equalsIgnoreCase(category) ? "index" : "";
+    }
+
+    private Path resolveUploadDirectory(String category) {
+        Path baseDir = Paths.get(uploadPath).toAbsolutePath().normalize();
+        if (!"index".equals(category)) {
+            return baseDir;
+        }
+        Path parent = baseDir.getParent();
+        return (parent == null ? baseDir : parent).resolve("index");
     }
 }

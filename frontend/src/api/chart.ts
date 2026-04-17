@@ -43,6 +43,12 @@ export interface ChartPageSqlQueryRequest {
   sqlText: string
 }
 
+export interface ChartPageSourceQueryRequest {
+  datasourceId: number
+  sqlText?: string
+  runtimeConfigText?: string
+}
+
 export const getChartList = (): Promise<Chart[]> =>
   request.get('/charts')
 
@@ -68,4 +74,7 @@ export const queryChartDataset = (data: ChartDatasetQueryRequest): Promise<{ col
 
 export const queryChartPageSql = (data: ChartPageSqlQueryRequest): Promise<{ columns: string[]; rows: Record<string, unknown>[]; rowCount: number }> =>
   request.post('/charts/query/page-sql', data)
+
+export const queryChartPageSource = (data: ChartPageSourceQueryRequest): Promise<{ columns: string[]; rows: Record<string, unknown>[]; rowCount: number }> =>
+  request.post('/charts/query/page-source', data)
 

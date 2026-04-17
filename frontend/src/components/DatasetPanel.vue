@@ -172,10 +172,11 @@
                 <el-option
                   v-for="ds in datasources"
                   :key="ds.id"
-                  :label="ds.name"
+                  :label="`${ds.name} (${ds.datasourceType || 'DATABASE'})`"
                   :value="ds.id"
                 />
               </el-select>
+              <div class="preview-empty" style="margin-top:6px;text-align:left">数据集仅支持数据库型数据源，API / 表格 / JSON 静态数据请在页面编写模式中使用。</div>
             </el-form-item>
             <el-form-item label="SQL" prop="sqlText">
               <el-input
@@ -435,10 +436,12 @@ const rules: FormRules = {
 const loadTree = async () => {
   treeLoading.value = true
   try {
-    ;[folderTree.value, datasources.value] = await Promise.all([
+    const [tree, datasourceList] = await Promise.all([
       getDatasetFolderTree(),
       getDatasourceList()
     ])
+    folderTree.value = tree
+    datasources.value = datasourceList.filter((item) => (item.sourceKind || 'DATABASE') === 'DATABASE')
   } finally {
     treeLoading.value = false
   }

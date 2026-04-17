@@ -5,7 +5,7 @@ import ComponentStaticPreview from './ComponentStaticPreview.vue';
 import { getChartData, getChartList } from '../api/chart';
 import { getDashboardById, getDashboardComponents } from '../api/dashboard';
 import { getPublicChartList, getPublicComponentData, getPublicDashboardById, getPublicDashboardComponents, } from '../api/report';
-import { buildComponentOption, chartTypeLabel, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
+import { buildComponentOption, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
 import { normalizeCanvasConfig, parseReportConfig } from '../utils/report-config';
 const props = defineProps();
 const loading = ref(false);
@@ -389,14 +389,6 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['preview-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-stage--screen']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-stage--dashboard']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-card-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-stage--screen']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-card-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-stage--dashboard']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-card-meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-stage--screen']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-card-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-stage--dashboard']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
@@ -780,35 +772,6 @@ else {
             ...{ class: "preview-card" },
             ...{ style: (__VLS_ctx.getCardStyle(component)) },
         });
-        if (!__VLS_ctx.isFilterButtonChart(component)) {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "preview-card-head" },
-            });
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "preview-card-title" },
-            });
-            (__VLS_ctx.getComponentChartConfig(component).name || '图表组件');
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "preview-card-meta" },
-            });
-            const __VLS_60 = {}.ElTag;
-            /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
-            // @ts-ignore
-            const __VLS_61 = __VLS_asFunctionalComponent(__VLS_60, new __VLS_60({
-                size: "small",
-                type: "info",
-            }));
-            const __VLS_62 = __VLS_61({
-                size: "small",
-                type: "info",
-            }, ...__VLS_functionalComponentArgsRest(__VLS_61));
-            __VLS_63.slots.default;
-            (__VLS_ctx.chartTypeLabel(__VLS_ctx.getComponentChartConfig(component).chartType));
-            var __VLS_63;
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-            (__VLS_ctx.getComponentChartConfig(component).datasetId ? `数据集 #${__VLS_ctx.getComponentChartConfig(component).datasetId}` : '未关联数据集');
-        }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "preview-card-body" },
         });
@@ -816,10 +779,10 @@ else {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ class: "filter-button-preview" },
             });
-            const __VLS_64 = {}.ElSelect;
+            const __VLS_60 = {}.ElSelect;
             /** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
             // @ts-ignore
-            const __VLS_65 = __VLS_asFunctionalComponent(__VLS_64, new __VLS_64({
+            const __VLS_61 = __VLS_asFunctionalComponent(__VLS_60, new __VLS_60({
                 ...{ 'onChange': {} },
                 modelValue: (__VLS_ctx.activeFilters[__VLS_ctx.getComponentChartConfig(component).xField] || ''),
                 placeholder: (__VLS_ctx.getComponentChartConfig(component).name || '筛选'),
@@ -828,7 +791,7 @@ else {
                 size: "default",
                 ...{ style: {} },
             }));
-            const __VLS_66 = __VLS_65({
+            const __VLS_62 = __VLS_61({
                 ...{ 'onChange': {} },
                 modelValue: (__VLS_ctx.activeFilters[__VLS_ctx.getComponentChartConfig(component).xField] || ''),
                 placeholder: (__VLS_ctx.getComponentChartConfig(component).name || '筛选'),
@@ -836,11 +799,11 @@ else {
                 clearable: true,
                 size: "default",
                 ...{ style: {} },
-            }, ...__VLS_functionalComponentArgsRest(__VLS_65));
-            let __VLS_68;
-            let __VLS_69;
-            let __VLS_70;
-            const __VLS_71 = {
+            }, ...__VLS_functionalComponentArgsRest(__VLS_61));
+            let __VLS_64;
+            let __VLS_65;
+            let __VLS_66;
+            const __VLS_67 = {
                 onChange: (...[$event]) => {
                     if (!!(!__VLS_ctx.loading && !__VLS_ctx.dashboard))
                         return;
@@ -849,32 +812,32 @@ else {
                     __VLS_ctx.updateFilter(__VLS_ctx.getComponentChartConfig(component).xField, $event);
                 }
             };
-            __VLS_67.slots.default;
+            __VLS_63.slots.default;
             for (const [val] of __VLS_getVForSourceType((__VLS_ctx.getFilterButtonOptions(component)))) {
-                const __VLS_72 = {}.ElOption;
+                const __VLS_68 = {}.ElOption;
                 /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
                 // @ts-ignore
-                const __VLS_73 = __VLS_asFunctionalComponent(__VLS_72, new __VLS_72({
+                const __VLS_69 = __VLS_asFunctionalComponent(__VLS_68, new __VLS_68({
                     key: (val),
                     label: (val),
                     value: (val),
                 }));
-                const __VLS_74 = __VLS_73({
+                const __VLS_70 = __VLS_69({
                     key: (val),
                     label: (val),
                     value: (val),
-                }, ...__VLS_functionalComponentArgsRest(__VLS_73));
+                }, ...__VLS_functionalComponentArgsRest(__VLS_69));
             }
-            var __VLS_67;
+            var __VLS_63;
         }
         else if (__VLS_ctx.isTableChart(component)) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ class: "table-wrapper" },
             });
-            const __VLS_76 = {}.ElTable;
+            const __VLS_72 = {}.ElTable;
             /** @type {[typeof __VLS_components.ElTable, typeof __VLS_components.elTable, typeof __VLS_components.ElTable, typeof __VLS_components.elTable, ]} */ ;
             // @ts-ignore
-            const __VLS_77 = __VLS_asFunctionalComponent(__VLS_76, new __VLS_76({
+            const __VLS_73 = __VLS_asFunctionalComponent(__VLS_72, new __VLS_72({
                 data: (__VLS_ctx.getTableRows(component.id)),
                 size: "small",
                 border: true,
@@ -892,7 +855,7 @@ else {
                     height: __VLS_ctx.getComponentConfig(component).style.tableRowHeight + 'px',
                 }),
             }));
-            const __VLS_78 = __VLS_77({
+            const __VLS_74 = __VLS_73({
                 data: (__VLS_ctx.getTableRows(component.id)),
                 size: "small",
                 border: true,
@@ -909,61 +872,63 @@ else {
                     fontSize: __VLS_ctx.getComponentConfig(component).style.tableFontSize + 'px',
                     height: __VLS_ctx.getComponentConfig(component).style.tableRowHeight + 'px',
                 }),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_77));
-            __VLS_79.slots.default;
+            }, ...__VLS_functionalComponentArgsRest(__VLS_73));
+            __VLS_75.slots.default;
             if (__VLS_ctx.getComponentConfig(component).style.tableShowIndex) {
+                const __VLS_76 = {}.ElTableColumn;
+                /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
+                // @ts-ignore
+                const __VLS_77 = __VLS_asFunctionalComponent(__VLS_76, new __VLS_76({
+                    type: "index",
+                    width: "50",
+                    label: "#",
+                }));
+                const __VLS_78 = __VLS_77({
+                    type: "index",
+                    width: "50",
+                    label: "#",
+                }, ...__VLS_functionalComponentArgsRest(__VLS_77));
+            }
+            for (const [column] of __VLS_getVForSourceType((__VLS_ctx.getTableColumns(component.id)))) {
                 const __VLS_80 = {}.ElTableColumn;
                 /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
                 // @ts-ignore
                 const __VLS_81 = __VLS_asFunctionalComponent(__VLS_80, new __VLS_80({
-                    type: "index",
-                    width: "50",
-                    label: "#",
+                    key: (column),
+                    prop: (column),
+                    label: (column),
+                    minWidth: "120",
+                    showOverflowTooltip: true,
+                    sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
                 }));
                 const __VLS_82 = __VLS_81({
-                    type: "index",
-                    width: "50",
-                    label: "#",
+                    key: (column),
+                    prop: (column),
+                    label: (column),
+                    minWidth: "120",
+                    showOverflowTooltip: true,
+                    sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
                 }, ...__VLS_functionalComponentArgsRest(__VLS_81));
             }
-            for (const [column] of __VLS_getVForSourceType((__VLS_ctx.getTableColumns(component.id)))) {
-                const __VLS_84 = {}.ElTableColumn;
-                /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
-                // @ts-ignore
-                const __VLS_85 = __VLS_asFunctionalComponent(__VLS_84, new __VLS_84({
-                    key: (column),
-                    prop: (column),
-                    label: (column),
-                    minWidth: "120",
-                    showOverflowTooltip: true,
-                    sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
-                }));
-                const __VLS_86 = __VLS_85({
-                    key: (column),
-                    prop: (column),
-                    label: (column),
-                    minWidth: "120",
-                    showOverflowTooltip: true,
-                    sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
-                }, ...__VLS_functionalComponentArgsRest(__VLS_85));
-            }
-            var __VLS_79;
+            var __VLS_75;
         }
         else if (__VLS_ctx.isStaticWidget(component)) {
             /** @type {[typeof ComponentStaticPreview, ]} */ ;
             // @ts-ignore
-            const __VLS_88 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
+            const __VLS_84 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
                 chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
                 data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
                 dark: (__VLS_ctx.scene === 'screen'),
+                showTitle: (__VLS_ctx.getComponentConfig(component).style.showTitle),
             }));
-            const __VLS_89 = __VLS_88({
+            const __VLS_85 = __VLS_84({
                 chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
                 data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
                 dark: (__VLS_ctx.scene === 'screen'),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_88));
+                showTitle: (__VLS_ctx.getComponentConfig(component).style.showTitle),
+            }, ...__VLS_functionalComponentArgsRest(__VLS_84));
         }
         else if (__VLS_ctx.showNoField(component)) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -973,18 +938,18 @@ else {
         else if (!__VLS_ctx.isRenderableChart(component)) {
             /** @type {[typeof ComponentDataFallback, ]} */ ;
             // @ts-ignore
-            const __VLS_91 = __VLS_asFunctionalComponent(ComponentDataFallback, new ComponentDataFallback({
+            const __VLS_87 = __VLS_asFunctionalComponent(ComponentDataFallback, new ComponentDataFallback({
                 chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
                 data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
                 dark: (__VLS_ctx.scene === 'screen'),
             }));
-            const __VLS_92 = __VLS_91({
+            const __VLS_88 = __VLS_87({
                 chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
                 data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
                 dark: (__VLS_ctx.scene === 'screen'),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_91));
+            }, ...__VLS_functionalComponentArgsRest(__VLS_87));
         }
         else {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
@@ -994,17 +959,17 @@ else {
         }
     }
     if (!__VLS_ctx.components.length && !__VLS_ctx.chartLoading) {
-        const __VLS_94 = {}.ElEmpty;
+        const __VLS_90 = {}.ElEmpty;
         /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
         // @ts-ignore
-        const __VLS_95 = __VLS_asFunctionalComponent(__VLS_94, new __VLS_94({
+        const __VLS_91 = __VLS_asFunctionalComponent(__VLS_90, new __VLS_90({
             description: "当前报告暂无组件",
             ...{ class: "preview-empty" },
         }));
-        const __VLS_96 = __VLS_95({
+        const __VLS_92 = __VLS_91({
             description: "当前报告暂无组件",
             ...{ class: "preview-empty" },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_95));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_91));
     }
 }
 /** @type {__VLS_StyleScopedClasses['preview-shell']} */ ;
@@ -1035,9 +1000,6 @@ else {
 /** @type {__VLS_StyleScopedClasses['filter-item-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-tags']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-card-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-card-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-card-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-card-body']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-button-preview']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
@@ -1051,7 +1013,6 @@ const __VLS_self = (await import('vue')).defineComponent({
         return {
             ComponentDataFallback: ComponentDataFallback,
             ComponentStaticPreview: ComponentStaticPreview,
-            chartTypeLabel: chartTypeLabel,
             loading: loading,
             chartLoading: chartLoading,
             filterCollapsed: filterCollapsed,

@@ -28,6 +28,35 @@
           </section>
 
           <section class="inspector-section">
+            <div class="section-title">实例设置</div>
+            <el-form label-position="top" class="chart-form summary-form">
+              <el-form-item label="组件名称">
+                <el-input v-model="configForm.chart.name" placeholder="请输入组件名称" />
+              </el-form-item>
+              <el-form-item label="图表类型">
+                <el-select v-model="configForm.chart.chartType" placeholder="请选择图表类型" style="width: 100%">
+                  <el-option-group v-for="group in chartTypeGroups" :key="group.label" :label="group.label">
+                    <el-option v-for="item in group.items" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-option-group>
+                </el-select>
+                <div class="helper-text">{{ currentChartMeta.description }}</div>
+              </el-form-item>
+            </el-form>
+            <div class="preset-grid">
+              <button
+                v-for="preset in componentPresets"
+                :key="preset.id"
+                type="button"
+                class="preset-card"
+                @click="applyPreset(preset.id)"
+              >
+                <strong>{{ preset.name }}</strong>
+                <span>{{ preset.description }}</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="inspector-section">
             <div class="section-title">配置健康度</div>
             <div class="health-card" :class="{ 'health-card--warning': missingFields.length }">
               <div class="health-head">
@@ -79,28 +108,8 @@
 
         <el-tab-pane v-if="!isDecorationComponentType" label="数据" name="data">
           <section class="inspector-section">
-            <div class="section-title">数据绑定</div>
-            <div class="preset-grid">
-              <button
-                v-for="preset in componentPresets"
-                :key="preset.id"
-                type="button"
-                class="preset-card"
-                @click="applyPreset(preset.id)"
-              >
-                <strong>{{ preset.name }}</strong>
-                <span>{{ preset.description }}</span>
-              </button>
-            </div>
+            <div class="section-title">数据来源</div>
             <el-form label-position="top" class="chart-form">
-              <el-form-item label="组件名称">
-                <el-input v-model="configForm.chart.name" placeholder="请输入组件名称" />
-              </el-form-item>
-              <el-form-item label="基础组件来源">
-                <el-select v-model="selectedBaseChartId" placeholder="选择一个已保存组件" style="width: 100%" filterable @change="applyBaseChart">
-                  <el-option v-for="item in availableCharts" :key="item.id" :label="`${item.name} · ${chartTypeLabel(item.chartType)}`" :value="item.id" />
-                </el-select>
-              </el-form-item>
               <el-form-item label="数据来源模式">
                 <el-switch
                   :model-value="isUseDatasetMode"
@@ -113,16 +122,21 @@
                 <el-select v-model="configForm.chart.datasetId" placeholder="请选择数据集" style="width: 100%" filterable :clearable="isStaticComponentType" @change="onDatasetChange">
                   <el-option v-for="dataset in datasets" :key="dataset.id" :label="dataset.name" :value="dataset.id" />
                 </el-select>
-                <div class="helper-text">{{ isStaticComponentType ? '静态组件可不绑定数据集；需要数据驱动时再选择数据集即可。' : '数据驱动组件需要绑定数据集后才能保存。' }}</div>
+                <div class="helper-text">{{ isStaticComponentType ? '静态组件可不绑定数据集；需要数据驱动时再选择数据集即可。' : '数据集模式仅使用已配置好的数据库型数据源与 SQL。' }}</div>
               </el-form-item>
               <template v-else>
-                <el-form-item label="数据库数据源">
-                  <el-select v-model="configForm.chart.datasourceId" placeholder="请选择数据源" style="width: 100%" filterable clearable>
-                    <el-option v-for="source in datasources" :key="source.id" :label="source.name" :value="source.id" />
-                  </el-select>
-                  <div class="helper-text">页面编写模式会直接执行下方 SQL，请确保已提前配置数据源。</div>
+                <el-form-item label="页面来源类型">
+                  <el-radio-group v-model="configForm.chart.pageSourceKind" class="page-source-group" @change="onPageSourceKindChange">
+                    <el-radio-button v-for="item in PAGE_SOURCE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</el-radio-button>
+                  </el-radio-group>
                 </el-form-item>
-                <el-form-item label="页面编写 SQL">
+                <el-form-item :label="`${pageSourceKindLabel}数据源`">
+                  <el-select v-model="configForm.chart.datasourceId" placeholder="请选择数据源" style="width: 100%" filterable clearable @change="onPageDatasourceChange">
+                    <el-option v-for="source in pageSourceDatasources" :key="source.id" :label="source.name" :value="source.id" />
+                  </el-select>
+                  <div class="helper-text">{{ pageSourceHelperText }}</div>
+                </el-form-item>
+                <el-form-item v-if="configForm.chart.pageSourceKind === 'DATABASE'" label="页面编写 SQL">
                   <el-input
                     v-model="configForm.chart.sqlText"
                     type="textarea"
@@ -130,18 +144,18 @@
                     placeholder="请输入查询 SQL（仅支持查询语句）"
                   />
                 </el-form-item>
+                <el-form-item v-else label="页面级配置 JSON">
+                  <el-input
+                    v-model="configForm.chart.runtimeConfigText"
+                    type="textarea"
+                    :rows="6"
+                    :placeholder="pageSourceConfigPlaceholder"
+                  />
+                </el-form-item>
                 <div class="action-row">
-                  <el-button size="small" type="primary" :loading="previewLoading" @click="onPageSqlQuery">查询 SQL</el-button>
+                  <el-button size="small" type="primary" :loading="previewLoading" @click="onPageSourceQuery">预览数据</el-button>
                 </div>
               </template>
-              <el-form-item label="图表类型">
-                <el-select v-model="configForm.chart.chartType" placeholder="请选择图表类型" style="width: 100%">
-                  <el-option-group v-for="group in chartTypeGroups" :key="group.label" :label="group.label">
-                    <el-option v-for="item in group.items" :key="item.value" :label="item.label" :value="item.value" />
-                  </el-option-group>
-                </el-select>
-                <div class="helper-text">{{ currentChartMeta.description }}</div>
-              </el-form-item>
               <div v-if="suggestionSummary.length" class="suggestion-card">
                 <div class="suggestion-head">
                   <span>推荐字段</span>
@@ -556,8 +570,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getChartList, queryChartDataset, queryChartPageSql, type Chart } from '../api/chart'
-import { getDatasourceList, type Datasource } from '../api/datasource'
+import { queryChartDataset, queryChartPageSource, type Chart } from '../api/chart'
+import { getDatasourceList, type Datasource, type DatasourceSourceKind } from '../api/datasource'
 import { getDatasetList, type Dataset } from '../api/dataset'
 import type { DashboardComponent } from '../api/dashboard'
 import {
@@ -666,6 +680,13 @@ const chartTypeGroups = [
   },
 ]
 
+const PAGE_SOURCE_OPTIONS: Array<{ label: string; value: DatasourceSourceKind }> = [
+  { label: '数据库', value: 'DATABASE' },
+  { label: 'API 接口', value: 'API' },
+  { label: '表格', value: 'TABLE' },
+  { label: 'JSON 静态数据', value: 'JSON_STATIC' },
+]
+
 const emit = defineEmits<{
   (e: 'apply-layout', patch: Partial<DashboardComponent>): void
   (e: 'bring-front'): void
@@ -674,7 +695,6 @@ const emit = defineEmits<{
   (e: 'save-component', payload: { chartId: number; configJson: string }): void
 }>()
 
-const availableCharts = ref<Chart[]>([])
 const datasets = ref<Dataset[]>([])
 const datasources = ref<Datasource[]>([])
 const previewColumns = ref<string[]>([])
@@ -682,7 +702,6 @@ const previewRows = ref<Record<string, unknown>[]>([])
 const previewRowCount = ref(0)
 const previewLoading = ref(false)
 const saving = ref(false)
-const selectedBaseChartId = ref<number | null>(null)
 const themeNames = Object.keys(COLOR_THEMES)
 const activeTab = ref('summary')
 const syncingFromProps = ref(false)
@@ -710,6 +729,34 @@ const isStaticComponentType = computed(() => isStaticWidgetChartType(configForm.
 const isUseDatasetMode = computed(() => configForm.chart.sourceMode !== 'PAGE_SQL')
 const missingFields = computed(() => isStaticComponentType.value ? [] : getMissingChartFields(configForm.chart))
 const suggestedFields = computed(() => suggestChartFields(previewColumns.value, configForm.chart.chartType))
+const pageSourceDatasources = computed(() => datasources.value.filter((item) => resolveDatasourceKind(item) === configForm.chart.pageSourceKind))
+const pageSourceKindLabel = computed(() => PAGE_SOURCE_OPTIONS.find((item) => item.value === configForm.chart.pageSourceKind)?.label ?? '页面')
+const pageSourceHelperText = computed(() => {
+  switch (configForm.chart.pageSourceKind) {
+    case 'DATABASE':
+      return '数据库模式会直接执行当前组件配置中的 SQL，请确保选择的是数据库型数据源。'
+    case 'API':
+      return '基础接口配置来自数据源，页面级 JSON 可覆盖 headers、query、body 或 resultPath。'
+    case 'TABLE':
+      return '基础表格文本保存在数据源中，页面级 JSON 可覆盖 tableText、tableDelimiter、tableHasHeader。'
+    case 'JSON_STATIC':
+      return '基础 JSON 保存在数据源中，页面级 JSON 可覆盖 jsonText 或 jsonResultPath。'
+    default:
+      return ''
+  }
+})
+const pageSourceConfigPlaceholder = computed(() => {
+  switch (configForm.chart.pageSourceKind) {
+    case 'API':
+      return '{\n  "apiQuery": { "page": 1 },\n  "apiHeaders": { "Authorization": "Bearer xxx" },\n  "apiBody": { "keyword": "tea" },\n  "apiResultPath": "data.records"\n}'
+    case 'TABLE':
+      return '{\n  "tableDelimiter": "CSV",\n  "tableHasHeader": true,\n  "tableText": "region,value\\n华东,120"\n}'
+    case 'JSON_STATIC':
+      return '{\n  "jsonText": "[{\\"region\\":\\"华东\\",\\"value\\":120}]",\n  "jsonResultPath": "data.list"\n}'
+    default:
+      return ''
+  }
+})
 const suggestionSummary = computed(() => {
   const entries = [
     suggestedFields.value.xField ? `维度 ${suggestedFields.value.xField}` : '',
@@ -718,6 +765,8 @@ const suggestionSummary = computed(() => {
   ]
   return entries.filter(Boolean)
 })
+
+const currentComponentChartId = computed(() => props.component?.chartId ?? props.chart?.id ?? null)
 
 const schemaPreview = computed(() => {
   if (!props.component) return ''
@@ -736,7 +785,9 @@ const schemaPreview = computed(() => {
       sourceId: configForm.chart.sourceMode === 'PAGE_SQL' ? configForm.chart.datasourceId : configForm.chart.datasetId,
       datasetId: configForm.chart.datasetId,
       datasourceId: configForm.chart.datasourceId,
+      pageSourceKind: configForm.chart.pageSourceKind,
       sqlText: configForm.chart.sqlText,
+      runtimeConfigText: configForm.chart.runtimeConfigText,
       chartId: props.component.chartId,
       dimensions: configForm.chart.xField ? [configForm.chart.xField] : [],
       metrics: configForm.chart.yField ? [configForm.chart.yField] : [],
@@ -750,7 +801,7 @@ const schemaPreview = computed(() => {
 })
 
 const buildCurrentConfigJson = () => buildComponentConfig(
-  availableCharts.value.find((item) => item.id === selectedBaseChartId.value) ?? props.chart,
+  props.chart,
   props.component?.configJson,
   {
     chart: { ...configForm.chart },
@@ -760,17 +811,50 @@ const buildCurrentConfigJson = () => buildComponentConfig(
 )
 
 const queuePreview = () => {
-  if (syncingFromProps.value || !props.component || !selectedBaseChartId.value) return
+  if (syncingFromProps.value || !props.component || !currentComponentChartId.value) return
   if (previewTimer !== null) {
     window.clearTimeout(previewTimer)
   }
   previewTimer = window.setTimeout(() => {
     previewTimer = null
     emit('preview-component', {
-      chartId: selectedBaseChartId.value as number,
+      chartId: currentComponentChartId.value as number,
       configJson: buildCurrentConfigJson(),
     })
   }, 160)
+}
+
+const resolveDatasourceKind = (datasource?: Datasource | null): DatasourceSourceKind => datasource?.sourceKind || 'DATABASE'
+
+const clearPreviewData = () => {
+  previewColumns.value = []
+  previewRows.value = []
+  previewRowCount.value = 0
+}
+
+const ensureRuntimeConfigTextValid = () => {
+  if (configForm.chart.pageSourceKind === 'DATABASE') return
+  const text = configForm.chart.runtimeConfigText.trim()
+  if (!text) return
+  try {
+    const parsed = JSON.parse(text)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('页面级配置必须是 JSON 对象')
+    }
+  } catch {
+    throw new Error('页面级配置必须是 JSON 对象')
+  }
+}
+
+const ensurePageDatasourceMatched = () => {
+  const datasourceId = Number(configForm.chart.datasourceId)
+  if (!Number.isFinite(datasourceId) || datasourceId <= 0) {
+    throw new Error(`请选择${pageSourceKindLabel.value}数据源`)
+  }
+  if (!pageSourceDatasources.value.some((item) => item.id === datasourceId)) {
+    throw new Error(`当前组件应选择${pageSourceKindLabel.value}类型的数据源`)
+  }
+  return datasourceId
 }
 
 const syncFromProps = async () => {
@@ -785,23 +869,26 @@ const syncFromProps = async () => {
   configForm.chart = { ...normalized.chart }
   configForm.style = { ...normalized.style }
   configForm.interaction = { ...normalized.interaction }
-  selectedBaseChartId.value = props.component?.chartId ?? props.chart?.id ?? null
 
   if (isUseDatasetMode.value && configForm.chart.datasetId) {
     await onDatasetChange(configForm.chart.datasetId)
-  } else if (!isUseDatasetMode.value && configForm.chart.datasourceId && configForm.chart.sqlText.trim()) {
-    await onPageSqlQuery()
+  } else if (!isUseDatasetMode.value && configForm.chart.datasourceId && (
+    configForm.chart.pageSourceKind !== 'DATABASE' || configForm.chart.sqlText.trim()
+  )) {
+    if (pageSourceDatasources.value.some((item) => item.id === Number(configForm.chart.datasourceId))) {
+      await onPageSourceQuery()
+    } else {
+      clearPreviewData()
+    }
   } else {
-    previewColumns.value = []
-    previewRows.value = []
-    previewRowCount.value = 0
+    clearPreviewData()
   }
   await nextTick()
   syncingFromProps.value = false
 }
 
 watch(() => [props.component?.id, props.component?.configJson, props.chart?.id], syncFromProps, { immediate: true })
-watch(() => [configForm.chart, configForm.style, configForm.interaction, selectedBaseChartId.value], queuePreview, { deep: true })
+watch(() => [configForm.chart, configForm.style, configForm.interaction, currentComponentChartId.value], queuePreview, { deep: true })
 watch(isDecorationComponentType, (isDecoration) => {
   if (!isDecoration) return
   configForm.chart.datasetId = ''
@@ -815,10 +902,12 @@ watch(isDecorationComponentType, (isDecoration) => {
 })
 
 const loadMeta = async () => {
-  const [chartList, datasetList, datasourceList] = await Promise.all([getChartList(), getDatasetList(), getDatasourceList()])
-  availableCharts.value = chartList
+  const [datasetList, datasourceList] = await Promise.all([getDatasetList(), getDatasourceList()])
   datasets.value = datasetList
   datasources.value = datasourceList
+  if (props.component) {
+    await syncFromProps()
+  }
 }
 
 const onSourceModeSwitch = async (useDataset: boolean) => {
@@ -826,27 +915,22 @@ const onSourceModeSwitch = async (useDataset: boolean) => {
   if (useDataset) {
     configForm.chart.datasourceId = ''
     configForm.chart.sqlText = ''
+    configForm.chart.runtimeConfigText = ''
     if (configForm.chart.datasetId) {
       await onDatasetChange(configForm.chart.datasetId)
       return
     }
   } else {
     configForm.chart.datasetId = ''
-    previewColumns.value = []
-    previewRows.value = []
-    previewRowCount.value = 0
+    clearPreviewData()
     return
   }
-  previewColumns.value = []
-  previewRows.value = []
-  previewRowCount.value = 0
+  clearPreviewData()
 }
 
 const onDatasetChange = async (datasetId: number | '' | null | undefined) => {
   if (!isUseDatasetMode.value) return
-  previewColumns.value = []
-  previewRows.value = []
-  previewRowCount.value = 0
+  clearPreviewData()
   if (!datasetId) return
   previewLoading.value = true
   try {
@@ -859,23 +943,41 @@ const onDatasetChange = async (datasetId: number | '' | null | undefined) => {
   }
 }
 
-const onPageSqlQuery = async () => {
+const onPageSourceKindChange = () => {
+  configForm.chart.datasourceId = ''
+  configForm.chart.sqlText = ''
+  configForm.chart.runtimeConfigText = ''
+  clearPreviewData()
+}
+
+const onPageDatasourceChange = () => {
+  clearPreviewData()
+}
+
+const onPageSourceQuery = async () => {
   if (isUseDatasetMode.value) return
-  const datasourceId = Number(configForm.chart.datasourceId)
-  if (!Number.isFinite(datasourceId) || datasourceId <= 0) {
-    ElMessage.warning('请选择数据库数据源')
+  let datasourceId = 0
+  try {
+    datasourceId = ensurePageDatasourceMatched()
+    if (configForm.chart.pageSourceKind === 'DATABASE' && !configForm.chart.sqlText.trim()) {
+      ElMessage.warning('请输入页面编写 SQL')
+      return
+    }
+    ensureRuntimeConfigTextValid()
+  } catch (error) {
+    ElMessage.warning(error instanceof Error ? error.message : '页面来源配置不正确')
     return
   }
-  if (!configForm.chart.sqlText.trim()) {
-    ElMessage.warning('请输入页面编写 SQL')
-    return
-  }
-  previewColumns.value = []
-  previewRows.value = []
-  previewRowCount.value = 0
+  clearPreviewData()
   previewLoading.value = true
   try {
-    const preview = await queryChartPageSql({ datasourceId, sqlText: configForm.chart.sqlText })
+    const preview = await queryChartPageSource({
+      datasourceId,
+      sqlText: configForm.chart.pageSourceKind === 'DATABASE' ? configForm.chart.sqlText : undefined,
+      runtimeConfigText: configForm.chart.pageSourceKind === 'DATABASE'
+        ? undefined
+        : (configForm.chart.runtimeConfigText.trim() || undefined),
+    })
     previewColumns.value = preview.columns
     previewRows.value = preview.rows
     previewRowCount.value = preview.rowCount
@@ -896,16 +998,6 @@ const handlePosYChange = (value: number | null | undefined) => applyLayout('posY
 const handleWidthChange = (value: number | null | undefined) => applyLayout('width', value)
 const handleHeightChange = (value: number | null | undefined) => applyLayout('height', value)
 const handleZIndexChange = (value: number | null | undefined) => applyLayout('zIndex', value)
-
-const applyBaseChart = async (chartId: number) => {
-  const selectedChart = availableCharts.value.find((item) => item.id === chartId)
-  if (!selectedChart) return
-  configForm.chart = { ...buildChartSnapshot(selectedChart) }
-  configForm.chart.sourceMode = 'DATASET'
-  configForm.chart.datasourceId = ''
-  configForm.chart.sqlText = ''
-  await onDatasetChange(configForm.chart.datasetId)
-}
 
 const applySuggestedFields = () => {
   if (suggestedFields.value.xField && !configForm.chart.xField) {
@@ -958,13 +1050,19 @@ const saveComponentConfig = async () => {
     return ElMessage.warning('请选择数据集')
   }
   if (!isStaticComponentType.value && !isUseDatasetMode.value) {
-    const datasourceId = Number(configForm.chart.datasourceId)
-    if (!Number.isFinite(datasourceId) || datasourceId <= 0) return ElMessage.warning('请选择数据库数据源')
-    if (!configForm.chart.sqlText.trim()) return ElMessage.warning('请输入页面编写 SQL')
+    try {
+      ensurePageDatasourceMatched()
+      if (configForm.chart.pageSourceKind === 'DATABASE' && !configForm.chart.sqlText.trim()) {
+        return ElMessage.warning('请输入页面编写 SQL')
+      }
+      ensureRuntimeConfigTextValid()
+    } catch (error) {
+      return ElMessage.warning(error instanceof Error ? error.message : '页面来源配置不正确')
+    }
   }
   if (!configForm.chart.chartType) return ElMessage.warning('请选择图表类型')
   if (missingFields.value.length) return ElMessage.warning(`请补充${missingFields.value.join('、')}`)
-  if (!selectedBaseChartId.value) return ElMessage.warning('请选择基础组件来源')
+  if (!currentComponentChartId.value) return ElMessage.warning('当前组件缺少图表标识，无法保存')
   saving.value = true
   try {
     if (previewTimer !== null) {
@@ -972,7 +1070,7 @@ const saveComponentConfig = async () => {
       previewTimer = null
     }
     emit('save-component', {
-      chartId: selectedBaseChartId.value,
+      chartId: currentComponentChartId.value,
       configJson: buildCurrentConfigJson(),
     })
   } finally {
@@ -1149,6 +1247,10 @@ onBeforeUnmount(() => {
   margin-bottom: 12px;
 }
 
+.summary-form {
+  margin-top: 2px;
+}
+
 .preset-card {
   display: flex;
   flex-direction: column;
@@ -1240,6 +1342,11 @@ onBeforeUnmount(() => {
 
 .chart-form :deep(.el-form-item) {
   margin-bottom: 12px;
+}
+
+.page-source-group {
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .schema-block {

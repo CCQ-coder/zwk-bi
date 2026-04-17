@@ -14,7 +14,7 @@ const COLOR_THEMES = {
 };
 const styleConfig = reactive({
     theme: '默认蓝',
-    bgColor: '#ffffff',
+    bgColor: 'rgba(0,0,0,0)',
     showLabel: true,
     labelSize: 12,
     showXName: false,

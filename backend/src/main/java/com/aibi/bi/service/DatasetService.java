@@ -37,18 +37,18 @@ public class DatasetService {
     private final BiDatasetFieldMapper biDatasetFieldMapper;
     private final BiDatasourceMapper biDatasourceMapper;
     private final BiDatasetFolderMapper biDatasetFolderMapper;
-    private final JdbcPreviewService jdbcPreviewService;
+    private final DatasourceService datasourceService;
 
     public DatasetService(BiDatasetMapper biDatasetMapper,
                           BiDatasetFieldMapper biDatasetFieldMapper,
                           BiDatasourceMapper biDatasourceMapper,
                           BiDatasetFolderMapper biDatasetFolderMapper,
-                          JdbcPreviewService jdbcPreviewService) {
+                          DatasourceService datasourceService) {
         this.biDatasetMapper = biDatasetMapper;
         this.biDatasetFieldMapper = biDatasetFieldMapper;
         this.biDatasourceMapper = biDatasourceMapper;
         this.biDatasetFolderMapper = biDatasetFolderMapper;
-        this.jdbcPreviewService = jdbcPreviewService;
+        this.datasourceService = datasourceService;
     }
 
     public List<BiDataset> list() {
@@ -195,7 +195,8 @@ public class DatasetService {
         if (datasource == null) {
             throw new IllegalArgumentException("Datasource not found: " + request.getDatasourceId());
         }
-        return jdbcPreviewService.preview(datasource, request.getSqlText());
+        ensureDatasetDatasource(datasource);
+        return datasourceService.previewDatasource(request.getDatasourceId(), request.getSqlText(), null);
     }
 
     public DatasetPreviewResponse previewDataset(Long datasetId) {
@@ -210,7 +211,8 @@ public class DatasetService {
         if (datasource == null) {
             throw new IllegalArgumentException("Datasource not found: " + dataset.getDatasourceId());
         }
-        return jdbcPreviewService.preview(datasource, dataset.getSqlText());
+        ensureDatasetDatasource(datasource);
+        return datasourceService.previewDatasource(dataset.getDatasourceId(), dataset.getSqlText(), null);
     }
 
     public void refreshAllDatasetFields() {
@@ -236,7 +238,8 @@ public class DatasetService {
         if (datasource == null) {
             throw new IllegalArgumentException("Datasource not found: " + datasourceId);
         }
-        jdbcPreviewService.preview(datasource, sqlText);
+        ensureDatasetDatasource(datasource);
+        datasourceService.previewDatasource(datasourceId, sqlText, null);
     }
 
     private void syncDatasetFields(BiDataset dataset) {
@@ -244,7 +247,8 @@ public class DatasetService {
         if (datasource == null) {
             throw new IllegalArgumentException("Datasource not found: " + dataset.getDatasourceId());
         }
-        DatasetPreviewResponse preview = jdbcPreviewService.preview(datasource, dataset.getSqlText());
+        ensureDatasetDatasource(datasource);
+        DatasetPreviewResponse preview = datasourceService.previewDatasource(dataset.getDatasourceId(), dataset.getSqlText(), null);
         biDatasetFieldMapper.deleteByDatasetId(dataset.getId());
         if (preview.getColumns() == null || preview.getColumns().isEmpty()) {
             return;
@@ -326,6 +330,12 @@ public class DatasetService {
                         {"A", 100}, {"B", 200}, {"C", 150}, {"D", 300}, {"E", 250}
                 }
         );
+    }
+
+    private void ensureDatasetDatasource(BiDatasource datasource) {
+        if (!datasourceService.isDatabaseDatasource(datasource)) {
+            throw new IllegalArgumentException("SQL 数据集仅支持数据库类型数据源");
+        }
     }
 
     private DatasetPreviewResponse buildDemoResponse(List<String> columns, Object[][] data) {

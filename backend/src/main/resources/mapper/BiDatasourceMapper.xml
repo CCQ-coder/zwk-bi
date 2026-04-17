@@ -6,6 +6,7 @@
     <resultMap id="BiDatasourceMap" type="com.aibi.bi.domain.BiDatasource">
         <id column="id" property="id"/>
         <result column="name" property="name"/>
+        <result column="source_kind" property="sourceKind"/>
         <result column="datasource_type" property="datasourceType"/>
         <result column="connect_mode" property="connectMode"/>
         <result column="host" property="host"/>
@@ -13,31 +14,32 @@
         <result column="database_name" property="databaseName"/>
         <result column="db_username" property="dbUsername"/>
         <result column="db_password" property="dbPassword"/>
+        <result column="config_json" property="configJson"/>
         <result column="created_at" property="createdAt"/>
     </resultMap>
 
     <select id="listAll" resultMap="BiDatasourceMap">
-        SELECT id, name, datasource_type, connect_mode, host, port, database_name, db_username, db_password, created_at
+        SELECT id, name, source_kind, datasource_type, connect_mode, host, port, database_name, db_username, db_password, config_json, created_at
         FROM bi_datasource
         ORDER BY id DESC
     </select>
 
     <select id="findById" resultMap="BiDatasourceMap" parameterType="long">
-        SELECT id, name, datasource_type, connect_mode, host, port, database_name, db_username, db_password, created_at
+        SELECT id, name, source_kind, datasource_type, connect_mode, host, port, database_name, db_username, db_password, config_json, created_at
         FROM bi_datasource
         WHERE id = #{id}
     </select>
 
     <insert id="insert" parameterType="com.aibi.bi.domain.BiDatasource" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO bi_datasource (name, datasource_type, connect_mode, host, port, database_name, db_username, db_password)
-        VALUES (#{name}, #{datasourceType}, #{connectMode}, #{host}, #{port}, #{databaseName}, #{dbUsername}, #{dbPassword})
+        INSERT INTO bi_datasource (name, source_kind, datasource_type, connect_mode, host, port, database_name, db_username, db_password, config_json)
+        VALUES (#{name}, #{sourceKind}, #{datasourceType}, #{connectMode}, #{host}, #{port}, #{databaseName}, #{dbUsername}, #{dbPassword}, #{configJson})
     </insert>
 
     <update id="update" parameterType="com.aibi.bi.domain.BiDatasource">
         UPDATE bi_datasource
-        SET name = #{name}, datasource_type = #{datasourceType}, connect_mode = #{connectMode},
+        SET name = #{name}, source_kind = #{sourceKind}, datasource_type = #{datasourceType}, connect_mode = #{connectMode},
             host = #{host}, port = #{port},
-            database_name = #{databaseName}, db_username = #{dbUsername}, db_password = #{dbPassword}
+            database_name = #{databaseName}, db_username = #{dbUsername}, db_password = #{dbPassword}, config_json = #{configJson}
         WHERE id = #{id}
     </update>
 

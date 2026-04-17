@@ -86,6 +86,11 @@ public class DatasourceController {
         return ApiResponse.ok(datasourceService.listColumns(id, table));
     }
 
+    @GetMapping("/{id}/preview-data")
+    public ApiResponse<com.aibi.bi.model.response.DatasetPreviewResponse> previewData(@PathVariable Long id) {
+        return ApiResponse.ok(datasourceService.previewDatasourceData(id));
+    }
+
     @DeleteMapping("/{id}")
     @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<Void> delete(@PathVariable Long id) {

@@ -1,24 +1,30 @@
 package com.aibi.bi.model.request;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-
 public class DatasourceConnectionTestRequest {
+
+    private String sourceKind;
 
     private String datasourceType;
 
-    @NotBlank(message = "host is required")
     private String host;
 
-    @NotNull(message = "port is required")
     private Integer port;
 
-    @NotBlank(message = "databaseName is required")
     private String databaseName;
 
     private String username;
 
     private String password;
+
+    private String configJson;
+
+    public String getSourceKind() {
+        return sourceKind;
+    }
+
+    public void setSourceKind(String sourceKind) {
+        this.sourceKind = sourceKind;
+    }
 
     public String getHost() {
         return host;
@@ -66,5 +72,13 @@ public class DatasourceConnectionTestRequest {
 
     public void setDatasourceType(String datasourceType) {
         this.datasourceType = datasourceType;
+    }
+
+    public String getConfigJson() {
+        return configJson;
+    }
+
+    public void setConfigJson(String configJson) {
+        this.configJson = configJson;
     }
 }

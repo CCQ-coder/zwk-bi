@@ -7,6 +7,9 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
@@ -26,11 +29,28 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String resourcePath = "file:" + uploadPath.replace("\\", "/");
+        String indexResourcePath = toResourcePath(resolveUploadDirectory("index"));
+        String defaultResourcePath = toResourcePath(resolveUploadDirectory(""));
+        registry.addResourceHandler("/uploads/index/**")
+                .addResourceLocations(indexResourcePath);
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations(defaultResourcePath);
+    }
+
+    private Path resolveUploadDirectory(String category) {
+        Path baseDir = Paths.get(uploadPath).toAbsolutePath().normalize();
+        if (!"index".equalsIgnoreCase(category)) {
+            return baseDir;
+        }
+        Path parent = baseDir.getParent();
+        return (parent == null ? baseDir : parent).resolve("index");
+    }
+
+    private String toResourcePath(Path directory) {
+        String resourcePath = "file:" + directory.toString().replace("\\", "/");
         if (!resourcePath.endsWith("/")) {
             resourcePath += "/";
         }
-        registry.addResourceHandler("/uploads/**")
-                .addResourceLocations(resourcePath);
+        return resourcePath;
     }
 }

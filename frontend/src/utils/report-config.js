@@ -26,7 +26,7 @@ export const normalizeCanvasConfig = (canvas, scene = 'dashboard') => {
     const height = Number.isFinite(parsedHeight) ? Math.max(540, Math.round(parsedHeight)) : defaults.height;
     return { width, height, overlay: canvas?.overlay };
 };
-export const buildReportConfig = (originalConfigJson, scene, publishPatch, canvasPatch) => {
+export const buildReportConfig = (originalConfigJson, scene, publishPatch, canvasPatch, coverPatch) => {
     const config = parseReportConfig(originalConfigJson);
     const currentPublish = normalizePublishConfig(config.publish);
     const nextPublish = publishPatch ? normalizePublishConfig({ ...currentPublish, ...publishPatch }) : currentPublish;
@@ -34,11 +34,14 @@ export const buildReportConfig = (originalConfigJson, scene, publishPatch, canva
     const nextCanvas = canvasPatch
         ? normalizeCanvasConfig({ ...currentCanvas, ...canvasPatch }, scene)
         : currentCanvas;
+    const currentCover = normalizeCoverConfig(config.cover);
+    const nextCover = coverPatch ? normalizeCoverConfig({ ...currentCover, ...coverPatch }) : currentCover;
     return JSON.stringify({
         ...config,
         scene,
         publish: nextPublish,
         canvas: nextCanvas,
+        ...(nextCover.url ? { cover: nextCover } : {}),
     });
 };
 export const normalizePublishConfig = (publish) => ({
@@ -47,6 +50,10 @@ export const normalizePublishConfig = (publish) => ({
     allowedRoles: Array.isArray(publish?.allowedRoles) && publish.allowedRoles.length ? publish.allowedRoles : [...DEFAULT_ALLOWED_ROLES],
     allowAnonymousAccess: publish?.allowAnonymousAccess ?? true,
     publishedAt: publish?.publishedAt,
+});
+export const normalizeCoverConfig = (cover) => ({
+    url: typeof cover?.url === 'string' ? cover.url : '',
+    updatedAt: cover?.updatedAt,
 });
 export const generateShareToken = () => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {

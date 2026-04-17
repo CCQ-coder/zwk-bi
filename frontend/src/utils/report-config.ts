@@ -34,10 +34,16 @@ export interface ReportCanvasPreset extends ReportCanvasConfig {
   label: string
 }
 
+export interface ReportCoverConfig {
+  url: string
+  updatedAt?: string
+}
+
 export interface ReportConfig {
   scene?: string
   publish?: ReportPublishConfig
   canvas?: ReportCanvasConfig
+  cover?: ReportCoverConfig
 }
 
 const DEFAULT_ALLOWED_ROLES = ['ADMIN', 'ANALYST']
@@ -79,7 +85,8 @@ export const buildReportConfig = (
   originalConfigJson: string | null | undefined,
   scene: 'dashboard' | 'screen',
   publishPatch?: Partial<ReportPublishConfig>,
-  canvasPatch?: Partial<ReportCanvasConfig>
+  canvasPatch?: Partial<ReportCanvasConfig>,
+  coverPatch?: Partial<ReportCoverConfig>
 ) => {
   const config = parseReportConfig(originalConfigJson)
   const currentPublish = normalizePublishConfig(config.publish)
@@ -88,11 +95,14 @@ export const buildReportConfig = (
   const nextCanvas = canvasPatch
     ? normalizeCanvasConfig({ ...currentCanvas, ...canvasPatch }, scene)
     : currentCanvas
+  const currentCover = normalizeCoverConfig(config.cover)
+  const nextCover = coverPatch ? normalizeCoverConfig({ ...currentCover, ...coverPatch }) : currentCover
   return JSON.stringify({
     ...config,
     scene,
     publish: nextPublish,
     canvas: nextCanvas,
+    ...(nextCover.url ? { cover: nextCover } : {}),
   })
 }
 
@@ -102,6 +112,11 @@ export const normalizePublishConfig = (publish?: Partial<ReportPublishConfig>): 
   allowedRoles: Array.isArray(publish?.allowedRoles) && publish.allowedRoles.length ? publish.allowedRoles : [...DEFAULT_ALLOWED_ROLES],
   allowAnonymousAccess: publish?.allowAnonymousAccess ?? true,
   publishedAt: publish?.publishedAt,
+})
+
+export const normalizeCoverConfig = (cover?: Partial<ReportCoverConfig>): ReportCoverConfig => ({
+  url: typeof cover?.url === 'string' ? cover.url : '',
+  updatedAt: cover?.updatedAt,
 })
 
 export const generateShareToken = () => {

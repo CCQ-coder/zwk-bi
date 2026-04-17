@@ -2,10 +2,9 @@ package com.aibi.bi.service;
 
 import com.aibi.bi.domain.BiChart;
 import com.aibi.bi.domain.BiDataset;
-import com.aibi.bi.domain.BiDatasource;
 import com.aibi.bi.mapper.BiChartMapper;
 import com.aibi.bi.mapper.BiDatasetMapper;
-import com.aibi.bi.mapper.BiDatasourceMapper;
+import com.aibi.bi.model.request.ChartPageSourceQueryRequest;
 import com.aibi.bi.model.request.DatasetPreviewRequest;
 import com.aibi.bi.model.request.CreateChartRequest;
 import com.aibi.bi.model.request.UpdateChartRequest;
@@ -49,21 +48,18 @@ public class ChartService {
 
     private final BiChartMapper biChartMapper;
     private final BiDatasetMapper biDatasetMapper;
-    private final BiDatasourceMapper biDatasourceMapper;
-    private final JdbcPreviewService jdbcPreviewService;
+    private final DatasourceService datasourceService;
     private final DatasetService datasetService;
     private final ObjectMapper objectMapper;
 
     public ChartService(BiChartMapper biChartMapper,
                         BiDatasetMapper biDatasetMapper,
-                        BiDatasourceMapper biDatasourceMapper,
-                        JdbcPreviewService jdbcPreviewService,
+                        DatasourceService datasourceService,
                         DatasetService datasetService,
                         ObjectMapper objectMapper) {
         this.biChartMapper = biChartMapper;
         this.biDatasetMapper = biDatasetMapper;
-        this.biDatasourceMapper = biDatasourceMapper;
-        this.jdbcPreviewService = jdbcPreviewService;
+        this.datasourceService = datasourceService;
         this.datasetService = datasetService;
         this.objectMapper = objectMapper;
     }
@@ -120,11 +116,14 @@ public class ChartService {
         if (request.getDatasourceId() == null || request.getDatasourceId() == 0L) {
             throw new IllegalArgumentException("datasourceId is required for page-sql query");
         }
-        BiDatasource datasource = biDatasourceMapper.findById(request.getDatasourceId());
-        if (datasource == null) {
-            throw new IllegalArgumentException("Datasource not found: " + request.getDatasourceId());
+        return datasourceService.previewDatasource(request.getDatasourceId(), request.getSqlText(), null);
+    }
+
+    public DatasetPreviewResponse queryPageSource(ChartPageSourceQueryRequest request) {
+        if (request.getDatasourceId() == null || request.getDatasourceId() == 0L) {
+            throw new IllegalArgumentException("datasourceId is required for page-source query");
         }
-        return jdbcPreviewService.preview(datasource, request.getSqlText());
+        return datasourceService.previewDatasource(request.getDatasourceId(), request.getSqlText(), request.getRuntimeConfigText());
     }
 
     /**
@@ -233,15 +232,16 @@ public class ChartService {
         String sourceMode = "DATASET";
         Long datasourceId = null;
         String sqlText = "";
+        String runtimeConfigText = "";
 
         if (configJson == null || configJson.isBlank()) {
-            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText);
+            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText, runtimeConfigText);
         }
 
         try {
             JsonNode chartNode = objectMapper.readTree(configJson).path("chart");
             if (!chartNode.isObject()) {
-                return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText);
+                return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText, runtimeConfigText);
             }
 
             datasetId = readLong(chartNode.get("datasetId"), datasetId);
@@ -252,7 +252,8 @@ public class ChartService {
             sourceMode = readText(chartNode.get("sourceMode"), sourceMode);
             datasourceId = readLong(chartNode.get("datasourceId"), datasourceId);
             sqlText = readText(chartNode.get("sqlText"), sqlText);
-            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText);
+            runtimeConfigText = readText(chartNode.get("runtimeConfigText"), runtimeConfigText);
+            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText, runtimeConfigText);
         } catch (Exception ex) {
             throw new IllegalArgumentException("组件配置格式不正确");
         }
@@ -263,14 +264,15 @@ public class ChartService {
             if (resolvedConfig.datasourceId() == null || resolvedConfig.datasourceId() == 0L) {
                 return null;
             }
-            if (resolvedConfig.sqlText() == null || resolvedConfig.sqlText().isBlank()) {
+            if ((resolvedConfig.sqlText() == null || resolvedConfig.sqlText().isBlank())
+                    && (resolvedConfig.runtimeConfigText() == null || resolvedConfig.runtimeConfigText().isBlank())) {
                 return null;
             }
-            BiDatasource datasource = biDatasourceMapper.findById(resolvedConfig.datasourceId());
-            if (datasource == null) {
-                throw new IllegalArgumentException("Datasource not found: " + resolvedConfig.datasourceId());
-            }
-            return jdbcPreviewService.preview(datasource, resolvedConfig.sqlText());
+            return datasourceService.previewDatasource(
+                    resolvedConfig.datasourceId(),
+                    resolvedConfig.sqlText(),
+                    resolvedConfig.runtimeConfigText()
+            );
         }
 
         if (resolvedConfig.datasetId() == null) {
@@ -283,11 +285,7 @@ public class ChartService {
         if (dataset.getDatasourceId() == null || dataset.getDatasourceId() == 0L) {
             return datasetService.getDemoPreviewResponse(dataset.getSqlText());
         }
-        BiDatasource datasource = biDatasourceMapper.findById(dataset.getDatasourceId());
-        if (datasource == null) {
-            throw new IllegalArgumentException("Datasource not found");
-        }
-        return jdbcPreviewService.preview(datasource, dataset.getSqlText());
+        return datasourceService.previewDatasource(dataset.getDatasourceId(), dataset.getSqlText(), null);
     }
 
     private Long readLong(JsonNode node, Long fallback) {
@@ -384,7 +382,8 @@ public class ChartService {
                                        String groupField,
                                        String sourceMode,
                                        Long datasourceId,
-                                       String sqlText) {
+                                       String sqlText,
+                                       String runtimeConfigText) {
     }
 }
 

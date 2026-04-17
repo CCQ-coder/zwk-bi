@@ -146,11 +146,12 @@ const rules = {
 const loadTree = async () => {
     treeLoading.value = true;
     try {
-        ;
-        [folderTree.value, datasources.value] = await Promise.all([
+        const [tree, datasourceList] = await Promise.all([
             getDatasetFolderTree(),
             getDatasourceList()
         ]);
+        folderTree.value = tree;
+        datasources.value = datasourceList.filter((item) => (item.sourceKind || 'DATABASE') === 'DATABASE');
     }
     finally {
         treeLoading.value = false;
@@ -1082,16 +1083,20 @@ for (const [ds] of __VLS_getVForSourceType((__VLS_ctx.datasources))) {
     // @ts-ignore
     const __VLS_173 = __VLS_asFunctionalComponent(__VLS_172, new __VLS_172({
         key: (ds.id),
-        label: (ds.name),
+        label: (`${ds.name} (${ds.datasourceType || 'DATABASE'})`),
         value: (ds.id),
     }));
     const __VLS_174 = __VLS_173({
         key: (ds.id),
-        label: (ds.name),
+        label: (`${ds.name} (${ds.datasourceType || 'DATABASE'})`),
         value: (ds.id),
     }, ...__VLS_functionalComponentArgsRest(__VLS_173));
 }
 var __VLS_167;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "preview-empty" },
+    ...{ style: {} },
+});
 var __VLS_163;
 const __VLS_176 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
@@ -1380,6 +1385,7 @@ var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['col-type']} */ ;
 /** @type {__VLS_StyleScopedClasses['col-remark']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-area']} */ ;
+/** @type {__VLS_StyleScopedClasses['preview-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-header']} */ ;
 // @ts-ignore

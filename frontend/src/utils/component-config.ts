@@ -4,8 +4,10 @@ export interface ComponentChartConfig {
   name: string
   datasetId: number | '' | null
   sourceMode: 'DATASET' | 'PAGE_SQL'
+  pageSourceKind: 'DATABASE' | 'API' | 'TABLE' | 'JSON_STATIC'
   datasourceId: number | '' | null
   sqlText: string
+  runtimeConfigText: string
   chartType: string
   xField: string
   yField: string
@@ -959,8 +961,10 @@ export const buildChartSnapshot = (chart?: Chart | null): ComponentChartConfig =
   name: chart?.name ?? '',
   datasetId: chart?.datasetId ?? '',
   sourceMode: 'DATASET',
+  pageSourceKind: 'DATABASE',
   datasourceId: '',
   sqlText: '',
+  runtimeConfigText: '',
   chartType: chart?.chartType ?? '',
   xField: chart?.xField ?? '',
   yField: chart?.yField ?? '',
@@ -988,9 +992,13 @@ export const parseComponentConfig = (configJson?: string | null): Partial<Compon
   if (typeof parsed.datasetId === 'number') chartPatch.datasetId = parsed.datasetId
   if (parsed.datasetId === null || parsed.datasetId === '') chartPatch.datasetId = ''
   if (parsed.sourceMode === 'DATASET' || parsed.sourceMode === 'PAGE_SQL') chartPatch.sourceMode = parsed.sourceMode
+  if (parsed.pageSourceKind === 'DATABASE' || parsed.pageSourceKind === 'API' || parsed.pageSourceKind === 'TABLE' || parsed.pageSourceKind === 'JSON_STATIC') {
+    chartPatch.pageSourceKind = parsed.pageSourceKind
+  }
   if (typeof parsed.datasourceId === 'number') chartPatch.datasourceId = parsed.datasourceId
   if (parsed.datasourceId === null || parsed.datasourceId === '') chartPatch.datasourceId = ''
   if (typeof parsed.sqlText === 'string') chartPatch.sqlText = parsed.sqlText
+  if (typeof parsed.runtimeConfigText === 'string') chartPatch.runtimeConfigText = parsed.runtimeConfigText
   if (typeof parsed.chartType === 'string') chartPatch.chartType = parsed.chartType
   if (typeof parsed.xField === 'string') chartPatch.xField = parsed.xField
   if (typeof parsed.yField === 'string') chartPatch.yField = parsed.yField

@@ -200,6 +200,10 @@
             :class="{ active: currentDashboard?.id === dashboard.id }"
             @click="selectDashboard(dashboard)"
           >
+            <div class="screen-item-cover" :class="{ 'screen-item-cover--empty': !getDashboardCoverUrl(dashboard) }">
+              <img v-if="getDashboardCoverUrl(dashboard)" :src="getDashboardCoverUrl(dashboard)" alt="" />
+              <span v-else>封面</span>
+            </div>
             <div class="screen-item-main">
               <div class="screen-item-name">{{ dashboard.name }}</div>
               <div class="screen-item-meta">{{ getDashboardComponentCount(dashboard.id) }} 个组件</div>
@@ -328,9 +332,14 @@
             <div class="screen-title">{{ currentDashboard.name }}</div>
             <el-tag size="small" :type="isPublished ? 'success' : 'info'">{{ isPublished ? '已发布' : '草稿' }}</el-tag>
             <span class="screen-comp-count">{{ components.length }} 个组件</span>
+            <div v-if="currentCoverConfig.url" class="screen-cover-pill">
+              <img :src="currentCoverConfig.url" alt="" />
+              <span>封面已生成</span>
+            </div>
           </div>
           <div class="screen-actions">
             <el-button size="small" :icon="Refresh" :loading="compLoading" @click="loadComponents" title="刷新画布" />
+            <el-button size="small" :icon="PictureFilled" :loading="coverSaving" @click="captureScreenCover">{{ currentCoverConfig.url ? '更新封面' : '生成封面' }}</el-button>
             <el-button size="small" :icon="View" @click="openPreview" title="预览" />
             <el-button size="small" :icon="Download" @click="exportScreenJson" title="导出JSON" />
             <el-divider direction="vertical" />
@@ -418,7 +427,7 @@
             <div
               ref="canvasRef"
               class="screen-stage"
-              :class="{ 'screen-stage--drop': stageDropActive }"
+              :class="{ 'screen-stage--drop': stageDropActive, 'screen-stage--capturing': capturingCover }"
               :style="{ width: `${canvasWorkWidth}px`, minHeight: `${canvasMinHeight}px`, height: `${canvasMinHeight}px`, transform: `scale(${canvasScale})`, transformOrigin: '0 0' }"
               @dragover.prevent="onStageDragOver"
               @dragleave="onStageDragLeave"
@@ -730,7 +739,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Grid, Operation, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Grid, Operation, PictureFilled, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
+import html2canvas from 'html2canvas'
 import * as echarts from 'echarts'
 import ComponentDataFallback from './ComponentDataFallback.vue'
 import ComponentStaticPreview from './ComponentStaticPreview.vue'
@@ -769,11 +779,13 @@ import {
   buildPublishedLink,
   buildReportConfig,
   normalizeCanvasConfig,
+  normalizeCoverConfig,
   normalizePublishConfig,
   parseReportConfig,
   SCREEN_CANVAS_PRESETS,
   type ReportCanvasConfig,
 } from '../utils/report-config'
+import { uploadImage } from '../api/upload'
 
 // ─── Props & Emits ────────────────────────────────────────────────────────────
 const props = withDefaults(defineProps<{
@@ -1012,6 +1024,11 @@ const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LI
       name: item.name,
       chartType: item.type,
       datasetId: '',
+      sourceMode: 'DATASET',
+      pageSourceKind: 'DATABASE',
+      datasourceId: '',
+      sqlText: '',
+      runtimeConfigText: '',
       xField: '',
       yField: '',
       groupField: '',
@@ -1032,6 +1049,8 @@ const shareVisible = ref(false)
 const publishVisible = ref(false)
 const publishSaving = ref(false)
 const canvasSaving = ref(false)
+const coverSaving = ref(false)
+const capturingCover = ref(false)
 const bgImgInputRef = ref<HTMLInputElement | null>(null)
 const bgImgUploading = ref(false)
 
@@ -1246,6 +1265,7 @@ const filteredDashboards = computed(() => {
   return keyword ? dashboards.value.filter((item) => item.name.toLowerCase().includes(keyword)) : dashboards.value
 })
 const currentPublishConfig = computed(() => normalizePublishConfig(parseReportConfig(currentDashboard.value?.configJson).publish))
+const currentCoverConfig = computed(() => normalizeCoverConfig(parseReportConfig(currentDashboard.value?.configJson).cover))
 const isPublished = computed(() => currentPublishConfig.value.status === 'PUBLISHED')
 const shareLink = computed(() => currentDashboard.value
   ? buildPublishedLink('screen', currentDashboard.value.id, currentPublishConfig.value.shareToken)
@@ -1321,6 +1341,7 @@ const setChartRef = (el: HTMLElement | null, componentId: number) => {
 }
 
 const getDashboardComponentCount = (dashboardId: number) => dashboardCounts.value.get(dashboardId) ?? 0
+const getDashboardCoverUrl = (dashboard: Dashboard) => normalizeCoverConfig(parseReportConfig(dashboard.configJson).cover).url
 
 const normalizeLayout = (component: DashboardComponent) => {
   if (component.width <= 24) component.width = Math.max(MIN_CARD_WIDTH, component.width * LEGACY_GRID_COL_PX)
@@ -1847,27 +1868,90 @@ const handleBgImageUpload = async (event: Event) => {
   if (!file) return
   bgImgUploading.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const token = localStorage.getItem('bi_token') || ''
-    const res = await fetch('/api/upload/image', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData
-    })
-    const json = await res.json()
-    if (json.data?.url) {
-      overlayConfig.bgImage = json.data.url
-      await saveOverlay()
-      ElMessage.success('背景图片上传成功')
-    } else {
+    const uploaded = await uploadImage(file, { filename: file.name })
+    if (!uploaded.url) {
       throw new Error('Upload failed')
     }
+    overlayConfig.bgImage = uploaded.url
+    await saveOverlay()
+    ElMessage.success('背景图片上传成功')
   } catch {
     ElMessage.error('图片上传失败')
   } finally {
     bgImgUploading.value = false
     input.value = ''
+  }
+}
+
+const waitForPaint = () => new Promise<void>((resolve) => {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => resolve())
+  })
+})
+
+const captureScreenCover = async () => {
+  const dashboard = currentDashboard.value
+  const stage = canvasRef.value
+  if (!dashboard || !stage) {
+    ElMessage.warning('请先选择大屏并等待画布加载完成')
+    return
+  }
+
+  const previousActiveCompId = activeCompId.value
+  const previousOverlaySelected = overlaySelected.value
+  const previousCanvasScale = canvasScale.value
+
+  coverSaving.value = true
+  capturingCover.value = true
+  activeCompId.value = null
+  overlaySelected.value = false
+  canvasScale.value = 1
+
+  try {
+    await nextTick()
+    await waitForPaint()
+    handleWindowResize()
+
+    const canvas = await html2canvas(stage, {
+      backgroundColor: null,
+      useCORS: true,
+      logging: false,
+      scale: Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
+      x: overlayConfig.x,
+      y: overlayConfig.y,
+      width: overlayConfig.w,
+      height: overlayConfig.h,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: stage.scrollWidth,
+      windowHeight: stage.scrollHeight,
+    })
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((result: Blob | null) => resolve(result), 'image/png'))
+    if (!blob) {
+      throw new Error('封面截图生成失败')
+    }
+    const uploaded = await uploadImage(blob, {
+      category: 'index',
+      filename: `screen-cover-${dashboard.id}-${Date.now()}.png`,
+    })
+    const configJson = buildReportConfig(dashboard.configJson, 'screen', undefined, undefined, {
+      url: uploaded.url,
+      updatedAt: new Date().toISOString(),
+    })
+    const updated = await updateDashboard(dashboard.id, { configJson })
+    currentDashboard.value = updated
+    dashboards.value = dashboards.value.map((item) => item.id === updated.id ? updated : item)
+    ElMessage.success('大屏封面已更新')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '封面截图失败')
+  } finally {
+    capturingCover.value = false
+    activeCompId.value = previousActiveCompId
+    overlaySelected.value = previousOverlaySelected
+    canvasScale.value = previousCanvasScale
+    await nextTick()
+    handleWindowResize()
+    coverSaving.value = false
   }
 }
 
@@ -2280,7 +2364,34 @@ onBeforeUnmount(() => {
 }
 
 .screen-item-main {
+  flex: 1;
   min-width: 0;
+}
+
+.screen-item-cover {
+  width: 88px;
+  height: 56px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid #d8e7f6;
+  background: linear-gradient(135deg, #eff6ff 0%, #dfeefe 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6f86a3;
+  font-size: 12px;
+}
+
+.screen-item-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.screen-item-cover--empty {
+  background: linear-gradient(135deg, #f5f8fc 0%, #e8eff8 100%);
 }
 
 .screen-item-name {
@@ -2560,6 +2671,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .screen-comp-count {
@@ -2568,11 +2680,30 @@ onBeforeUnmount(() => {
   margin-left: 4px;
 }
 
+.screen-cover-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: #edf7ff;
+  color: #24527b;
+  font-size: 12px;
+}
+
+.screen-cover-pill img {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
 .screen-actions {
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .share-block {
@@ -2843,6 +2974,23 @@ onBeforeUnmount(() => {
 .screen-stage--drop {
   border-color: #7bc4ff;
   box-shadow: inset 0 0 0 2px rgba(123, 196, 255, 0.25);
+}
+
+.screen-stage--capturing .stage-card.active {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.screen-stage--capturing .stage-card-header,
+.screen-stage--capturing .resize-handle,
+.screen-stage--capturing .curtain-badge {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.screen-stage--capturing .canvas-curtain--selected {
+  box-shadow: none;
+  outline: none;
 }
 
 .stage-card {

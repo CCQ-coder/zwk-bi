@@ -11,3 +11,4 @@ export const getChartData = (id, options) => request.get(`/charts/${id}/data`, {
 });
 export const queryChartDataset = (data) => request.post('/charts/query/dataset', data);
 export const queryChartPageSql = (data) => request.post('/charts/query/page-sql', data);
+export const queryChartPageSource = (data) => request.post('/charts/query/page-source', data);

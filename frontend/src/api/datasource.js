@@ -5,5 +5,6 @@ export const updateDatasource = (id, data) => request.put(`/datasources/${id}`, 
 export const deleteDatasource = (id) => request.delete(`/datasources/${id}`);
 export const testDatasourceConnection = (data) => request.post('/datasources/test-connection', data);
 export const getDatasourceTables = (id) => request.get(`/datasources/${id}/tables`);
+export const getDatasourcePreviewData = (id) => request.get(`/datasources/${id}/preview-data`);
 export const getTableColumns = (id, table) => request.get(`/datasources/${id}/columns`, { params: { table } });
 export const previewExtract = (data) => request.post('/datasources/extract/preview', data);

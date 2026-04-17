@@ -1,19 +1,24 @@
 import request from './request'
 
+export type DatasourceSourceKind = 'DATABASE' | 'API' | 'TABLE' | 'JSON_STATIC'
+
 export interface Datasource {
   id: number
   name: string
+  sourceKind: DatasourceSourceKind
   datasourceType: string
   connectMode: string
   host: string
   port: number
   databaseName: string
   dbUsername: string
+  configJson?: string
   createdAt: string
 }
 
 export interface DatasourceForm {
   name: string
+  sourceKind: DatasourceSourceKind
   datasourceType: string
   connectMode: string
   host: string
@@ -21,6 +26,7 @@ export interface DatasourceForm {
   databaseName: string
   username: string
   password: string
+  configJson?: string
 }
 
 export interface DatasourceConnectionTestResult {
@@ -38,6 +44,12 @@ export interface TableInfo {
 
 export interface ExtractPreviewResult {
   sqlText: string
+  columns: string[]
+  rows: Record<string, unknown>[]
+  rowCount: number
+}
+
+export interface DatasourcePreviewResult {
   columns: string[]
   rows: Record<string, unknown>[]
   rowCount: number
@@ -68,6 +80,9 @@ export interface ColumnMeta {
 
 export const getDatasourceTables = (id: number): Promise<TableInfo[]> =>
   request.get(`/datasources/${id}/tables`)
+
+export const getDatasourcePreviewData = (id: number): Promise<DatasourcePreviewResult> =>
+  request.get(`/datasources/${id}/preview-data`)
 
 export const getTableColumns = (id: number, table: string): Promise<ColumnMeta[]> =>
   request.get(`/datasources/${id}/columns`, { params: { table } })

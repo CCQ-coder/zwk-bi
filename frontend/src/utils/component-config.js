@@ -820,8 +820,10 @@ export const buildChartSnapshot = (chart) => ({
     name: chart?.name ?? '',
     datasetId: chart?.datasetId ?? '',
     sourceMode: 'DATASET',
+    pageSourceKind: 'DATABASE',
     datasourceId: '',
     sqlText: '',
+    runtimeConfigText: '',
     chartType: chart?.chartType ?? '',
     xField: chart?.xField ?? '',
     yField: chart?.yField ?? '',
@@ -853,12 +855,17 @@ export const parseComponentConfig = (configJson) => {
         chartPatch.datasetId = '';
     if (parsed.sourceMode === 'DATASET' || parsed.sourceMode === 'PAGE_SQL')
         chartPatch.sourceMode = parsed.sourceMode;
+    if (parsed.pageSourceKind === 'DATABASE' || parsed.pageSourceKind === 'API' || parsed.pageSourceKind === 'TABLE' || parsed.pageSourceKind === 'JSON_STATIC') {
+        chartPatch.pageSourceKind = parsed.pageSourceKind;
+    }
     if (typeof parsed.datasourceId === 'number')
         chartPatch.datasourceId = parsed.datasourceId;
     if (parsed.datasourceId === null || parsed.datasourceId === '')
         chartPatch.datasourceId = '';
     if (typeof parsed.sqlText === 'string')
         chartPatch.sqlText = parsed.sqlText;
+    if (typeof parsed.runtimeConfigText === 'string')
+        chartPatch.runtimeConfigText = parsed.runtimeConfigText;
     if (typeof parsed.chartType === 'string')
         chartPatch.chartType = parsed.chartType;
     if (typeof parsed.xField === 'string')
@@ -1140,7 +1147,9 @@ export const materializeChartData = (rawRows, columns, chartConfig) => {
         series: [{ name: chartConfig.yField, data: labels.map((label) => values.get(label) ?? 0) }],
     };
 };
-export const buildComponentOption = (data, chartConfig, style) => {
+export const buildComponentOption = (data, chartConfig, styleInput) => {
+    // Force transparent component board globally; charts only render data/decoration content.
+    const style = { ...styleInput, bgColor: 'rgba(0,0,0,0)' };
     const colors = COLOR_THEMES[style.theme] ?? COLOR_THEMES['默认蓝'];
     if (data.chartType === 'pie' || data.chartType === 'doughnut' || data.chartType === 'rose') {
         const isRose = data.chartType === 'rose';
@@ -1488,20 +1497,8 @@ export const buildComponentOption = (data, chartConfig, style) => {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const postProcessChartOption = (option, style, chartName) => {
-    if (style.showTitle) {
-        option.title = {
-            text: style.titleText || chartName,
-            textStyle: { fontSize: style.titleFontSize, color: style.titleColor, fontWeight: 600 },
-            top: 6,
-            left: 10,
-        };
-        if (option.grid && typeof option.grid.top === 'number') {
-            option.grid = { ...option.grid, top: option.grid.top + style.titleFontSize + 12 };
-        }
-        else if (option.grid) {
-            option.grid = { ...option.grid, top: style.titleFontSize + 20 };
-        }
-    }
+    // Force chart titles hidden for screen clean-room visual style.
+    delete option.title;
     if (!style.showTooltip) {
         delete option.tooltip;
     }

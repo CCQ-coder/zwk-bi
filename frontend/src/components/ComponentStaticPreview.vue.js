@@ -3,6 +3,7 @@ import { chartTypeLabel, isDecorationChartType, isVectorIconChartType, } from '.
 const props = withDefaults(defineProps(), {
     data: null,
     dark: false,
+    showTitle: false,
 });
 const now = ref(new Date());
 let clockTimer = null;
@@ -20,6 +21,8 @@ onBeforeUnmount(() => {
     }
 });
 const titleText = computed(() => props.chartConfig.name || chartTypeLabel(props.chartType));
+// Enforce hidden titles for static widgets in preview, per screen design requirement.
+const shouldShowTitle = computed(() => false);
 const rawRows = computed(() => props.data?.rawRows ?? []);
 const primaryMetric = computed(() => {
     if (props.chartConfig.yField && rawRows.value.length) {
@@ -116,13 +119,12 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_withDefaultsArg = (function (t) { return t; })({
     data: null,
     dark: false,
+    showTitle: false,
 });
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['decor-shell']} */ ;
-/** @type {__VLS_StyleScopedClasses['decor-shell__title']} */ ;
-/** @type {__VLS_StyleScopedClasses['decor-shell__subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['time-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['qr-shell']} */ ;
@@ -156,14 +158,6 @@ if (__VLS_ctx.isDecorationChartType(__VLS_ctx.chartType)) {
         ...{ class: "decor-shell" },
         ...{ class: (`decor-shell--${__VLS_ctx.chartType}`) },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "decor-shell__title" },
-    });
-    (__VLS_ctx.titleText);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "decor-shell__subtitle" },
-    });
-    (__VLS_ctx.chartTypeLabel(__VLS_ctx.chartType));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
         ...{ class: "decor-corner decor-corner--tl" },
     });
@@ -185,14 +179,16 @@ else if (__VLS_ctx.isVectorIconChartType(__VLS_ctx.chartType)) {
         ...{ class: "icon-shell__stage" },
     });
     __VLS_asFunctionalDirective(__VLS_directives.vHtml)(null, { ...__VLS_directiveBindingRestFields, value: (__VLS_ctx.iconMarkup) }, null, null);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "icon-shell__label" },
-    });
-    (__VLS_ctx.titleText);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "icon-shell__meta" },
-    });
-    (__VLS_ctx.chartTypeLabel(__VLS_ctx.chartType));
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "icon-shell__label" },
+        });
+        (__VLS_ctx.titleText);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "icon-shell__meta" },
+        });
+        (__VLS_ctx.chartTypeLabel(__VLS_ctx.chartType));
+    }
 }
 else if (__VLS_ctx.chartType === 'clock_display') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -232,10 +228,12 @@ else if (__VLS_ctx.chartType === 'hyperlink') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "link-shell" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "link-shell__title" },
-    });
-    (__VLS_ctx.titleText);
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "link-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.a, __VLS_intrinsicElements.a)({
         ...{ class: "link-shell__url" },
         href: "javascript:void(0)",
@@ -294,10 +292,12 @@ else if (__VLS_ctx.chartType === 'text_block') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "text-shell" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "text-shell__title" },
-    });
-    (__VLS_ctx.titleText);
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "text-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "text-shell__paragraph" },
     });
@@ -306,10 +306,12 @@ else if (__VLS_ctx.chartType === 'single_field' || __VLS_ctx.chartType === 'metr
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "metric-shell" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "metric-shell__title" },
-    });
-    (__VLS_ctx.titleText);
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "metric-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "metric-shell__value" },
         ...{ class: ({ 'metric-shell__value--flipper': __VLS_ctx.chartType === 'number_flipper' }) },
@@ -324,10 +326,12 @@ else if (__VLS_ctx.chartType === 'text_list' || __VLS_ctx.chartType === 'image_l
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "list-shell" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "list-shell__title" },
-    });
-    (__VLS_ctx.titleText);
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "list-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     for (const [item] of __VLS_getVForSourceType((__VLS_ctx.listItems))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             key: (item.key),
@@ -370,10 +374,12 @@ else if (__VLS_ctx.chartType === 'business_trend') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "trend-shell" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "trend-shell__title" },
-    });
-    (__VLS_ctx.titleText);
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "trend-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "trend-shell__bars" },
     });
@@ -398,10 +404,12 @@ else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "text-shell" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "text-shell__title" },
-    });
-    (__VLS_ctx.titleText);
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "text-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "text-shell__paragraph" },
     });
@@ -409,8 +417,6 @@ else {
 }
 /** @type {__VLS_StyleScopedClasses['static-widget']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell']} */ ;
-/** @type {__VLS_StyleScopedClasses['decor-shell__title']} */ ;
-/** @type {__VLS_StyleScopedClasses['decor-shell__subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-corner']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-corner--tl']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-corner']} */ ;
@@ -483,6 +489,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             isDecorationChartType: isDecorationChartType,
             isVectorIconChartType: isVectorIconChartType,
             titleText: titleText,
+            shouldShowTitle: shouldShowTitle,
             primaryMetric: primaryMetric,
             listItems: listItems,
             cloudItems: cloudItems,

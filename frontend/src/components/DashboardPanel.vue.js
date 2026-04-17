@@ -993,6 +993,7 @@ else {
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "chart-card-name" },
+            ...{ style: {} },
         });
         (__VLS_ctx.getComponentChartConfig(comp).name || '图表');
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -1065,10 +1066,12 @@ else {
             const __VLS_124 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
                 chartType: (__VLS_ctx.getComponentChartConfig(comp).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(comp)),
+                showTitle: (__VLS_ctx.getComponentConfig(comp).style.showTitle),
             }));
             const __VLS_125 = __VLS_124({
                 chartType: (__VLS_ctx.getComponentChartConfig(comp).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(comp)),
+                showTitle: (__VLS_ctx.getComponentConfig(comp).style.showTitle),
             }, ...__VLS_functionalComponentArgsRest(__VLS_124));
         }
         else {
@@ -1802,6 +1805,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             draftPublishedLink: draftPublishedLink,
             activeComponent: activeComponent,
             activeChart: activeChart,
+            getComponentConfig: getComponentConfig,
             getComponentChartConfig: getComponentChartConfig,
             isStaticWidget: isStaticWidget,
             showNoField: showNoField,

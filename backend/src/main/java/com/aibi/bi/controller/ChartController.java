@@ -4,6 +4,7 @@ import com.aibi.bi.common.ApiResponse;
 import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiChart;
 import com.aibi.bi.model.request.ChartDatasetQueryRequest;
+import com.aibi.bi.model.request.ChartPageSourceQueryRequest;
 import com.aibi.bi.model.request.CreateChartRequest;
 import com.aibi.bi.model.request.DatasetPreviewRequest;
 import com.aibi.bi.model.request.UpdateChartRequest;
@@ -83,6 +84,12 @@ public class ChartController {
     @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<DatasetPreviewResponse> queryPageSql(@Valid @RequestBody DatasetPreviewRequest request) {
         return ApiResponse.ok(chartService.queryPageSql(request));
+    }
+
+    @PostMapping("/query/page-source")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<DatasetPreviewResponse> queryPageSource(@Valid @RequestBody ChartPageSourceQueryRequest request) {
+        return ApiResponse.ok(chartService.queryPageSource(request));
     }
 }
 

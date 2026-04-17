@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS sys_user_role (
 CREATE TABLE IF NOT EXISTS bi_datasource (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(128) NOT NULL,
+  source_kind VARCHAR(32) NOT NULL DEFAULT 'DATABASE',
   datasource_type VARCHAR(32) NOT NULL DEFAULT 'MYSQL',
   connect_mode VARCHAR(16) NOT NULL DEFAULT 'DIRECT',
   host VARCHAR(128) NOT NULL,
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS bi_datasource (
   database_name VARCHAR(128) NOT NULL,
   db_username VARCHAR(128) NOT NULL DEFAULT '',
   db_password VARCHAR(256) NOT NULL DEFAULT '',
+  config_json TEXT NOT NULL DEFAULT ('{}'),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -177,11 +179,11 @@ SELECT u.id, r.id
 FROM sys_user u
 INNER JOIN sys_role r ON r.name = u.role;
 
-INSERT INTO bi_datasource(name, host, port, database_name)
+INSERT INTO bi_datasource(name, source_kind, host, port, database_name)
 VALUES
-('ERP MySQL', '127.0.0.1', 3306, 'erp'),
-('MES MySQL', '127.0.0.1', 3307, 'mes'),
-('CRM MySQL', '127.0.0.1', 3308, 'crm');
+('ERP MySQL', 'DATABASE', '127.0.0.1', 3306, 'erp'),
+('MES MySQL', 'DATABASE', '127.0.0.1', 3307, 'mes'),
+('CRM MySQL', 'DATABASE', '127.0.0.1', 3308, 'crm');
 
 INSERT INTO bi_dataset_folder (id, name, parent_id, sort_order)
 VALUES (1, '演示数据集', NULL, 0);
