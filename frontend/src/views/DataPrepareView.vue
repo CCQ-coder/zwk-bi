@@ -3,16 +3,16 @@
     <TopNavBar active="prepare" />
     <main class="page-main">
       <el-tabs v-model="activeTab" type="border-card" class="prepare-tabs">
-        <el-tab-pane label="数据源管理" name="datasource">
+        <el-tab-pane label="数据源管理" name="datasource" lazy>
           <DatasourcePanel />
         </el-tab-pane>
-        <el-tab-pane label="数据集管理" name="dataset">
+        <el-tab-pane label="数据集管理" name="dataset" lazy>
           <DatasetPanel />
         </el-tab-pane>
-        <el-tab-pane label="组件管理" name="components">
+        <el-tab-pane label="组件管理" name="components" lazy>
           <ComponentAssetPanel />
         </el-tab-pane>
-        <el-tab-pane label="数据抽取" name="extract">
+        <el-tab-pane label="数据抽取" name="extract" lazy>
           <ExtractPanel />
         </el-tab-pane>
       </el-tabs>
@@ -21,13 +21,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TopNavBar from '../components/TopNavBar.vue'
-import DatasourcePanel from '../components/DatasourcePanel.vue'
-import DatasetPanel from '../components/DatasetPanel.vue'
-import ExtractPanel from '../components/ExtractPanel.vue'
-import ComponentAssetPanel from '../components/ComponentAssetPanel.vue'
+
+const DatasourcePanel = defineAsyncComponent(() => import('../components/DatasourcePanel.vue'))
+const DatasetPanel = defineAsyncComponent(() => import('../components/DatasetPanel.vue'))
+const ExtractPanel = defineAsyncComponent(() => import('../components/ExtractPanel.vue'))
+const ComponentAssetPanel = defineAsyncComponent(() => import('../components/ComponentAssetPanel.vue'))
 
 const route = useRoute()
 const router = useRouter()

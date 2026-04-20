@@ -87,7 +87,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElButton, ElInput, ElMessage, ElOption, ElSelect, ElTable, ElTableColumn } from 'element-plus'
 import { DataAnalysis, Edit, Plus } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
@@ -97,6 +97,7 @@ import {
 
 // ─── Sub-components (inline for simplicity) ──────────────────────────────────
 const ModelJoinConfig = defineComponent({
+  components: { ElButton, ElInput, ElOption, ElSelect, ElTable, ElTableColumn },
   props: { configJson: String },
   emits: ['save'],
   setup(props, { emit }) {
@@ -152,6 +153,7 @@ const ModelJoinConfig = defineComponent({
 })
 
 const ModelCalcFields = defineComponent({
+  components: { ElButton, ElInput, ElOption, ElSelect, ElTable, ElTableColumn },
   props: { configJson: String },
   emits: ['save'],
   setup(props, { emit }) {
@@ -267,7 +269,7 @@ onMounted(loadList)
 </script>
 
 <style scoped>
-.model-layout { display: flex; height: calc(100vh - 56px); overflow: hidden; background: #f5f7fa; }
+.model-layout { display: flex; height: calc(100vh - 64px); overflow: hidden; background: #f5f7fa; }
 
 .model-sidebar {
   width: 220px; min-width: 220px; background: #fff;

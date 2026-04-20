@@ -1,9 +1,10 @@
 import { computed, defineComponent, onMounted, reactive, ref } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElButton, ElInput, ElMessage, ElOption, ElSelect, ElTable, ElTableColumn } from 'element-plus';
 import { DataAnalysis, Edit, Plus } from '@element-plus/icons-vue';
 import { createModel, deleteModel, getModelList, updateModel } from '../api/model';
 // ─── Sub-components (inline for simplicity) ──────────────────────────────────
 const ModelJoinConfig = defineComponent({
+    components: { ElButton, ElInput, ElOption, ElSelect, ElTable, ElTableColumn },
     props: { configJson: String },
     emits: ['save'],
     setup(props, { emit }) {
@@ -61,6 +62,7 @@ const ModelJoinConfig = defineComponent({
     </div>`
 });
 const ModelCalcFields = defineComponent({
+    components: { ElButton, ElInput, ElOption, ElSelect, ElTable, ElTableColumn },
     props: { configJson: String },
     emits: ['save'],
     setup(props, { emit }) {
@@ -668,6 +670,8 @@ var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
+            ElButton: ElButton,
+            ElInput: ElInput,
             DataAnalysis: DataAnalysis,
             Edit: Edit,
             Plus: Plus,

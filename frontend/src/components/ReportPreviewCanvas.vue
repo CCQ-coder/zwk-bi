@@ -205,7 +205,6 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import * as echarts from 'echarts'
 import ComponentDataFallback from './ComponentDataFallback.vue'
 import ComponentStaticPreview from './ComponentStaticPreview.vue'
 import { getChartData, getChartList, type Chart, type ChartDataResult } from '../api/chart'
@@ -227,6 +226,7 @@ import {
   normalizeComponentConfig,
   postProcessChartOption,
 } from '../utils/component-config'
+import { echarts, type ECharts } from '../utils/echarts'
 import { normalizeCanvasConfig, parseReportConfig, type CanvasOverlay } from '../utils/report-config'
 
 const props = defineProps<{
@@ -247,7 +247,7 @@ const componentDataMap = ref(new Map<number, ChartDataResult>())
 const activeFilters = reactive<Record<string, string>>({})
 const canvasRef = ref<HTMLElement | null>(null)
 const chartRefs = new Map<number, HTMLElement>()
-const chartInstances = new Map<number, echarts.ECharts>()
+const chartInstances = new Map<number, ECharts>()
 const viewportSize = reactive({
   width: typeof window === 'undefined' ? 1920 : window.innerWidth,
   height: typeof window === 'undefined' ? 1080 : window.innerHeight,

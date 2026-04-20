@@ -1,9 +1,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { DataLine, Delete, Edit, PieChart, TrendCharts, Histogram, Plus, RefreshRight } from '@element-plus/icons-vue';
-import * as echarts from 'echarts';
 import { createChart, deleteChart, getChartData, getChartList, updateChart } from '../api/chart';
 import { getDatasetList, previewDatasetSql } from '../api/dataset';
+import { echarts } from '../utils/echarts';
 // ─── 颜色主题 ──────────────────────────────────────────────────────────────────
 const COLOR_THEMES = {
     '默认蓝': ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4'],

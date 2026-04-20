@@ -36,15 +36,23 @@ const createEmptyForm = () => ({
     configJson: '{}',
     apiUrl: '',
     apiMethod: 'GET',
-    apiHeadersText: '{}',
-    apiQueryText: '{}',
-    apiBodyText: '',
-    apiResultPath: '',
     tableText: '',
     tableDelimiter: 'CSV',
     tableHasHeader: true,
     jsonText: '[]',
     jsonResultPath: '',
+});
+let runtimeRowSeed = 0;
+const createRuntimeRow = (patch) => ({
+    id: `runtime-row-${runtimeRowSeed++}`,
+    key: patch?.key ?? '',
+    value: patch?.value ?? '',
+});
+const createEmptyApiRuntimeForm = () => ({
+    headers: [createRuntimeRow()],
+    query: [createRuntimeRow()],
+    bodyText: '',
+    resultPath: '',
 });
 const loading = ref(false);
 const datasources = ref([]);
@@ -66,6 +74,8 @@ const saving = ref(false);
 const testing = ref(false);
 const formRef = ref();
 const form = reactive(createEmptyForm());
+const apiRuntimeForm = reactive(createEmptyApiRuntimeForm());
+const apiRuntimeTab = ref('headers');
 const selectedDatasource = computed(() => datasources.value.find((item) => item.id === selectedId.value) ?? null);
 const filteredDatasources = computed(() => {
     const keyword = searchKeyword.value.trim().toLowerCase();
@@ -79,6 +89,37 @@ const filteredTables = computed(() => {
     if (!keyword)
         return tables.value;
     return tables.value.filter((item) => item.tableName.toLowerCase().includes(keyword));
+});
+const tableDraftStats = computed(() => {
+    const lines = form.tableText.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+    const delimiterChar = form.tableDelimiter === 'TSV' ? '\t' : ',';
+    const firstLine = lines[0] ?? '';
+    const columnCount = firstLine ? firstLine.split(delimiterChar).length : 0;
+    const rowCount = Math.max(lines.length - (form.tableHasHeader && lines.length ? 1 : 0), 0);
+    return {
+        rowCount,
+        columnCount,
+        headerLabel: form.tableHasHeader ? '首行为表头' : '首行即数据',
+    };
+});
+const jsonDraftStats = computed(() => {
+    const trimmed = form.jsonText.trim();
+    if (!trimmed) {
+        return { rootType: '未填写', itemCount: '0', statusText: '待输入' };
+    }
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+            return { rootType: '数组', itemCount: String(parsed.length), statusText: '合法 JSON' };
+        }
+        if (parsed && typeof parsed === 'object') {
+            return { rootType: '对象', itemCount: String(Object.keys(parsed).length), statusText: '合法 JSON' };
+        }
+        return { rootType: typeof parsed, itemCount: '1', statusText: '合法 JSON' };
+    }
+    catch {
+        return { rootType: '格式错误', itemCount: '-', statusText: '当前不是合法 JSON' };
+    }
 });
 const selectedDatasourceInfo = computed(() => {
     const datasource = selectedDatasource.value;
@@ -186,6 +227,10 @@ const loadDatasources = async (preferredId) => {
                 : list[0]?.id ?? null;
         selectedId.value = nextId;
     }
+    catch {
+        datasources.value = [];
+        selectedId.value = null;
+    }
     finally {
         loading.value = false;
     }
@@ -198,6 +243,9 @@ const loadStaticPreview = async (datasourceId) => {
     try {
         const result = await getDatasourcePreviewData(datasourceId);
         Object.assign(preview, result);
+    }
+    catch {
+        Object.assign(preview, emptyPreview());
     }
     finally {
         previewLoading.value = false;
@@ -214,6 +262,12 @@ const loadDatabaseTables = async (datasourceId) => {
                 : result[0].tableName;
             await selectTable(targetTable);
         }
+    }
+    catch {
+        tables.value = [];
+        selectedTable.value = '';
+        tableColumns.value = [];
+        Object.assign(extractPreview, emptyExtractPreview());
     }
     finally {
         tablesLoading.value = false;
@@ -232,6 +286,10 @@ const selectTable = async (tableName) => {
         tableColumns.value = columns;
         Object.assign(extractPreview, previewResult);
     }
+    catch {
+        tableColumns.value = [];
+        Object.assign(extractPreview, emptyExtractPreview());
+    }
     finally {
         columnsLoading.value = false;
     }
@@ -240,12 +298,14 @@ const openCreate = () => {
     dialogMode.value = 'create';
     dialogEditId.value = null;
     Object.assign(form, createEmptyForm());
+    resetApiRuntimeForm();
     dialogVisible.value = true;
 };
 const openEdit = (datasource) => {
     dialogMode.value = 'edit';
     dialogEditId.value = datasource.id;
     Object.assign(form, createEmptyForm());
+    resetApiRuntimeForm();
     form.name = datasource.name;
     form.sourceKind = resolveSourceKind(datasource);
     form.datasourceType = datasource.datasourceType || 'MYSQL';
@@ -259,10 +319,7 @@ const openEdit = (datasource) => {
     if (form.sourceKind === 'API') {
         form.apiUrl = readString(config.apiUrl ?? config.url);
         form.apiMethod = (readString(config.apiMethod ?? config.method) || 'GET').toUpperCase();
-        form.apiHeadersText = JSON.stringify(readObject(config.apiHeaders ?? config.headers), null, 2);
-        form.apiQueryText = JSON.stringify(readObject(config.apiQuery ?? config.query), null, 2);
-        form.apiBodyText = stringifyUnknown(config.apiBody ?? config.body);
-        form.apiResultPath = readString(config.apiResultPath ?? config.resultPath);
+        syncApiRuntimeFormFromConfig(config);
     }
     else if (form.sourceKind === 'TABLE') {
         form.tableText = readString(config.tableText ?? config.text);
@@ -337,16 +394,28 @@ const handleSubmit = async () => {
         await loadDatasources(saved.id);
         ElMessage.success(dialogMode.value === 'create' ? '数据源创建成功' : '数据源更新成功');
     }
+    catch (error) {
+        if (error instanceof Error && error.message) {
+            ElMessage.error(error.message);
+        }
+    }
     finally {
         saving.value = false;
     }
 };
 const handleDelete = async (id) => {
-    await deleteDatasource(id);
-    const remaining = datasources.value.filter((item) => item.id !== id);
-    const nextSelected = remaining[0]?.id ?? null;
-    await loadDatasources(nextSelected);
-    ElMessage.success('数据源已删除');
+    try {
+        await deleteDatasource(id);
+        const remaining = datasources.value.filter((item) => item.id !== id);
+        const nextSelected = remaining[0]?.id ?? null;
+        await loadDatasources(nextSelected);
+        ElMessage.success('数据源已删除');
+    }
+    catch (error) {
+        if (error instanceof Error && error.message) {
+            ElMessage.error(error.message);
+        }
+    }
 };
 const buildDatasourcePayload = () => {
     if (form.sourceKind === 'DATABASE') {
@@ -364,9 +433,9 @@ const buildDatasourcePayload = () => {
         };
     }
     if (form.sourceKind === 'API') {
-        const headers = parseJsonObjectText(form.apiHeadersText, '请求头 JSON 必须是对象');
-        const query = parseJsonObjectText(form.apiQueryText, 'Query 参数 JSON 必须是对象');
-        const body = parseLooseJsonValue(form.apiBodyText);
+        const headers = buildRuntimeKeyValueObject(apiRuntimeForm.headers);
+        const query = buildRuntimeKeyValueObject(apiRuntimeForm.query);
+        const body = parseLooseJsonValue(apiRuntimeForm.bodyText);
         const config = {
             apiUrl: form.apiUrl.trim(),
             apiMethod: form.apiMethod,
@@ -377,8 +446,8 @@ const buildDatasourcePayload = () => {
             config.apiQuery = query;
         if (body !== undefined)
             config.apiBody = body;
-        if (form.apiResultPath.trim())
-            config.apiResultPath = form.apiResultPath.trim();
+        if (apiRuntimeForm.resultPath.trim())
+            config.apiResultPath = apiRuntimeForm.resultPath.trim();
         return {
             name: form.name.trim(),
             sourceKind: 'API',
@@ -461,21 +530,6 @@ const parseConfigJson = (configJson) => {
         return {};
     }
 };
-const parseJsonObjectText = (jsonText, errorMessage) => {
-    const trimmed = jsonText.trim();
-    if (!trimmed)
-        return {};
-    try {
-        const parsed = JSON.parse(trimmed);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            throw new Error(errorMessage);
-        }
-        return parsed;
-    }
-    catch {
-        throw new Error(errorMessage);
-    }
-};
 const parseJsonValueText = (jsonText, errorMessage) => {
     try {
         return JSON.parse(jsonText);
@@ -500,6 +554,12 @@ const readObject = (value) => {
         return {};
     return value;
 };
+const rowsFromObject = (value) => {
+    const entries = Object.entries(readObject(value));
+    return entries.length
+        ? entries.map(([key, rowValue]) => createRuntimeRow({ key, value: stringifyUnknown(rowValue) }))
+        : [createRuntimeRow()];
+};
 const readString = (value) => typeof value === 'string' ? value : '';
 const readBoolean = (value, fallback = false) => typeof value === 'boolean' ? value : fallback;
 const countLines = (text) => text ? `${text.split(/\r?\n/).filter((item) => item.trim()).length} 行` : '0 行';
@@ -513,6 +573,69 @@ const stringifyUnknown = (value) => {
     }
     catch {
         return String(value);
+    }
+};
+const resetApiRuntimeForm = () => {
+    Object.assign(apiRuntimeForm, createEmptyApiRuntimeForm());
+    apiRuntimeTab.value = 'headers';
+};
+const syncApiRuntimeFormFromConfig = (config) => {
+    resetApiRuntimeForm();
+    apiRuntimeForm.headers = rowsFromObject(config.apiHeaders ?? config.headers);
+    apiRuntimeForm.query = rowsFromObject(config.apiQuery ?? config.query);
+    apiRuntimeForm.bodyText = stringifyUnknown(config.apiBody ?? config.body);
+    apiRuntimeForm.resultPath = readString(config.apiResultPath ?? config.resultPath);
+};
+const buildRuntimeKeyValueObject = (rows) => rows.reduce((result, row) => {
+    const key = row.key.trim();
+    if (!key)
+        return result;
+    const parsedValue = parseLooseJsonValue(row.value);
+    result[key] = parsedValue === undefined ? '' : parsedValue;
+    return result;
+}, {});
+const addApiRuntimeRow = (section) => {
+    apiRuntimeForm[section] = [...apiRuntimeForm[section], createRuntimeRow()];
+};
+const removeApiRuntimeRow = (section, rowId) => {
+    const nextRows = apiRuntimeForm[section].filter((item) => item.id !== rowId);
+    apiRuntimeForm[section] = nextRows.length ? nextRows : [createRuntimeRow()];
+};
+const applyTableExample = (delimiter) => {
+    form.tableDelimiter = delimiter;
+    form.tableHasHeader = true;
+    form.tableText = delimiter === 'TSV'
+        ? ['region\tvalue\ttrend', '华东\t120\t12%', '华南\t98\t8%', '西南\t76\t5%'].join('\n')
+        : ['region,value,trend', '华东,120,12%', '华南,98,8%', '西南,76,5%'].join('\n');
+};
+const clearTableDraft = () => {
+    form.tableText = '';
+};
+const applyJsonExample = (kind) => {
+    form.jsonText = kind === 'array'
+        ? JSON.stringify([
+            { region: '华东', value: 120, trend: 12 },
+            { region: '华南', value: 98, trend: 8 },
+            { region: '西南', value: 76, trend: 5 },
+        ], null, 2)
+        : JSON.stringify({
+            data: {
+                summary: { total: 294, updatedAt: '2026-04-17 12:00:00' },
+                records: [
+                    { region: '华东', value: 120 },
+                    { region: '华南', value: 98 },
+                ],
+            },
+        }, null, 2);
+};
+const formatJsonDraft = () => {
+    try {
+        form.jsonText = JSON.stringify(parseJsonValueText(form.jsonText, 'JSON 静态数据内容不是合法 JSON'), null, 2);
+    }
+    catch (error) {
+        if (error instanceof Error && error.message) {
+            ElMessage.warning(error.message);
+        }
     }
 };
 const validateBySourceKind = (callback, shouldFail, message) => {
@@ -545,12 +668,19 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['table-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['column-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['dialog-footer']} */ ;
 /** @type {__VLS_StyleScopedClasses['detail-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['datasource-layout']} */ ;
 /** @type {__VLS_StyleScopedClasses['datasource-sidebar']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-browser']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['kv-editor-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['action-row']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 const __VLS_0 = {}.ElCard;
@@ -1572,98 +1702,274 @@ else if (__VLS_ctx.form.sourceKind === 'API') {
     /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
     // @ts-ignore
     const __VLS_244 = __VLS_asFunctionalComponent(__VLS_243, new __VLS_243({
-        modelValue: (__VLS_ctx.form.apiResultPath),
+        modelValue: (__VLS_ctx.apiRuntimeForm.resultPath),
         placeholder: "可选，例如 data.list",
     }));
     const __VLS_245 = __VLS_244({
-        modelValue: (__VLS_ctx.form.apiResultPath),
+        modelValue: (__VLS_ctx.apiRuntimeForm.resultPath),
         placeholder: "可选，例如 data.list",
     }, ...__VLS_functionalComponentArgsRest(__VLS_244));
     var __VLS_242;
-    const __VLS_247 = {}.ElFormItem;
-    /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-card form-item--full" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-tip" },
+    });
+    const __VLS_247 = {}.ElTabs;
+    /** @type {[typeof __VLS_components.ElTabs, typeof __VLS_components.elTabs, typeof __VLS_components.ElTabs, typeof __VLS_components.elTabs, ]} */ ;
     // @ts-ignore
     const __VLS_248 = __VLS_asFunctionalComponent(__VLS_247, new __VLS_247({
-        label: "请求头 JSON",
-        ...{ class: "form-item--full" },
+        modelValue: (__VLS_ctx.apiRuntimeTab),
+        ...{ class: "runtime-tabs" },
     }));
     const __VLS_249 = __VLS_248({
-        label: "请求头 JSON",
-        ...{ class: "form-item--full" },
+        modelValue: (__VLS_ctx.apiRuntimeTab),
+        ...{ class: "runtime-tabs" },
     }, ...__VLS_functionalComponentArgsRest(__VLS_248));
     __VLS_250.slots.default;
-    const __VLS_251 = {}.ElInput;
-    /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+    const __VLS_251 = {}.ElTabPane;
+    /** @type {[typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, ]} */ ;
     // @ts-ignore
     const __VLS_252 = __VLS_asFunctionalComponent(__VLS_251, new __VLS_251({
-        modelValue: (__VLS_ctx.form.apiHeadersText),
-        type: "textarea",
-        rows: (4),
-        placeholder: '例如 {"Authorization":"Bearer token"}',
+        label: "请求头",
+        name: "headers",
     }));
     const __VLS_253 = __VLS_252({
-        modelValue: (__VLS_ctx.form.apiHeadersText),
-        type: "textarea",
-        rows: (4),
-        placeholder: '例如 {"Authorization":"Bearer token"}',
+        label: "请求头",
+        name: "headers",
     }, ...__VLS_functionalComponentArgsRest(__VLS_252));
+    __VLS_254.slots.default;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "kv-editor-list" },
+    });
+    for (const [row] of __VLS_getVForSourceType((__VLS_ctx.apiRuntimeForm.headers))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            key: (row.id),
+            ...{ class: "kv-editor-row" },
+        });
+        const __VLS_255 = {}.ElInput;
+        /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+        // @ts-ignore
+        const __VLS_256 = __VLS_asFunctionalComponent(__VLS_255, new __VLS_255({
+            modelValue: (row.key),
+            placeholder: "名称，例如 Authorization",
+        }));
+        const __VLS_257 = __VLS_256({
+            modelValue: (row.key),
+            placeholder: "名称，例如 Authorization",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_256));
+        const __VLS_259 = {}.ElInput;
+        /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+        // @ts-ignore
+        const __VLS_260 = __VLS_asFunctionalComponent(__VLS_259, new __VLS_259({
+            modelValue: (row.value),
+            placeholder: "值，支持 JSON 或纯文本",
+        }));
+        const __VLS_261 = __VLS_260({
+            modelValue: (row.value),
+            placeholder: "值，支持 JSON 或纯文本",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_260));
+        const __VLS_263 = {}.ElButton;
+        /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+        // @ts-ignore
+        const __VLS_264 = __VLS_asFunctionalComponent(__VLS_263, new __VLS_263({
+            ...{ 'onClick': {} },
+            text: true,
+            size: "small",
+        }));
+        const __VLS_265 = __VLS_264({
+            ...{ 'onClick': {} },
+            text: true,
+            size: "small",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_264));
+        let __VLS_267;
+        let __VLS_268;
+        let __VLS_269;
+        const __VLS_270 = {
+            onClick: (...[$event]) => {
+                if (!!(__VLS_ctx.form.sourceKind === 'DATABASE'))
+                    return;
+                if (!(__VLS_ctx.form.sourceKind === 'API'))
+                    return;
+                __VLS_ctx.removeApiRuntimeRow('headers', row.id);
+            }
+        };
+        __VLS_266.slots.default;
+        var __VLS_266;
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "action-row action-row--compact" },
+    });
+    const __VLS_271 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_272 = __VLS_asFunctionalComponent(__VLS_271, new __VLS_271({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }));
+    const __VLS_273 = __VLS_272({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_272));
+    let __VLS_275;
+    let __VLS_276;
+    let __VLS_277;
+    const __VLS_278 = {
+        onClick: (...[$event]) => {
+            if (!!(__VLS_ctx.form.sourceKind === 'DATABASE'))
+                return;
+            if (!(__VLS_ctx.form.sourceKind === 'API'))
+                return;
+            __VLS_ctx.addApiRuntimeRow('headers');
+        }
+    };
+    __VLS_274.slots.default;
+    var __VLS_274;
+    var __VLS_254;
+    const __VLS_279 = {}.ElTabPane;
+    /** @type {[typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, ]} */ ;
+    // @ts-ignore
+    const __VLS_280 = __VLS_asFunctionalComponent(__VLS_279, new __VLS_279({
+        label: "Query 参数",
+        name: "query",
+    }));
+    const __VLS_281 = __VLS_280({
+        label: "Query 参数",
+        name: "query",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_280));
+    __VLS_282.slots.default;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "kv-editor-list" },
+    });
+    for (const [row] of __VLS_getVForSourceType((__VLS_ctx.apiRuntimeForm.query))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            key: (row.id),
+            ...{ class: "kv-editor-row" },
+        });
+        const __VLS_283 = {}.ElInput;
+        /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+        // @ts-ignore
+        const __VLS_284 = __VLS_asFunctionalComponent(__VLS_283, new __VLS_283({
+            modelValue: (row.key),
+            placeholder: "参数名，例如 page",
+        }));
+        const __VLS_285 = __VLS_284({
+            modelValue: (row.key),
+            placeholder: "参数名，例如 page",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_284));
+        const __VLS_287 = {}.ElInput;
+        /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+        // @ts-ignore
+        const __VLS_288 = __VLS_asFunctionalComponent(__VLS_287, new __VLS_287({
+            modelValue: (row.value),
+            placeholder: "值，支持 JSON 或纯文本",
+        }));
+        const __VLS_289 = __VLS_288({
+            modelValue: (row.value),
+            placeholder: "值，支持 JSON 或纯文本",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_288));
+        const __VLS_291 = {}.ElButton;
+        /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+        // @ts-ignore
+        const __VLS_292 = __VLS_asFunctionalComponent(__VLS_291, new __VLS_291({
+            ...{ 'onClick': {} },
+            text: true,
+            size: "small",
+        }));
+        const __VLS_293 = __VLS_292({
+            ...{ 'onClick': {} },
+            text: true,
+            size: "small",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_292));
+        let __VLS_295;
+        let __VLS_296;
+        let __VLS_297;
+        const __VLS_298 = {
+            onClick: (...[$event]) => {
+                if (!!(__VLS_ctx.form.sourceKind === 'DATABASE'))
+                    return;
+                if (!(__VLS_ctx.form.sourceKind === 'API'))
+                    return;
+                __VLS_ctx.removeApiRuntimeRow('query', row.id);
+            }
+        };
+        __VLS_294.slots.default;
+        var __VLS_294;
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "action-row action-row--compact" },
+    });
+    const __VLS_299 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_300 = __VLS_asFunctionalComponent(__VLS_299, new __VLS_299({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }));
+    const __VLS_301 = __VLS_300({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_300));
+    let __VLS_303;
+    let __VLS_304;
+    let __VLS_305;
+    const __VLS_306 = {
+        onClick: (...[$event]) => {
+            if (!!(__VLS_ctx.form.sourceKind === 'DATABASE'))
+                return;
+            if (!(__VLS_ctx.form.sourceKind === 'API'))
+                return;
+            __VLS_ctx.addApiRuntimeRow('query');
+        }
+    };
+    __VLS_302.slots.default;
+    var __VLS_302;
+    var __VLS_282;
+    const __VLS_307 = {}.ElTabPane;
+    /** @type {[typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, ]} */ ;
+    // @ts-ignore
+    const __VLS_308 = __VLS_asFunctionalComponent(__VLS_307, new __VLS_307({
+        label: "请求体",
+        name: "body",
+    }));
+    const __VLS_309 = __VLS_308({
+        label: "请求体",
+        name: "body",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_308));
+    __VLS_310.slots.default;
+    const __VLS_311 = {}.ElInput;
+    /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+    // @ts-ignore
+    const __VLS_312 = __VLS_asFunctionalComponent(__VLS_311, new __VLS_311({
+        modelValue: (__VLS_ctx.apiRuntimeForm.bodyText),
+        type: "textarea",
+        rows: (6),
+        placeholder: "可输入 JSON 或普通文本；GET 请求可留空",
+    }));
+    const __VLS_313 = __VLS_312({
+        modelValue: (__VLS_ctx.apiRuntimeForm.bodyText),
+        type: "textarea",
+        rows: (6),
+        placeholder: "可输入 JSON 或普通文本；GET 请求可留空",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_312));
+    var __VLS_310;
     var __VLS_250;
-    const __VLS_255 = {}.ElFormItem;
-    /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
-    // @ts-ignore
-    const __VLS_256 = __VLS_asFunctionalComponent(__VLS_255, new __VLS_255({
-        label: "Query 参数 JSON",
-        ...{ class: "form-item--full" },
-    }));
-    const __VLS_257 = __VLS_256({
-        label: "Query 参数 JSON",
-        ...{ class: "form-item--full" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_256));
-    __VLS_258.slots.default;
-    const __VLS_259 = {}.ElInput;
-    /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
-    // @ts-ignore
-    const __VLS_260 = __VLS_asFunctionalComponent(__VLS_259, new __VLS_259({
-        modelValue: (__VLS_ctx.form.apiQueryText),
-        type: "textarea",
-        rows: (4),
-        placeholder: '例如 {"page":1,"size":20}',
-    }));
-    const __VLS_261 = __VLS_260({
-        modelValue: (__VLS_ctx.form.apiQueryText),
-        type: "textarea",
-        rows: (4),
-        placeholder: '例如 {"page":1,"size":20}',
-    }, ...__VLS_functionalComponentArgsRest(__VLS_260));
-    var __VLS_258;
-    const __VLS_263 = {}.ElFormItem;
-    /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
-    // @ts-ignore
-    const __VLS_264 = __VLS_asFunctionalComponent(__VLS_263, new __VLS_263({
-        label: "请求体",
-        ...{ class: "form-item--full" },
-    }));
-    const __VLS_265 = __VLS_264({
-        label: "请求体",
-        ...{ class: "form-item--full" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_264));
-    __VLS_266.slots.default;
-    const __VLS_267 = {}.ElInput;
-    /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
-    // @ts-ignore
-    const __VLS_268 = __VLS_asFunctionalComponent(__VLS_267, new __VLS_267({
-        modelValue: (__VLS_ctx.form.apiBodyText),
-        type: "textarea",
-        rows: (5),
-        placeholder: "可输入 JSON 或普通文本；GET 请求可留空",
-    }));
-    const __VLS_269 = __VLS_268({
-        modelValue: (__VLS_ctx.form.apiBodyText),
-        type: "textarea",
-        rows: (5),
-        placeholder: "可输入 JSON 或普通文本；GET 请求可留空",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_268));
-    var __VLS_266;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "form-tip" },
     });
@@ -1672,163 +1978,430 @@ else if (__VLS_ctx.form.sourceKind === 'TABLE') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "form-grid" },
     });
-    const __VLS_271 = {}.ElFormItem;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-card form-item--full" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-tip" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-actions" },
+    });
+    const __VLS_315 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_316 = __VLS_asFunctionalComponent(__VLS_315, new __VLS_315({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }));
+    const __VLS_317 = __VLS_316({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_316));
+    let __VLS_319;
+    let __VLS_320;
+    let __VLS_321;
+    const __VLS_322 = {
+        onClick: (...[$event]) => {
+            if (!!(__VLS_ctx.form.sourceKind === 'DATABASE'))
+                return;
+            if (!!(__VLS_ctx.form.sourceKind === 'API'))
+                return;
+            if (!(__VLS_ctx.form.sourceKind === 'TABLE'))
+                return;
+            __VLS_ctx.applyTableExample('CSV');
+        }
+    };
+    __VLS_318.slots.default;
+    var __VLS_318;
+    const __VLS_323 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_324 = __VLS_asFunctionalComponent(__VLS_323, new __VLS_323({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }));
+    const __VLS_325 = __VLS_324({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_324));
+    let __VLS_327;
+    let __VLS_328;
+    let __VLS_329;
+    const __VLS_330 = {
+        onClick: (...[$event]) => {
+            if (!!(__VLS_ctx.form.sourceKind === 'DATABASE'))
+                return;
+            if (!!(__VLS_ctx.form.sourceKind === 'API'))
+                return;
+            if (!(__VLS_ctx.form.sourceKind === 'TABLE'))
+                return;
+            __VLS_ctx.applyTableExample('TSV');
+        }
+    };
+    __VLS_326.slots.default;
+    var __VLS_326;
+    const __VLS_331 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_332 = __VLS_asFunctionalComponent(__VLS_331, new __VLS_331({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+    }));
+    const __VLS_333 = __VLS_332({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+    }, ...__VLS_functionalComponentArgsRest(__VLS_332));
+    let __VLS_335;
+    let __VLS_336;
+    let __VLS_337;
+    const __VLS_338 = {
+        onClick: (__VLS_ctx.clearTableDraft)
+    };
+    __VLS_334.slots.default;
+    var __VLS_334;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-grid" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.form.tableDelimiter);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.tableDraftStats.headerLabel);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.tableDraftStats.rowCount);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.tableDraftStats.columnCount);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-form-grid" },
+    });
+    const __VLS_339 = {}.ElFormItem;
     /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
     // @ts-ignore
-    const __VLS_272 = __VLS_asFunctionalComponent(__VLS_271, new __VLS_271({
+    const __VLS_340 = __VLS_asFunctionalComponent(__VLS_339, new __VLS_339({
         label: "分隔格式",
+        ...{ class: "runtime-form-item" },
     }));
-    const __VLS_273 = __VLS_272({
+    const __VLS_341 = __VLS_340({
         label: "分隔格式",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_272));
-    __VLS_274.slots.default;
-    const __VLS_275 = {}.ElRadioGroup;
+        ...{ class: "runtime-form-item" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_340));
+    __VLS_342.slots.default;
+    const __VLS_343 = {}.ElRadioGroup;
     /** @type {[typeof __VLS_components.ElRadioGroup, typeof __VLS_components.elRadioGroup, typeof __VLS_components.ElRadioGroup, typeof __VLS_components.elRadioGroup, ]} */ ;
     // @ts-ignore
-    const __VLS_276 = __VLS_asFunctionalComponent(__VLS_275, new __VLS_275({
+    const __VLS_344 = __VLS_asFunctionalComponent(__VLS_343, new __VLS_343({
         modelValue: (__VLS_ctx.form.tableDelimiter),
     }));
-    const __VLS_277 = __VLS_276({
+    const __VLS_345 = __VLS_344({
         modelValue: (__VLS_ctx.form.tableDelimiter),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_276));
-    __VLS_278.slots.default;
-    const __VLS_279 = {}.ElRadioButton;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_344));
+    __VLS_346.slots.default;
+    const __VLS_347 = {}.ElRadioButton;
     /** @type {[typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, ]} */ ;
     // @ts-ignore
-    const __VLS_280 = __VLS_asFunctionalComponent(__VLS_279, new __VLS_279({
+    const __VLS_348 = __VLS_asFunctionalComponent(__VLS_347, new __VLS_347({
         value: "CSV",
     }));
-    const __VLS_281 = __VLS_280({
+    const __VLS_349 = __VLS_348({
         value: "CSV",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_280));
-    __VLS_282.slots.default;
-    var __VLS_282;
-    const __VLS_283 = {}.ElRadioButton;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_348));
+    __VLS_350.slots.default;
+    var __VLS_350;
+    const __VLS_351 = {}.ElRadioButton;
     /** @type {[typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, typeof __VLS_components.ElRadioButton, typeof __VLS_components.elRadioButton, ]} */ ;
     // @ts-ignore
-    const __VLS_284 = __VLS_asFunctionalComponent(__VLS_283, new __VLS_283({
+    const __VLS_352 = __VLS_asFunctionalComponent(__VLS_351, new __VLS_351({
         value: "TSV",
     }));
-    const __VLS_285 = __VLS_284({
+    const __VLS_353 = __VLS_352({
         value: "TSV",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_284));
-    __VLS_286.slots.default;
-    var __VLS_286;
-    var __VLS_278;
-    var __VLS_274;
-    const __VLS_287 = {}.ElFormItem;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_352));
+    __VLS_354.slots.default;
+    var __VLS_354;
+    var __VLS_346;
+    var __VLS_342;
+    const __VLS_355 = {}.ElFormItem;
     /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
     // @ts-ignore
-    const __VLS_288 = __VLS_asFunctionalComponent(__VLS_287, new __VLS_287({
+    const __VLS_356 = __VLS_asFunctionalComponent(__VLS_355, new __VLS_355({
         label: "首行为表头",
+        ...{ class: "runtime-form-item" },
     }));
-    const __VLS_289 = __VLS_288({
+    const __VLS_357 = __VLS_356({
         label: "首行为表头",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_288));
-    __VLS_290.slots.default;
-    const __VLS_291 = {}.ElSwitch;
+        ...{ class: "runtime-form-item" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_356));
+    __VLS_358.slots.default;
+    const __VLS_359 = {}.ElSwitch;
     /** @type {[typeof __VLS_components.ElSwitch, typeof __VLS_components.elSwitch, ]} */ ;
     // @ts-ignore
-    const __VLS_292 = __VLS_asFunctionalComponent(__VLS_291, new __VLS_291({
+    const __VLS_360 = __VLS_asFunctionalComponent(__VLS_359, new __VLS_359({
         modelValue: (__VLS_ctx.form.tableHasHeader),
         activeText: "是",
         inactiveText: "否",
     }));
-    const __VLS_293 = __VLS_292({
+    const __VLS_361 = __VLS_360({
         modelValue: (__VLS_ctx.form.tableHasHeader),
         activeText: "是",
         inactiveText: "否",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_292));
-    var __VLS_290;
-    const __VLS_295 = {}.ElFormItem;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_360));
+    var __VLS_358;
+    const __VLS_363 = {}.ElFormItem;
     /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
     // @ts-ignore
-    const __VLS_296 = __VLS_asFunctionalComponent(__VLS_295, new __VLS_295({
+    const __VLS_364 = __VLS_asFunctionalComponent(__VLS_363, new __VLS_363({
         label: "表格内容",
         prop: "tableText",
-        ...{ class: "form-item--full" },
+        ...{ class: "runtime-form-item runtime-form-item--full" },
     }));
-    const __VLS_297 = __VLS_296({
+    const __VLS_365 = __VLS_364({
         label: "表格内容",
         prop: "tableText",
-        ...{ class: "form-item--full" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_296));
-    __VLS_298.slots.default;
-    const __VLS_299 = {}.ElInput;
+        ...{ class: "runtime-form-item runtime-form-item--full" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_364));
+    __VLS_366.slots.default;
+    const __VLS_367 = {}.ElInput;
     /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
     // @ts-ignore
-    const __VLS_300 = __VLS_asFunctionalComponent(__VLS_299, new __VLS_299({
+    const __VLS_368 = __VLS_asFunctionalComponent(__VLS_367, new __VLS_367({
         modelValue: (__VLS_ctx.form.tableText),
         type: "textarea",
         rows: (12),
         placeholder: "请输入 CSV 或 TSV 文本，页面编写时可通过运行时配置覆盖",
     }));
-    const __VLS_301 = __VLS_300({
+    const __VLS_369 = __VLS_368({
         modelValue: (__VLS_ctx.form.tableText),
         type: "textarea",
         rows: (12),
         placeholder: "请输入 CSV 或 TSV 文本，页面编写时可通过运行时配置覆盖",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_300));
-    var __VLS_298;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_368));
+    var __VLS_366;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "form-tip" },
+    });
 }
 else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "form-grid" },
     });
-    const __VLS_303 = {}.ElFormItem;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-card form-item--full" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-tip" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-editor-actions" },
+    });
+    const __VLS_371 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_372 = __VLS_asFunctionalComponent(__VLS_371, new __VLS_371({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }));
+    const __VLS_373 = __VLS_372({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_372));
+    let __VLS_375;
+    let __VLS_376;
+    let __VLS_377;
+    const __VLS_378 = {
+        onClick: (...[$event]) => {
+            if (!!(__VLS_ctx.form.sourceKind === 'DATABASE'))
+                return;
+            if (!!(__VLS_ctx.form.sourceKind === 'API'))
+                return;
+            if (!!(__VLS_ctx.form.sourceKind === 'TABLE'))
+                return;
+            __VLS_ctx.applyJsonExample('array');
+        }
+    };
+    __VLS_374.slots.default;
+    var __VLS_374;
+    const __VLS_379 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_380 = __VLS_asFunctionalComponent(__VLS_379, new __VLS_379({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }));
+    const __VLS_381 = __VLS_380({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_380));
+    let __VLS_383;
+    let __VLS_384;
+    let __VLS_385;
+    const __VLS_386 = {
+        onClick: (...[$event]) => {
+            if (!!(__VLS_ctx.form.sourceKind === 'DATABASE'))
+                return;
+            if (!!(__VLS_ctx.form.sourceKind === 'API'))
+                return;
+            if (!!(__VLS_ctx.form.sourceKind === 'TABLE'))
+                return;
+            __VLS_ctx.applyJsonExample('object');
+        }
+    };
+    __VLS_382.slots.default;
+    var __VLS_382;
+    const __VLS_387 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_388 = __VLS_asFunctionalComponent(__VLS_387, new __VLS_387({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }));
+    const __VLS_389 = __VLS_388({
+        ...{ 'onClick': {} },
+        size: "small",
+        link: true,
+        type: "primary",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_388));
+    let __VLS_391;
+    let __VLS_392;
+    let __VLS_393;
+    const __VLS_394 = {
+        onClick: (__VLS_ctx.formatJsonDraft)
+    };
+    __VLS_390.slots.default;
+    var __VLS_390;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-grid" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.jsonDraftStats.rootType);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.jsonDraftStats.itemCount);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.form.jsonResultPath.trim() || '直接读取根节点');
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-stat-card" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.jsonDraftStats.statusText);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "runtime-form-grid" },
+    });
+    const __VLS_395 = {}.ElFormItem;
     /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
     // @ts-ignore
-    const __VLS_304 = __VLS_asFunctionalComponent(__VLS_303, new __VLS_303({
+    const __VLS_396 = __VLS_asFunctionalComponent(__VLS_395, new __VLS_395({
         label: "结果路径",
-        ...{ class: "form-item--full" },
+        ...{ class: "runtime-form-item runtime-form-item--full" },
     }));
-    const __VLS_305 = __VLS_304({
+    const __VLS_397 = __VLS_396({
         label: "结果路径",
-        ...{ class: "form-item--full" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_304));
-    __VLS_306.slots.default;
-    const __VLS_307 = {}.ElInput;
+        ...{ class: "runtime-form-item runtime-form-item--full" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_396));
+    __VLS_398.slots.default;
+    const __VLS_399 = {}.ElInput;
     /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
     // @ts-ignore
-    const __VLS_308 = __VLS_asFunctionalComponent(__VLS_307, new __VLS_307({
+    const __VLS_400 = __VLS_asFunctionalComponent(__VLS_399, new __VLS_399({
         modelValue: (__VLS_ctx.form.jsonResultPath),
         placeholder: "可选，例如 data.records",
     }));
-    const __VLS_309 = __VLS_308({
+    const __VLS_401 = __VLS_400({
         modelValue: (__VLS_ctx.form.jsonResultPath),
         placeholder: "可选，例如 data.records",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_308));
-    var __VLS_306;
-    const __VLS_311 = {}.ElFormItem;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_400));
+    var __VLS_398;
+    const __VLS_403 = {}.ElFormItem;
     /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
     // @ts-ignore
-    const __VLS_312 = __VLS_asFunctionalComponent(__VLS_311, new __VLS_311({
+    const __VLS_404 = __VLS_asFunctionalComponent(__VLS_403, new __VLS_403({
         label: "JSON 内容",
         prop: "jsonText",
-        ...{ class: "form-item--full" },
+        ...{ class: "runtime-form-item runtime-form-item--full" },
     }));
-    const __VLS_313 = __VLS_312({
+    const __VLS_405 = __VLS_404({
         label: "JSON 内容",
         prop: "jsonText",
-        ...{ class: "form-item--full" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_312));
-    __VLS_314.slots.default;
-    const __VLS_315 = {}.ElInput;
+        ...{ class: "runtime-form-item runtime-form-item--full" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_404));
+    __VLS_406.slots.default;
+    const __VLS_407 = {}.ElInput;
     /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
     // @ts-ignore
-    const __VLS_316 = __VLS_asFunctionalComponent(__VLS_315, new __VLS_315({
+    const __VLS_408 = __VLS_asFunctionalComponent(__VLS_407, new __VLS_407({
         modelValue: (__VLS_ctx.form.jsonText),
         type: "textarea",
         rows: (12),
         placeholder: '请输入 JSON 数组或对象，例如 [{"name":"华东","value":120}]',
     }));
-    const __VLS_317 = __VLS_316({
+    const __VLS_409 = __VLS_408({
         modelValue: (__VLS_ctx.form.jsonText),
         type: "textarea",
         rows: (12),
         placeholder: '请输入 JSON 数组或对象，例如 [{"name":"华东","value":120}]',
-    }, ...__VLS_functionalComponentArgsRest(__VLS_316));
-    var __VLS_314;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_408));
+    var __VLS_406;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "form-tip" },
     });
@@ -1845,65 +2418,65 @@ var __VLS_124;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "dialog-actions" },
     });
-    const __VLS_319 = {}.ElButton;
+    const __VLS_411 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_320 = __VLS_asFunctionalComponent(__VLS_319, new __VLS_319({
+    const __VLS_412 = __VLS_asFunctionalComponent(__VLS_411, new __VLS_411({
         ...{ 'onClick': {} },
         loading: (__VLS_ctx.testing),
     }));
-    const __VLS_321 = __VLS_320({
+    const __VLS_413 = __VLS_412({
         ...{ 'onClick': {} },
         loading: (__VLS_ctx.testing),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_320));
-    let __VLS_323;
-    let __VLS_324;
-    let __VLS_325;
-    const __VLS_326 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_412));
+    let __VLS_415;
+    let __VLS_416;
+    let __VLS_417;
+    const __VLS_418 = {
         onClick: (__VLS_ctx.handleTestConnection)
     };
-    __VLS_322.slots.default;
-    var __VLS_322;
-    const __VLS_327 = {}.ElButton;
+    __VLS_414.slots.default;
+    var __VLS_414;
+    const __VLS_419 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_328 = __VLS_asFunctionalComponent(__VLS_327, new __VLS_327({
+    const __VLS_420 = __VLS_asFunctionalComponent(__VLS_419, new __VLS_419({
         ...{ 'onClick': {} },
     }));
-    const __VLS_329 = __VLS_328({
+    const __VLS_421 = __VLS_420({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_328));
-    let __VLS_331;
-    let __VLS_332;
-    let __VLS_333;
-    const __VLS_334 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_420));
+    let __VLS_423;
+    let __VLS_424;
+    let __VLS_425;
+    const __VLS_426 = {
         onClick: (...[$event]) => {
             __VLS_ctx.dialogVisible = false;
         }
     };
-    __VLS_330.slots.default;
-    var __VLS_330;
-    const __VLS_335 = {}.ElButton;
+    __VLS_422.slots.default;
+    var __VLS_422;
+    const __VLS_427 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_336 = __VLS_asFunctionalComponent(__VLS_335, new __VLS_335({
+    const __VLS_428 = __VLS_asFunctionalComponent(__VLS_427, new __VLS_427({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.saving),
     }));
-    const __VLS_337 = __VLS_336({
+    const __VLS_429 = __VLS_428({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.saving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_336));
-    let __VLS_339;
-    let __VLS_340;
-    let __VLS_341;
-    const __VLS_342 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_428));
+    let __VLS_431;
+    let __VLS_432;
+    let __VLS_433;
+    const __VLS_434 = {
         onClick: (__VLS_ctx.handleSubmit)
     };
-    __VLS_338.slots.default;
-    var __VLS_338;
+    __VLS_430.slots.default;
+    var __VLS_430;
 }
 var __VLS_120;
 var __VLS_3;
@@ -1971,15 +2544,56 @@ var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-item--full']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-item--full']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-item--full']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-item--full']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-item--full']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-tip']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-tabs']} */ ;
+/** @type {__VLS_StyleScopedClasses['kv-editor-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['kv-editor-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['action-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['action-row--compact']} */ ;
+/** @type {__VLS_StyleScopedClasses['kv-editor-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['kv-editor-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['action-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['action-row--compact']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-tip']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-item--full']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-tip']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-item--full']} */ ;
+/** @type {__VLS_StyleScopedClasses['form-tip']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-item--full']} */ ;
-/** @type {__VLS_StyleScopedClasses['form-item--full']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-tip']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-editor-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-stat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-item--full']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['runtime-form-item--full']} */ ;
 /** @type {__VLS_StyleScopedClasses['form-tip']} */ ;
 /** @type {__VLS_StyleScopedClasses['dialog-footer']} */ ;
 /** @type {__VLS_StyleScopedClasses['dialog-hint']} */ ;
@@ -2013,9 +2627,13 @@ const __VLS_self = (await import('vue')).defineComponent({
             testing: testing,
             formRef: formRef,
             form: form,
+            apiRuntimeForm: apiRuntimeForm,
+            apiRuntimeTab: apiRuntimeTab,
             selectedDatasource: selectedDatasource,
             filteredDatasources: filteredDatasources,
             filteredTables: filteredTables,
+            tableDraftStats: tableDraftStats,
+            jsonDraftStats: jsonDraftStats,
             selectedDatasourceInfo: selectedDatasourceInfo,
             selectedConfigPreview: selectedConfigPreview,
             rules: rules,
@@ -2034,6 +2652,12 @@ const __VLS_self = (await import('vue')).defineComponent({
             resolveSourceKind: resolveSourceKind,
             isDatabaseDatasource: isDatabaseDatasource,
             datasourceSubtitle: datasourceSubtitle,
+            addApiRuntimeRow: addApiRuntimeRow,
+            removeApiRuntimeRow: removeApiRuntimeRow,
+            applyTableExample: applyTableExample,
+            clearTableDraft: clearTableDraft,
+            applyJsonExample: applyJsonExample,
+            formatJsonDraft: formatJsonDraft,
         };
     },
 });

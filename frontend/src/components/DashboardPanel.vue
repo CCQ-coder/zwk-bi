@@ -1,7 +1,7 @@
 <template>
-  <div class="dash-root">
+  <div class="dash-root" :class="{ 'dash-root--editor': editorMode }">
     <!-- 左侧仪表板列表 -->
-    <aside class="dash-sidebar" :class="{ 'dash-sidebar--collapsed': sidebarCollapsed }">
+    <aside v-if="!editorMode" class="dash-sidebar" :class="{ 'dash-sidebar--collapsed': sidebarCollapsed }">
       <div class="sidebar-header">
         <span v-if="!sidebarCollapsed" class="sidebar-title">仪表板</span>
         <div class="sidebar-header-btns">
@@ -22,7 +22,10 @@
           @click="selectDashboard(db)"
         >
           <el-icon class="sidebar-icon"><Grid /></el-icon>
-          <span class="sidebar-name" :title="db.name">{{ db.name }}</span>
+          <div class="sidebar-copy">
+            <span class="sidebar-name" :title="db.name">{{ db.name }}</span>
+            <span class="sidebar-meta">{{ getDashboardComponentCount(db.id) }} 个组件 · {{ getDashboardStatusText(db) }}</span>
+          </div>
           <el-popconfirm title="确认删除此仪表板？" @confirm.stop="handleDeleteDashboard(db.id)">
             <template #reference>
               <el-icon class="sidebar-del" @click.stop><Delete /></el-icon>
@@ -37,7 +40,7 @@
     <!-- 主内容区 -->
     <main class="dash-main" v-loading="loading">
       <template v-if="!currentDashboard">
-        <el-empty description="请在左侧选择或新建仪表板" class="dash-empty" />
+        <el-empty :description="editorMode ? '未找到对应仪表板' : '请在左侧选择或新建仪表板'" class="dash-empty" />
       </template>
 
       <template v-else>
@@ -64,7 +67,10 @@
         <!-- 工具栏 -->
         <div class="section-bar">
           <div class="section-title-wrap">
-            <span class="section-title">{{ currentDashboard.name }}</span>
+            <div class="section-title-block">
+              <span class="section-title">{{ currentDashboard.name }}</span>
+              <span class="section-subtext">{{ components.length }} 个组件 · {{ isPublished ? '已发布，可直接分享' : '草稿，建议完成后发布' }}</span>
+            </div>
             <el-tag size="small" :type="isPublished ? 'success' : 'info'">{{ isPublished ? '已发布' : '草稿' }}</el-tag>
           </div>
           <div class="section-actions">
@@ -74,6 +80,7 @@
             <el-button size="small" :icon="Promotion" @click="openPublishDialog">{{ isPublished ? '发布设置' : '发布' }}</el-button>
             <el-button size="small" :icon="Share" @click="openShareDialog">分享</el-button>
             <el-button size="small" :icon="Download" @click="exportDashboardJson">导出</el-button>
+            <el-button v-if="editorMode" size="small" :icon="ArrowLeft" @click="emit('back')">退出</el-button>
           </div>
         </div>
 
@@ -90,10 +97,13 @@
             @mousedown="focusComponent(comp)"
           >
             <div class="chart-card-header" @mousedown.stop.prevent="startDrag($event, comp)">
-              <span class="chart-card-name" style="display:none">{{ getComponentChartConfig(comp).name || '图表' }}</span>
+              <div class="chart-card-header-main">
+                <span class="chart-card-name">{{ getComponentDisplayName(comp) }}</span>
+                <span class="chart-card-subtitle">{{ chartTypeLabel(getComponentChartConfig(comp).chartType) }}</span>
+              </div>
               <div class="chart-card-actions">
-                <el-tag size="small" type="info" style="margin-right:6px">
-                  {{ chartTypeLabel(getComponentChartConfig(comp).chartType) }}
+                <el-tag size="small" :type="getComponentStatus(comp).type" style="margin-right:6px">
+                  {{ getComponentStatus(comp).label }}
                 </el-tag>
                 <el-popconfirm title="从仪表板移除此图表？" @confirm="removeComponent(comp.id)">
                   <template #reference>
@@ -238,16 +248,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Close, Delete, Download, Fold, Grid, PieChart, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
-import * as echarts from 'echarts'
+import { ArrowLeft, Close, Delete, Download, Fold, Grid, PieChart, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import ComponentStaticPreview from './ComponentStaticPreview.vue'
 import EditorComponentInspector from './EditorComponentInspector.vue'
 import {
   addDashboardComponent,
   createDashboard,
   deleteDashboard,
+  getDashboardById,
   getDashboardComponents,
   getDashboardList,
   getDefaultDashboard,
@@ -270,7 +280,15 @@ import {
   materializeChartData,
   normalizeComponentConfig,
 } from '../utils/component-config'
-import { buildPublishedLink, buildReportConfig, normalizePublishConfig, parseReportConfig } from '../utils/report-config'
+import { echarts, type ECharts } from '../utils/echarts'
+import { buildPublishedLink, buildReportConfig, normalizePublishConfig, parseReportConfig, type PublishStatus } from '../utils/report-config'
+
+const props = withDefaults(defineProps<{
+  dashboardId?: number | null
+}>(), {
+  dashboardId: null,
+})
+const emit = defineEmits<{ (e: 'back'): void }>()
 
 // ---- state ----
 const loading    = ref(false)
@@ -278,6 +296,7 @@ const compLoading = ref(false)
 const dashboards  = ref<Dashboard[]>([])
 const currentDashboard = ref<Dashboard | null>(null)
 const components  = ref<DashboardComponent[]>([])
+const dashboardComponentCountMap = ref<Record<number, number>>({})
 const allCharts   = ref<Chart[]>([])
 const chartMap    = ref(new Map<number, Chart>())
 const kpi = ref<{ dashboardCount?: number; chartCount?: number; datasetCount?: number; datasourceCount?: number }>({})
@@ -311,6 +330,12 @@ const chartSearch = ref('')
 const selectedChartId = ref<number | null>(null)
 const addingChart = ref(false)
 
+const requestedDashboardId = computed(() => {
+  const id = Number(props.dashboardId ?? 0)
+  return Number.isFinite(id) && id > 0 ? id : null
+})
+const editorMode = computed(() => requestedDashboardId.value !== null)
+
 const filteredCharts = computed(() => {
   const q = chartSearch.value.toLowerCase()
   return q ? allCharts.value.filter(c => c.name.toLowerCase().includes(q)) : allCharts.value
@@ -320,6 +345,11 @@ const filteredDashboards = computed(() => {
   const q = dashboardSearch.value.trim().toLowerCase()
   return q ? dashboards.value.filter(d => d.name.toLowerCase().includes(q)) : dashboards.value
 })
+
+const getDashboardScene = (dashboard: Dashboard) => parseReportConfig(dashboard.configJson).scene === 'screen' ? 'screen' : 'dashboard'
+const getDashboardPublishStatus = (dashboard: Dashboard): PublishStatus => normalizePublishConfig(parseReportConfig(dashboard.configJson).publish).status
+const getDashboardComponentCount = (dashboardId: number) => dashboardComponentCountMap.value[dashboardId] ?? 0
+const getDashboardStatusText = (dashboard: Dashboard) => getDashboardPublishStatus(dashboard) === 'PUBLISHED' ? '已发布' : '草稿'
 
 const shareLink = computed(() => currentDashboard.value
   ? buildPublishedLink('dashboard', currentDashboard.value.id, currentPublishConfig.value.shareToken)
@@ -338,16 +368,44 @@ const activeChart = computed(() => activeComponent.value ? chartMap.value.get(ac
 
 const getComponentConfig = (comp: DashboardComponent) => normalizeComponentConfig(comp.configJson, chartMap.value.get(comp.chartId))
 const getComponentChartConfig = (comp: DashboardComponent) => getComponentConfig(comp).chart
+const getComponentDisplayName = (comp: DashboardComponent) => getComponentChartConfig(comp).name?.trim()
+  || chartMap.value.get(comp.chartId)?.name
+  || '未命名组件'
 const isStaticWidget = (comp: DashboardComponent) => isStaticWidgetChartType(getComponentChartConfig(comp).chartType ?? '')
 const showNoField = (comp: DashboardComponent) => isStaticWidget(comp) ? false : getMissingChartFields(getComponentChartConfig(comp)).length > 0
 const isRenderableChart = (comp: DashboardComponent) => isCanvasRenderableChartType(getComponentChartConfig(comp).chartType ?? '')
+const getComponentStatus = (comp: DashboardComponent) => {
+  if (showNoField(comp)) {
+    return { label: '待补字段', type: 'warning' as const }
+  }
+  if (!isStaticWidget(comp) && !isRenderableChart(comp)) {
+    return { label: '预览受限', type: 'info' as const }
+  }
+  return { label: '可预览', type: 'success' as const }
+}
 
 // echarts instances
 const chartRefs = new Map<number, HTMLElement>()
-const chartInstances = new Map<number, echarts.ECharts>()
+const chartInstances = new Map<number, ECharts>()
 
 const setChartRef = (el: HTMLElement | null, compId: number) => {
   if (el) chartRefs.set(compId, el)
+  else chartRefs.delete(compId)
+}
+
+const waitForRenderFrame = () => new Promise<void>((resolve) => {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => resolve())
+  })
+})
+
+const resolveChartHost = async (compId: number, attempt = 0): Promise<HTMLElement | null> => {
+  const host = chartRefs.get(compId) ?? null
+  if (!host) return null
+  if (host.clientWidth > 0 && host.clientHeight > 0) return host
+  if (attempt >= 6) return null
+  await waitForRenderFrame()
+  return resolveChartHost(compId, attempt + 1)
 }
 
 const getCanvasWidth = () => Math.max(canvasRef.value?.clientWidth ?? 1200, MIN_CARD_WIDTH + 32)
@@ -390,6 +448,10 @@ const canvasMinHeight = computed(() => {
   const occupied = components.value.reduce((max, c) => Math.max(max, (c.posY ?? 0) + (c.height ?? 0) + 20), 0)
   return Math.max(420, occupied)
 })
+
+const handleWindowResize = () => {
+  chartInstances.forEach((instance) => instance.resize())
+}
 
 const getMaxZ = () => components.value.reduce((max, c) => Math.max(max, c.zIndex ?? 0), 0)
 
@@ -452,6 +514,40 @@ const saveActiveComponent = async (payload: { chartId: number; configJson: strin
 }
 
 // ---- load ----
+const loadRequestedDashboard = async (dashboardId = requestedDashboardId.value) => {
+  if (!dashboardId) {
+    if (dashboards.value.length) {
+      await selectDashboard(dashboards.value[0])
+    } else {
+      currentDashboard.value = null
+      components.value = []
+    }
+    return
+  }
+
+  let target = dashboards.value.find((item) => item.id === dashboardId) ?? null
+  if (!target) {
+    try {
+      const fetched = await getDashboardById(dashboardId)
+      if (getDashboardScene(fetched) === 'dashboard') {
+        target = fetched
+        dashboards.value = [fetched, ...dashboards.value.filter((item) => item.id !== fetched.id)]
+      }
+    } catch {
+      target = null
+    }
+  }
+
+  if (!target) {
+    currentDashboard.value = null
+    components.value = []
+    ElMessage.error('未找到对应仪表板')
+    return
+  }
+
+  await selectDashboard(target)
+}
+
 const loadAll = async () => {
   loading.value = true
   try {
@@ -460,13 +556,15 @@ const loadAll = async () => {
       getChartList(),
       getDefaultDashboard()
     ])
-    dashboards.value = dbList
+    dashboards.value = dbList.filter((item) => getDashboardScene(item) === 'dashboard')
     allCharts.value = charts
     kpi.value = summary.kpi
     chartMap.value = new Map(charts.map(c => [c.id, c]))
-    if (dbList.length) {
-      await selectDashboard(dbList[0])
-    }
+    const entries = await Promise.all(
+      dashboards.value.map(async (dashboard) => [dashboard.id, (await getDashboardComponents(dashboard.id)).length] as const)
+    )
+    dashboardComponentCountMap.value = Object.fromEntries(entries)
+    await loadRequestedDashboard()
   } finally {
     loading.value = false
   }
@@ -488,10 +586,16 @@ const loadComponents = async () => {
   try {
     components.value = await getDashboardComponents(currentDashboard.value.id)
     components.value.forEach(normalizeLayout)
-    await nextTick()
-    for (const comp of components.value) {
-      if (!showNoField(comp) && isRenderableChart(comp)) renderChart(comp)
+    dashboardComponentCountMap.value = {
+      ...dashboardComponentCountMap.value,
+      [currentDashboard.value.id]: components.value.length,
     }
+    await nextTick()
+    await Promise.all(components.value.map(async (comp) => {
+      if (!showNoField(comp) && isRenderableChart(comp)) {
+        await renderChart(comp)
+      }
+    }))
   } finally {
     compLoading.value = false
   }
@@ -499,7 +603,7 @@ const loadComponents = async () => {
 
 // ---- render ----
 const renderChart = async (comp: DashboardComponent) => {
-  const el = chartRefs.get(comp.id)
+  const el = await resolveChartHost(comp.id)
   if (!el) return
   if (!isRenderableChart(comp)) return
   try {
@@ -513,7 +617,8 @@ const renderChart = async (comp: DashboardComponent) => {
     if (!inst) {
       inst = echarts.init(el)
       chartInstances.set(comp.id, inst)
-      window.addEventListener('resize', () => inst?.resize())
+    } else {
+      inst.resize()
     }
     inst.setOption(buildComponentOption(materialized, resolved.chart, resolved.style), true)
   } catch { /* ignore */ }
@@ -656,6 +761,10 @@ const handleCreateDashboard = async () => {
   try {
     const newDb = await createDashboard({ name: dashForm.name, configJson: buildReportConfig(null, 'dashboard') })
     dashboards.value.unshift(newDb)
+    dashboardComponentCountMap.value = {
+      ...dashboardComponentCountMap.value,
+      [newDb.id]: 0,
+    }
     createDashVisible.value = false
     await selectDashboard(newDb)
     ElMessage.success('仪表板创建成功')
@@ -667,6 +776,9 @@ const handleCreateDashboard = async () => {
 const handleDeleteDashboard = async (id: number) => {
   await deleteDashboard(id)
   dashboards.value = dashboards.value.filter(d => d.id !== id)
+  const nextCountMap = { ...dashboardComponentCountMap.value }
+  delete nextCountMap[id]
+  dashboardComponentCountMap.value = nextCountMap
   if (currentDashboard.value?.id === id) {
     currentDashboard.value = dashboards.value[0] ?? null
     if (currentDashboard.value) await loadComponents()
@@ -783,10 +895,14 @@ const handleAddChart = async () => {
     })
     normalizeLayout(comp)
     components.value.push(comp)
+    dashboardComponentCountMap.value = {
+      ...dashboardComponentCountMap.value,
+      [currentDashboard.value.id]: components.value.length,
+    }
     addChartVisible.value = false
     ElMessage.success('图表已添加到仪表板')
     await nextTick()
-    if (!showNoField(comp) && isRenderableChart(comp)) renderChart(comp)
+    if (!showNoField(comp) && isRenderableChart(comp)) await renderChart(comp)
   } finally {
     addingChart.value = false
   }
@@ -798,14 +914,27 @@ const removeComponent = async (compId: number) => {
   const inst = chartInstances.get(compId)
   if (inst) { inst.dispose(); chartInstances.delete(compId) }
   components.value = components.value.filter(c => c.id !== compId)
+  dashboardComponentCountMap.value = {
+    ...dashboardComponentCountMap.value,
+    [currentDashboard.value.id]: components.value.length,
+  }
   if (activeCompId.value === compId) activeCompId.value = null
   ElMessage.success('已从仪表板移除')
 }
 
-onMounted(loadAll)
+watch(requestedDashboardId, (nextId, prevId) => {
+  if (nextId === prevId) return
+  void loadRequestedDashboard(nextId)
+})
+
+onMounted(() => {
+  window.addEventListener('resize', handleWindowResize)
+  void loadAll()
+})
 onBeforeUnmount(() => {
   document.removeEventListener('mousemove', onPointerMove)
   document.removeEventListener('mouseup', onPointerUp)
+  window.removeEventListener('resize', handleWindowResize)
   chartInstances.forEach(i => i.dispose())
   chartInstances.clear()
 })
@@ -817,6 +946,10 @@ onBeforeUnmount(() => {
   height: 100%;
   background: #f5f7fa;
   overflow: hidden;
+}
+
+.dash-root--editor {
+  background: #eef3f8;
 }
 
 /* sidebar */
@@ -850,19 +983,27 @@ onBeforeUnmount(() => {
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 10px 12px;
   cursor: pointer;
   font-size: 13px;
   color: #606266;
   transition: background .15s;
-  border-radius: 4px;
+  border-radius: 10px;
   margin: 2px 6px;
 }
 .sidebar-item:hover { background: #f0f2f5; }
 .sidebar-item.active { background: #ecf5ff; color: #409eff; font-weight: 600; }
 .sidebar-icon { flex-shrink: 0; color: #909399; }
-.sidebar-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sidebar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-meta { font-size: 11px; color: #909399; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-del { color: #c0c4cc; cursor: pointer; flex-shrink: 0; }
 .sidebar-del:hover { color: #f56c6c; }
 .sidebar-empty { color: #c0c4cc; font-size: 12px; text-align: center; padding: 20px 0; }
@@ -908,7 +1049,9 @@ onBeforeUnmount(() => {
   margin-bottom: 12px;
 }
 .section-title-wrap { display: flex; align-items: center; gap: 8px; }
+.section-title-block { display: flex; flex-direction: column; gap: 4px; }
 .section-title { font-size: 15px; font-weight: 700; color: #303133; }
+.section-subtext { font-size: 12px; color: #909399; }
 .section-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .layout-hint { color: #909399; font-size: 12px; margin-bottom: 8px; }
 
@@ -950,7 +1093,14 @@ onBeforeUnmount(() => {
   margin-bottom: 8px;
   cursor: move;
 }
+.chart-card-header-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .chart-card-name { font-size: 13px; font-weight: 600; color: #303133; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chart-card-subtitle { font-size: 12px; color: #909399; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chart-card-actions { display: flex; align-items: center; flex-shrink: 0; }
 .remove-btn { color: #c0c4cc; cursor: pointer; }
 .remove-btn:hover { color: #f56c6c; }

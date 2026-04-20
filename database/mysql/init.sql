@@ -193,15 +193,20 @@ VALUES
 (1, 'Sales Trend Dataset', 1, 'SELECT biz_date, amount FROM dwd_sales ORDER BY biz_date', NULL),
 (2, 'Order Detail Dataset', 1, 'SELECT order_id, amount, region FROM dwd_order_detail', NULL);
 
--- Demo datasets (internal, no datasource required) -- IDs 3-6 are fixed for template references
+-- Demo datasets (internal, no datasource required) -- IDs 3-11 are reserved for built-in demos; 3-6 are used by chart template seeds
 INSERT INTO bi_dataset(id, name, datasource_id, sql_text, folder_id)
 VALUES
 (3, '销售额月度趋势（演示）', NULL, 'SELECT * FROM demo_sales_monthly', 1),
 (4, '各区域销售额（演示）', NULL, 'SELECT * FROM demo_sales_region', 1),
 (5, '产品类别占比（演示）', NULL, 'SELECT * FROM demo_category_pie', 1),
-(6, '用户增长趋势（演示）', NULL, 'SELECT * FROM demo_user_growth', 1);
+(6, '用户增长趋势（演示）', NULL, 'SELECT * FROM demo_user_growth', 1),
+(7, '茶饮订单明细', NULL, 'SELECT `店铺`, `品线`, `菜品名称`, `冷/热`, `规格`, `销售数量`, `单价`, (`销售数量` * `单价`) AS `销售金额`, DATE(`销售日期`) AS `销售日期` FROM `demo_tea_order` ORDER BY `销售日期` DESC', 1),
+(8, '茶饮店铺日汇总', NULL, 'SELECT DATE(`销售日期`) AS `日期`, `店铺`, `品线`, SUM(`销售数量`) AS `销售数量`, SUM(`销售数量` * `单价`) AS `销售金额`, COUNT(DISTINCT `账单流水号`) AS `订单数` FROM `demo_tea_order` GROUP BY DATE(`销售日期`), `店铺`, `品线` ORDER BY `日期` DESC', 1),
+(9, '茶饮品线销售排名', NULL, 'SELECT `品线`, SUM(`销售数量`) AS `销售数量`, SUM(`销售数量` * `单价`) AS `销售金额` FROM `demo_tea_order` GROUP BY `品线` ORDER BY `销售金额` DESC', 1),
+(10, '茶饮原料费用明细', NULL, 'SELECT DATE(`日期`) AS `日期`, `店铺`, `用途`, `金额` FROM `demo_tea_material` ORDER BY `日期` DESC', 1),
+(11, '茶饮店铺收支对比', NULL, 'SELECT o.`日期`, o.`店铺`, o.`销售金额`, COALESCE(m.`原料费用`, 0) AS `原料费用`, (o.`销售金额` - COALESCE(m.`原料费用`, 0)) AS `毛利` FROM ( SELECT DATE(`销售日期`) AS `日期`, `店铺`, SUM(`销售数量` * `单价`) AS `销售金额` FROM `demo_tea_order` GROUP BY DATE(`销售日期`), `店铺` ) o LEFT JOIN ( SELECT DATE(`日期`) AS `日期`, `店铺`, SUM(`金额`) AS `原料费用` FROM `demo_tea_material` GROUP BY DATE(`日期`), `店铺` ) m ON o.`日期` = m.`日期` AND o.`店铺` = m.`店铺` ORDER BY o.`日期` DESC', 1);
 -- Ensure auto_increment continues after explicit inserts
-ALTER TABLE bi_dataset AUTO_INCREMENT = 7;
+ALTER TABLE bi_dataset AUTO_INCREMENT = 12;
 
 INSERT INTO bi_dataset_field(dataset_id, field_name, field_type, field_label)
 VALUES
@@ -217,8 +222,19 @@ VALUES
 ('Product Ranking', 1, 'bar', 'biz_date', 'amount'),
 ('Order Detail', 2, 'table', 'order_id', 'amount');
 
+INSERT INTO bi_chart(name, dataset_id, chart_type, x_field, y_field, group_field)
+VALUES
+('茶饮日销趋势', 8, 'line', '日期', '销售金额', '店铺'),
+('茶饮品线销售排行', 9, 'bar_horizontal', '品线', '销售金额', ''),
+('茶饮门店毛利对比', 11, 'bar', '店铺', '毛利', ''),
+('茶饮原料费用对比', 10, 'bar', '店铺', '金额', ''),
+('茶饮订单明细表', 7, 'table', '店铺', '销售金额', '');
+
 INSERT INTO bi_dashboard(name, layout_json)
 VALUES ('Business Overview', '{"theme":"default","backgroundColor":"#f0f2f5"}');
+
+INSERT INTO bi_dashboard(name, layout_json)
+VALUES ('茶饮经营分析', '{"scene":"dashboard","publish":{"status":"DRAFT","shareToken":"teaoperatingdemo20260417","allowedRoles":["ADMIN","ANALYST"],"allowAnonymousAccess":true},"canvas":{"width":1440,"height":900}}');
 
 INSERT INTO sys_menu(name, path, component, parent_id, type, permission, icon, sort, visible, dashboard_id)
 VALUES
@@ -313,6 +329,36 @@ VALUES (1, 1, 0, 0, 12, 4),
        (1, 2, 12, 0, 12, 4),
        (1, 3, 0, 4, 24, 4);
 
+INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height)
+SELECT d.id, c.id, 0, 0, 12, 4
+FROM bi_dashboard d
+INNER JOIN bi_chart c ON c.name = '茶饮日销趋势'
+WHERE d.name = '茶饮经营分析';
+
+INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height)
+SELECT d.id, c.id, 12, 0, 12, 4
+FROM bi_dashboard d
+INNER JOIN bi_chart c ON c.name = '茶饮品线销售排行'
+WHERE d.name = '茶饮经营分析';
+
+INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height)
+SELECT d.id, c.id, 0, 4, 12, 4
+FROM bi_dashboard d
+INNER JOIN bi_chart c ON c.name = '茶饮门店毛利对比'
+WHERE d.name = '茶饮经营分析';
+
+INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height)
+SELECT d.id, c.id, 12, 4, 12, 4
+FROM bi_dashboard d
+INNER JOIN bi_chart c ON c.name = '茶饮原料费用对比'
+WHERE d.name = '茶饮经营分析';
+
+INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height)
+SELECT d.id, c.id, 0, 8, 24, 5
+FROM bi_dashboard d
+INNER JOIN bi_chart c ON c.name = '茶饮订单明细表'
+WHERE d.name = '茶饮经营分析';
+
 INSERT INTO bi_chart_template(name, description, chart_type, config_json, built_in, sort_order, created_by)
 VALUES
 ('晨光趋势卡', '适合首页趋势区，默认柔和渐变和面积填充。', 'line', '{"chart":{"name":"晨光趋势卡","datasetId":3,"chartType":"line","xField":"月份","yField":"销售额","groupField":""},"style":{"theme":"海湾晨光","bgColor":"#f6fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":true,"areaFill":true,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":560,"height":320}}', 1, 10, 'system'),
@@ -323,4 +369,9 @@ VALUES
 ('目标仪表卡', '适合完成率、达成率和告警值展示。', 'gauge', '{"chart":{"name":"目标仪表卡","datasetId":3,"chartType":"gauge","xField":"月份","yField":"销售额","groupField":""},"style":{"theme":"深海荧光","bgColor":"#f4fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":360,"height":300}}', 1, 60, 'system'),
 ('能力雷达卡', '适合多维度能力、质量评分等场景。', 'radar', '{"chart":{"name":"能力雷达卡","datasetId":4,"chartType":"radar","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"山岚青绿","bgColor":"#f8fbff","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":480,"height":340}}', 1, 70, 'system'),
 ('关系散点卡', '适合相关性、分布和聚类趋势观察。', 'scatter', '{"chart":{"name":"关系散点卡","datasetId":4,"chartType":"scatter","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"深海荧光","bgColor":"#f5fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":340}}', 1, 80, 'system'),
-('经营明细表', '适合明细追踪、问题回溯和导出。', 'table', '{"chart":{"name":"经营明细表","datasetId":4,"chartType":"table","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"海湾晨光","bgColor":"#ffffff","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":640,"height":360}}', 1, 90, 'system');
+('经营明细表', '适合明细追踪、问题回溯和导出。', 'table', '{"chart":{"name":"经营明细表","datasetId":4,"chartType":"table","xField":"区域","yField":"销售额","groupField":""},"style":{"theme":"海湾晨光","bgColor":"#ffffff","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":640,"height":360}}', 1, 90, 'system'),
+('茶饮日销趋势卡', '适合追踪门店日销波动和高峰日表现。', 'line', '{"chart":{"name":"茶饮日销趋势卡","datasetId":8,"chartType":"line","xField":"日期","yField":"销售金额","groupField":"店铺"},"style":{"theme":"海湾晨光","bgColor":"#f6fbff","showLabel":false,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":true,"areaFill":true,"barRadius":8,"barMaxWidth":36,"legendPos":"top"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":560,"height":320}}', 1, 100, 'system'),
+('茶饮品线排行卡', '适合查看不同品线的销售贡献排名。', 'bar_horizontal', '{"chart":{"name":"茶饮品线排行卡","datasetId":9,"chartType":"bar_horizontal","xField":"品线","yField":"销售金额","groupField":""},"style":{"theme":"山岚青绿","bgColor":"#f5fcf8","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":12,"barMaxWidth":26,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":340}}', 1, 110, 'system'),
+('茶饮门店毛利卡', '适合对比不同门店的销售金额、成本与毛利。', 'bar', '{"chart":{"name":"茶饮门店毛利卡","datasetId":11,"chartType":"bar","xField":"店铺","yField":"毛利","groupField":""},"style":{"theme":"琥珀橙金","bgColor":"#fffaf3","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":10,"barMaxWidth":32,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":320}}', 1, 120, 'system'),
+('茶饮原料费用卡', '适合观察门店原料费用投入分布。', 'bar', '{"chart":{"name":"茶饮原料费用卡","datasetId":10,"chartType":"bar","xField":"店铺","yField":"金额","groupField":""},"style":{"theme":"暮光珊瑚","bgColor":"#fff8f5","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":false,"smooth":false,"areaFill":false,"barRadius":10,"barMaxWidth":32,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":520,"height":320}}', 1, 130, 'system'),
+('茶饮订单明细表', '适合回看茶饮订单明细与门店销售构成。', 'table', '{"chart":{"name":"茶饮订单明细表","datasetId":7,"chartType":"table","xField":"店铺","yField":"销售金额","groupField":""},"style":{"theme":"海湾晨光","bgColor":"#ffffff","showLabel":true,"labelSize":12,"showXName":false,"showYName":false,"showGrid":true,"smooth":false,"areaFill":false,"barRadius":8,"barMaxWidth":36,"legendPos":"bottom"},"interaction":{"clickAction":"filter","enableClickLinkage":true,"allowManualFilters":true,"linkageFieldMode":"auto","linkageField":""},"layout":{"width":640,"height":360}}', 1, 140, 'system');

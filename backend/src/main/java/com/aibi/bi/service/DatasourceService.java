@@ -2,6 +2,7 @@ package com.aibi.bi.service;
 
 import com.aibi.bi.domain.BiDatasource;
 import com.aibi.bi.mapper.BiDatasourceMapper;
+import com.aibi.bi.mapper.BiDatasetMapper;
 import com.aibi.bi.model.request.CreateDatasourceRequest;
 import com.aibi.bi.model.request.DatasourceConnectionTestRequest;
 import com.aibi.bi.model.request.ExtractPreviewRequest;
@@ -43,14 +44,17 @@ public class DatasourceService {
     private static final int PREVIEW_LIMIT = 20;
 
     private final BiDatasourceMapper biDatasourceMapper;
+    private final BiDatasetMapper biDatasetMapper;
     private final JdbcPreviewService jdbcPreviewService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
     public DatasourceService(BiDatasourceMapper biDatasourceMapper,
+                             BiDatasetMapper biDatasetMapper,
                              JdbcPreviewService jdbcPreviewService,
                              ObjectMapper objectMapper) {
         this.biDatasourceMapper = biDatasourceMapper;
+        this.biDatasetMapper = biDatasetMapper;
         this.jdbcPreviewService = jdbcPreviewService;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
@@ -212,6 +216,11 @@ public class DatasourceService {
     }
 
     public void delete(Long id) {
+        requireDatasource(id);
+        long datasetCount = biDatasetMapper.countByDatasourceId(id);
+        if (datasetCount > 0) {
+            throw new IllegalArgumentException("当前数据源仍被 " + datasetCount + " 个数据集引用，请先修改或删除这些数据集后再删除数据源");
+        }
         biDatasourceMapper.deleteById(id);
     }
 

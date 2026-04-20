@@ -125,6 +125,29 @@ const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['decor-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_corner']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-corner']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_stream']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_pulse']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-corner']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_bracket']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_circuit']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_title_plate']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_divider_glow']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_target_ring']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_scan_panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_hex_badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider__tail']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider__line']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__sweep']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__edge']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-hex']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['time-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['qr-shell']} */ ;
@@ -158,18 +181,123 @@ if (__VLS_ctx.isDecorationChartType(__VLS_ctx.chartType)) {
         ...{ class: "decor-shell" },
         ...{ class: (`decor-shell--${__VLS_ctx.chartType}`) },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
-        ...{ class: "decor-corner decor-corner--tl" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
-        ...{ class: "decor-corner decor-corner--tr" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
-        ...{ class: "decor-corner decor-corner--bl" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
-        ...{ class: "decor-corner decor-corner--br" },
-    });
+    if (__VLS_ctx.chartType === 'decor_title_plate') {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "decor-title-plate" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-title-plate__rail decor-title-plate__rail--left" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "decor-title-plate__bar" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-title-plate__cap decor-title-plate__cap--left" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "decor-title-plate__label" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-title-plate__cap decor-title-plate__cap--right" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-title-plate__rail decor-title-plate__rail--right" },
+        });
+    }
+    else if (__VLS_ctx.chartType === 'decor_divider_glow') {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "decor-divider" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-divider__tail decor-divider__tail--left" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-divider__line" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-divider__core" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-divider__line" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-divider__tail decor-divider__tail--right" },
+        });
+    }
+    else if (__VLS_ctx.chartType === 'decor_target_ring') {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "decor-target" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-target__cross decor-target__cross--h" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-target__cross decor-target__cross--v" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-target__ring decor-target__ring--outer" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-target__ring decor-target__ring--middle" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-target__ring decor-target__ring--inner" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-target__dot" },
+        });
+    }
+    else if (__VLS_ctx.chartType === 'decor_scan_panel') {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "decor-scan" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-scan__grid" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-scan__sweep" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "decor-scan__badge" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-scan__edge decor-scan__edge--top" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-scan__edge decor-scan__edge--bottom" },
+        });
+    }
+    else if (__VLS_ctx.chartType === 'decor_hex_badge') {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "decor-hex" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-hex__halo" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "decor-hex__core" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-hex__inner" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "decor-hex__label" },
+        });
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-corner decor-corner--tl" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-corner decor-corner--tr" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-corner decor-corner--bl" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "decor-corner decor-corner--br" },
+        });
+    }
 }
 else if (__VLS_ctx.isVectorIconChartType(__VLS_ctx.chartType)) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -417,6 +545,50 @@ else {
 }
 /** @type {__VLS_StyleScopedClasses['static-widget']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__rail']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__rail--left']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__bar']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__cap']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__cap--left']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__label']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__cap']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__cap--right']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__rail']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-title-plate__rail--right']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider__tail']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider__tail--left']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider__line']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider__core']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider__line']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider__tail']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-divider__tail--right']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__cross']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__cross--h']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__cross']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__cross--v']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__ring']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__ring--outer']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__ring']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__ring--middle']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__ring']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__ring--inner']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-target__dot']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__sweep']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__edge']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__edge--top']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__edge']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-scan__edge--bottom']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-hex']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-hex__halo']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-hex__core']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-hex__inner']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-hex__label']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-corner']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-corner--tl']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-corner']} */ ;

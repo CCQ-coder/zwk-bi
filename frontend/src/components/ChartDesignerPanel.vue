@@ -273,12 +273,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { ElMessage } from 'element-plus'
 import { DataLine, Delete, Edit, PieChart, TrendCharts, Histogram, Plus, RefreshRight } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import * as echarts from 'echarts'
 import {
   createChart, deleteChart, getChartData, getChartList, updateChart,
   type Chart, type ChartForm
 } from '../api/chart'
 import { getDatasetList, previewDatasetSql, type Dataset } from '../api/dataset'
+import { echarts, type ECharts } from '../utils/echarts'
 
 // ─── 颜色主题 ──────────────────────────────────────────────────────────────────
 const COLOR_THEMES: Record<string, string[]> = {
@@ -379,7 +379,7 @@ const selectChart = async (row: Chart) => {
 // ─── 图表渲染 ──────────────────────────────────────────────────────────────────
 const chartPreviewRef = ref<HTMLDivElement | null>(null)
 const dataLoading = ref(false)
-let echart: echarts.ECharts | null = null
+let echart: ECharts | null = null
 
 interface ChartDataType {
   chartType: string

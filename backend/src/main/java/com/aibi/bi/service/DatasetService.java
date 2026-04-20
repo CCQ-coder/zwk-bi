@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -286,7 +287,8 @@ public class DatasetService {
     }
 
     public DatasetPreviewResponse getDemoPreviewResponse(String sqlText) {
-        if (sqlText != null && sqlText.contains("demo_sales_monthly")) {
+        String normalizedSql = sqlText == null ? "" : sqlText.toLowerCase(Locale.ROOT);
+        if (normalizedSql.contains("demo_sales_monthly")) {
             return buildDemoResponse(
                     Arrays.asList("月份", "销售额"),
                     new Object[][]{
@@ -296,7 +298,7 @@ public class DatasetService {
                             {"10月", 20100}, {"11月", 25600}, {"12月", 30400}
                     }
             );
-        } else if (sqlText != null && sqlText.contains("demo_sales_region")) {
+                    } else if (normalizedSql.contains("demo_sales_region")) {
             return buildDemoResponse(
                     Arrays.asList("区域", "销售额"),
                     new Object[][]{
@@ -304,7 +306,7 @@ public class DatasetService {
                             {"华中", 38700}, {"西南", 29400}, {"西北", 18500}
                     }
             );
-        } else if (sqlText != null && sqlText.contains("demo_category_pie")) {
+                    } else if (normalizedSql.contains("demo_category_pie")) {
             return buildDemoResponse(
                     Arrays.asList("产品类别", "销售占比"),
                     new Object[][]{
@@ -312,7 +314,7 @@ public class DatasetService {
                             {"家居", 12.4}, {"运动", 7.6}, {"其他", 3.5}
                     }
             );
-        } else if (sqlText != null && sqlText.contains("demo_user_growth")) {
+                    } else if (normalizedSql.contains("demo_user_growth")) {
             return buildDemoResponse(
                     Arrays.asList("月份", "用户数"),
                     new Object[][]{
@@ -322,6 +324,16 @@ public class DatasetService {
                             {"10月", 14600}, {"11月", 16200}, {"12月", 18900}
                     }
             );
+        } else if (normalizedSql.contains("demo_tea_order") && normalizedSql.contains("left join") && normalizedSql.contains("demo_tea_material")) {
+            return buildTeaStoreProfitDemoResponse();
+        } else if (normalizedSql.contains("demo_tea_material")) {
+            return buildTeaMaterialCostDemoResponse();
+        } else if (normalizedSql.contains("demo_tea_order") && normalizedSql.contains("count(distinct `账单流水号`)")) {
+            return buildTeaDailySummaryDemoResponse();
+        } else if (normalizedSql.contains("demo_tea_order") && normalizedSql.contains("group by `品线`")) {
+            return buildTeaLineRankingDemoResponse();
+        } else if (normalizedSql.contains("demo_tea_order")) {
+            return buildTeaOrderDetailDemoResponse();
         }
         // Generic multi-field demo
         return buildDemoResponse(
@@ -353,6 +365,70 @@ public class DatasetService {
         response.setRowCount(rows.size());
         return response;
     }
+
+        private DatasetPreviewResponse buildTeaOrderDetailDemoResponse() {
+        return buildDemoResponse(
+            Arrays.asList("店铺", "品线", "菜品名称", "冷/热", "规格", "销售数量", "单价", "销售金额", "销售日期"),
+            new Object[][]{
+                {"乐园店", "浓郁椰奶", "生榨纯椰", "冷", "纸大", 168, new BigDecimal("16.00"), new BigDecimal("2688.00"), LocalDate.of(2024, 3, 24)},
+                {"香橙店", "爆料果汁", "爆粒鲜橙", "冷", "纸", 194, new BigDecimal("6.00"), new BigDecimal("1164.00"), LocalDate.of(2024, 3, 21)},
+                {"果元店", "超大果茶", "爆粒鲜橙", "热", "塑大", 247, new BigDecimal("6.00"), new BigDecimal("1482.00"), LocalDate.of(2024, 3, 19)},
+                {"蓝墨店", "滋味果昔", "珍珠奶茶", "冷", "纸大", 246, new BigDecimal("6.00"), new BigDecimal("1476.00"), LocalDate.of(2024, 3, 23)},
+                {"南都店", "爆料果汁", "爆粒鲜橙", "冷", "40塑", 144, new BigDecimal("6.00"), new BigDecimal("864.00"), LocalDate.of(2024, 3, 11)}
+            }
+        );
+        }
+
+        private DatasetPreviewResponse buildTeaDailySummaryDemoResponse() {
+        return buildDemoResponse(
+            Arrays.asList("日期", "店铺", "品线", "销售数量", "销售金额", "订单数"),
+            new Object[][]{
+                {LocalDate.of(2024, 3, 29), "乐园店", "滋味果昔", 144, new BigDecimal("864.00"), 1},
+                {LocalDate.of(2024, 3, 24), "乐园店", "醇香奶茶", 174, new BigDecimal("1044.00"), 1},
+                {LocalDate.of(2024, 3, 23), "蓝墨店", "滋味果昔", 246, new BigDecimal("1476.00"), 1},
+                {LocalDate.of(2024, 3, 21), "香橙店", "爆料果汁", 194, new BigDecimal("1164.00"), 1},
+                {LocalDate.of(2024, 3, 11), "南都店", "爆料果汁", 144, new BigDecimal("864.00"), 1}
+            }
+        );
+        }
+
+        private DatasetPreviewResponse buildTeaLineRankingDemoResponse() {
+        return buildDemoResponse(
+            Arrays.asList("品线", "销售数量", "销售金额"),
+            new Object[][]{
+                {"滋味果昔", 601, new BigDecimal("3606.00")},
+                {"爆料果汁", 473, new BigDecimal("2838.00")},
+                {"浓郁椰奶", 411, new BigDecimal("2466.00")},
+                {"超大果茶", 247, new BigDecimal("1482.00")},
+                {"醇香奶茶", 174, new BigDecimal("1044.00")}
+            }
+        );
+        }
+
+        private DatasetPreviewResponse buildTeaMaterialCostDemoResponse() {
+        return buildDemoResponse(
+            Arrays.asList("日期", "店铺", "用途", "金额"),
+            new Object[][]{
+                {LocalDate.of(2024, 3, 28), "蓝墨店", "原料购进", new BigDecimal("243.00")},
+                {LocalDate.of(2024, 3, 25), "果元店", "原料购进", new BigDecimal("211.00")},
+                {LocalDate.of(2024, 3, 21), "乐园店", "原料购进", new BigDecimal("183.00")},
+                {LocalDate.of(2024, 3, 13), "水围店", "原料购进", new BigDecimal("576.00")},
+                {LocalDate.of(2024, 3, 10), "香橙店", "原料购进", new BigDecimal("190.00")}
+            }
+        );
+        }
+
+        private DatasetPreviewResponse buildTeaStoreProfitDemoResponse() {
+        return buildDemoResponse(
+            Arrays.asList("日期", "店铺", "销售金额", "原料费用", "毛利"),
+            new Object[][]{
+                {LocalDate.of(2024, 3, 28), "蓝墨店", new BigDecimal("930.00"), new BigDecimal("243.00"), new BigDecimal("687.00")},
+                {LocalDate.of(2024, 3, 24), "乐园店", new BigDecimal("2688.00"), new BigDecimal("183.00"), new BigDecimal("2505.00")},
+                {LocalDate.of(2024, 3, 21), "香橙店", new BigDecimal("1164.00"), new BigDecimal("190.00"), new BigDecimal("974.00")},
+                {LocalDate.of(2024, 3, 11), "南都店", new BigDecimal("864.00"), new BigDecimal("101.00"), new BigDecimal("763.00")}
+            }
+        );
+        }
 
     private String inferFieldType(String column, List<Map<String, Object>> rows) {
         if (rows == null) {

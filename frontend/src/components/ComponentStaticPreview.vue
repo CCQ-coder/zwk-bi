@@ -2,10 +2,60 @@
   <div class="static-widget" :class="[`static-widget--${themeName}`, { 'static-widget--dark': dark }]">
     <template v-if="isDecorationChartType(chartType)">
       <div class="decor-shell" :class="`decor-shell--${chartType}`">
-        <span class="decor-corner decor-corner--tl" />
-        <span class="decor-corner decor-corner--tr" />
-        <span class="decor-corner decor-corner--bl" />
-        <span class="decor-corner decor-corner--br" />
+        <template v-if="chartType === 'decor_title_plate'">
+          <div class="decor-title-plate">
+            <span class="decor-title-plate__rail decor-title-plate__rail--left" />
+            <div class="decor-title-plate__bar">
+              <span class="decor-title-plate__cap decor-title-plate__cap--left" />
+              <span class="decor-title-plate__label">BI STUDIO</span>
+              <span class="decor-title-plate__cap decor-title-plate__cap--right" />
+            </div>
+            <span class="decor-title-plate__rail decor-title-plate__rail--right" />
+          </div>
+        </template>
+        <template v-else-if="chartType === 'decor_divider_glow'">
+          <div class="decor-divider">
+            <span class="decor-divider__tail decor-divider__tail--left" />
+            <span class="decor-divider__line" />
+            <span class="decor-divider__core" />
+            <span class="decor-divider__line" />
+            <span class="decor-divider__tail decor-divider__tail--right" />
+          </div>
+        </template>
+        <template v-else-if="chartType === 'decor_target_ring'">
+          <div class="decor-target">
+            <span class="decor-target__cross decor-target__cross--h" />
+            <span class="decor-target__cross decor-target__cross--v" />
+            <span class="decor-target__ring decor-target__ring--outer" />
+            <span class="decor-target__ring decor-target__ring--middle" />
+            <span class="decor-target__ring decor-target__ring--inner" />
+            <span class="decor-target__dot" />
+          </div>
+        </template>
+        <template v-else-if="chartType === 'decor_scan_panel'">
+          <div class="decor-scan">
+            <span class="decor-scan__grid" />
+            <span class="decor-scan__sweep" />
+            <span class="decor-scan__badge">ACTIVE</span>
+            <span class="decor-scan__edge decor-scan__edge--top" />
+            <span class="decor-scan__edge decor-scan__edge--bottom" />
+          </div>
+        </template>
+        <template v-else-if="chartType === 'decor_hex_badge'">
+          <div class="decor-hex">
+            <span class="decor-hex__halo" />
+            <div class="decor-hex__core">
+              <span class="decor-hex__inner" />
+              <span class="decor-hex__label">CORE</span>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <span class="decor-corner decor-corner--tl" />
+          <span class="decor-corner decor-corner--tr" />
+          <span class="decor-corner decor-corner--bl" />
+          <span class="decor-corner decor-corner--br" />
+        </template>
       </div>
     </template>
 
@@ -309,8 +359,24 @@ const themeName = computed(() => {
 
 .decor-shell {
   position: relative;
-  border-radius: 14px;
+  border-radius: 18px;
   border: 1px solid rgba(102, 183, 255, 0.24);
+  background:
+    linear-gradient(180deg, rgba(8, 24, 43, 0.45), rgba(8, 24, 43, 0.1)),
+    radial-gradient(circle at 50% 0%, rgba(77, 179, 255, 0.14), transparent 58%);
+  overflow: hidden;
+}
+
+.decor-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(123, 194, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(123, 194, 255, 0.05) 1px, transparent 1px);
+  background-size: 22px 22px;
+  opacity: 0.28;
+  pointer-events: none;
 }
 
 .decor-corner {
@@ -329,6 +395,22 @@ const themeName = computed(() => {
   box-shadow: inset 0 0 20px rgba(77, 179, 255, 0.14), 0 0 20px rgba(77, 179, 255, 0.1);
 }
 
+.decor-shell--decor_border_frame::after,
+.decor-shell--decor_border_corner::after {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(121, 198, 255, 0.12);
+  pointer-events: none;
+}
+
+.decor-shell--decor_border_corner .decor-corner {
+  width: 34px;
+  height: 34px;
+  border-color: #7ad5ff;
+}
+
 .decor-shell--decor_border_grid::after {
   content: '';
   position: absolute;
@@ -337,6 +419,339 @@ const themeName = computed(() => {
   background-image: linear-gradient(rgba(77, 179, 255, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(77, 179, 255, 0.08) 1px, transparent 1px);
   background-size: 18px 18px;
   pointer-events: none;
+}
+
+.decor-shell--decor_border_stream {
+  box-shadow: inset 0 0 24px rgba(77, 179, 255, 0.12), 0 0 22px rgba(77, 179, 255, 0.08);
+}
+
+.decor-shell--decor_border_stream::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 18%, rgba(130, 233, 255, 0.02) 34%, rgba(130, 233, 255, 0.32) 50%, rgba(130, 233, 255, 0.02) 66%, transparent 82%);
+  animation: decorBorderStream 3s linear infinite;
+  pointer-events: none;
+}
+
+.decor-shell--decor_border_pulse {
+  box-shadow: inset 0 0 0 1px rgba(126, 220, 255, 0.16);
+}
+
+.decor-shell--decor_border_pulse::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(123, 220, 255, 0.38);
+  box-shadow: inset 0 0 18px rgba(77, 179, 255, 0.12), 0 0 10px rgba(77, 179, 255, 0.12);
+  animation: decorBorderPulse 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+.decor-shell--decor_border_bracket .decor-corner {
+  width: 40px;
+  height: 40px;
+  border-width: 4px;
+  border-color: #88e4ff;
+  animation: decorBracketBlink 2.4s ease-in-out infinite;
+}
+
+.decor-shell--decor_border_bracket::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent, rgba(123, 220, 255, 0.6), transparent) center top / 92px 1px no-repeat,
+    linear-gradient(90deg, transparent, rgba(123, 220, 255, 0.6), transparent) center bottom / 92px 1px no-repeat,
+    linear-gradient(180deg, transparent, rgba(123, 220, 255, 0.6), transparent) left center / 1px 58px no-repeat,
+    linear-gradient(180deg, transparent, rgba(123, 220, 255, 0.6), transparent) right center / 1px 58px no-repeat;
+  pointer-events: none;
+}
+
+.decor-shell--decor_border_circuit {
+  border-style: dashed;
+  border-color: rgba(123, 220, 255, 0.22);
+}
+
+.decor-shell--decor_border_circuit::after {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(135, 232, 255, 0.95) 0 2px, transparent 3px),
+    radial-gradient(circle at 88% 22%, rgba(135, 232, 255, 0.95) 0 2px, transparent 3px),
+    radial-gradient(circle at 22% 84%, rgba(135, 232, 255, 0.95) 0 2px, transparent 3px),
+    radial-gradient(circle at 82% 74%, rgba(135, 232, 255, 0.95) 0 2px, transparent 3px),
+    linear-gradient(90deg, transparent 0 8%, rgba(100, 212, 255, 0.5) 8% 44%, transparent 44% 56%, rgba(100, 212, 255, 0.5) 56% 92%, transparent 92% 100%) top center / 100% 1px no-repeat,
+    linear-gradient(180deg, transparent 0 14%, rgba(100, 212, 255, 0.42) 14% 48%, transparent 48% 56%, rgba(100, 212, 255, 0.42) 56% 88%, transparent 88% 100%) center left / 1px 100% no-repeat;
+  opacity: 0.9;
+  animation: decorCircuitShift 6s linear infinite;
+  pointer-events: none;
+}
+
+.decor-shell--decor_title_plate,
+.decor-shell--decor_divider_glow,
+.decor-shell--decor_target_ring,
+.decor-shell--decor_scan_panel,
+.decor-shell--decor_hex_badge {
+  border: none;
+  background: transparent;
+}
+
+.decor-shell--decor_title_plate::before,
+.decor-shell--decor_divider_glow::before,
+.decor-shell--decor_target_ring::before,
+.decor-shell--decor_scan_panel::before,
+.decor-shell--decor_hex_badge::before {
+  display: none;
+}
+
+.decor-title-plate,
+.decor-divider,
+.decor-target,
+.decor-hex {
+  position: absolute;
+  inset: 0;
+}
+
+.decor-title-plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 18px;
+}
+
+.decor-title-plate__bar {
+  position: relative;
+  min-width: min(72%, 280px);
+  height: 48px;
+  padding: 0 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(117, 201, 255, 0.42);
+  background: linear-gradient(90deg, rgba(21, 62, 102, 0.3), rgba(73, 171, 255, 0.18), rgba(21, 62, 102, 0.3));
+  box-shadow: inset 0 0 28px rgba(77, 179, 255, 0.18), 0 0 28px rgba(77, 179, 255, 0.12);
+}
+
+.decor-title-plate__label {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  color: #dff4ff;
+}
+
+.decor-title-plate__cap {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #9be7ff, #37b3ff);
+  box-shadow: 0 0 12px rgba(77, 179, 255, 0.7);
+}
+
+.decor-title-plate__rail {
+  flex: 1;
+  height: 2px;
+  max-width: 96px;
+  background: linear-gradient(90deg, transparent, rgba(77, 179, 255, 0.8), transparent);
+  opacity: 0.88;
+}
+
+.decor-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 18px;
+}
+
+.decor-divider__tail,
+.decor-divider__line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(90, 202, 255, 0.85), transparent);
+}
+
+.decor-divider__tail {
+  width: 52px;
+  opacity: 0.5;
+}
+
+.decor-divider__line {
+  flex: 1;
+}
+
+.decor-divider__core {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(122, 214, 255, 0.9);
+  background: radial-gradient(circle, rgba(139, 231, 255, 0.95) 0%, rgba(77, 179, 255, 0.55) 48%, rgba(77, 179, 255, 0.08) 100%);
+  box-shadow: 0 0 16px rgba(77, 179, 255, 0.38);
+}
+
+.decor-target {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.decor-target__ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(106, 206, 255, 0.65);
+  box-shadow: inset 0 0 18px rgba(77, 179, 255, 0.08);
+}
+
+.decor-target__ring--outer {
+  width: min(72%, 180px);
+  aspect-ratio: 1;
+}
+
+.decor-target__ring--middle {
+  width: min(48%, 120px);
+  aspect-ratio: 1;
+  border-style: dashed;
+}
+
+.decor-target__ring--inner {
+  width: min(24%, 56px);
+  aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(94, 211, 255, 0.24), transparent 70%);
+}
+
+.decor-target__cross {
+  position: absolute;
+  background: rgba(114, 210, 255, 0.55);
+}
+
+.decor-target__cross--h {
+  width: 70%;
+  height: 1px;
+}
+
+.decor-target__cross--v {
+  width: 1px;
+  height: 70%;
+}
+
+.decor-target__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8fe8ff;
+  box-shadow: 0 0 14px rgba(143, 232, 255, 0.9);
+}
+
+.decor-scan {
+  position: absolute;
+  inset: 10px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(109, 204, 255, 0.28);
+  background: linear-gradient(180deg, rgba(9, 27, 46, 0.68), rgba(9, 27, 46, 0.22));
+  box-shadow: inset 0 0 24px rgba(77, 179, 255, 0.08);
+}
+
+.decor-scan__grid,
+.decor-scan__sweep,
+.decor-scan__edge,
+.decor-scan__badge {
+  position: absolute;
+}
+
+.decor-scan__grid {
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(117, 194, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(117, 194, 255, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.decor-scan__sweep {
+  left: 0;
+  right: 0;
+  height: 34%;
+  background: linear-gradient(180deg, transparent, rgba(84, 229, 255, 0.22), transparent);
+  filter: blur(2px);
+  animation: decorScanSweep 3.4s linear infinite;
+}
+
+.decor-scan__badge {
+  top: 12px;
+  right: 14px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(84, 229, 255, 0.14);
+  border: 1px solid rgba(84, 229, 255, 0.32);
+  color: #9bf0ff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.decor-scan__edge {
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(88, 210, 255, 0.85), transparent);
+}
+
+.decor-scan__edge--top {
+  top: 12px;
+}
+
+.decor-scan__edge--bottom {
+  bottom: 12px;
+}
+
+.decor-hex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.decor-hex__halo {
+  position: absolute;
+  width: min(54%, 150px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(77, 179, 255, 0.2), transparent 68%);
+  filter: blur(10px);
+}
+
+.decor-hex__core {
+  position: relative;
+  width: min(42%, 118px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  clip-path: polygon(25% 7%, 75% 7%, 100% 50%, 75% 93%, 25% 93%, 0 50%);
+  background: linear-gradient(180deg, rgba(14, 58, 96, 0.92), rgba(10, 31, 54, 0.92));
+  border: 1px solid rgba(126, 214, 255, 0.42);
+  box-shadow: inset 0 0 24px rgba(77, 179, 255, 0.2), 0 0 24px rgba(77, 179, 255, 0.14);
+}
+
+.decor-hex__inner {
+  position: absolute;
+  inset: 14px;
+  clip-path: inherit;
+  border: 1px solid rgba(126, 214, 255, 0.3);
+}
+
+.decor-hex__label {
+  position: relative;
+  z-index: 1;
+  color: #dff6ff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
 }
 
 .icon-shell,
@@ -641,5 +1056,32 @@ const themeName = computed(() => {
 .trend-shell__axis span {
   flex: 1;
   text-align: center;
+}
+
+@keyframes decorScanSweep {
+  0% { top: -24%; }
+  100% { top: 100%; }
+}
+
+@keyframes decorBorderStream {
+  0% { transform: translateX(-42%); opacity: 0.35; }
+  50% { opacity: 0.95; }
+  100% { transform: translateX(42%); opacity: 0.35; }
+}
+
+@keyframes decorBorderPulse {
+  0% { transform: scale(0.98); opacity: 0.28; }
+  50% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1.02); opacity: 0.22; }
+}
+
+@keyframes decorBracketBlink {
+  0%, 100% { opacity: 0.45; filter: drop-shadow(0 0 0 rgba(136, 228, 255, 0)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 8px rgba(136, 228, 255, 0.55)); }
+}
+
+@keyframes decorCircuitShift {
+  0% { background-position: 0 0, 0 0, 0 0, 0 0, -10% 0, 0 -10%; }
+  100% { background-position: 0 0, 0 0, 0 0, 0 0, 110% 0, 0 110%; }
 }
 </style>

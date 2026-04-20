@@ -152,8 +152,8 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { createTemplate, deleteTemplate, getTemplateList, updateTemplate, type ChartTemplate } from '../api/chart-template'
 import { getChartList, type Chart } from '../api/chart'
 import { getDatasetFields, getDatasetList, getDatasetPreviewData, type Dataset, type DatasetField } from '../api/dataset'
-import * as echarts from 'echarts'
 import { buildComponentOption, COLOR_THEMES, chartTypeLabel, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config'
+import { echarts, type ECharts } from '../utils/echarts'
 
 interface TemplateFormState {
   name: string
@@ -452,7 +452,7 @@ const handleDelete = async (item: ChartTemplate) => {
 
 // ─── 图表预览 ────────────────────────────────────────────────────────────────
 const previewChartRef = ref<HTMLElement | null>(null)
-let previewChartInstance: echarts.ECharts | null = null
+let previewChartInstance: ECharts | null = null
 const previewLoading = ref(false)
 
 const isPreviewRenderable = computed(() =>

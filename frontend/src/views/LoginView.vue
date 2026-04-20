@@ -65,8 +65,7 @@ onMounted(() => {
     username.value = lastUsername
     rememberUser.value = true
   } else {
-    username.value = 'admin'
-    password.value = '123456'
+    rememberUser.value = false
   }
 })
 </script>

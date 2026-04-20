@@ -40,8 +40,7 @@ onMounted(() => {
         rememberUser.value = true;
     }
     else {
-        username.value = 'admin';
-        password.value = '123456';
+        rememberUser.value = false;
     }
 });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */

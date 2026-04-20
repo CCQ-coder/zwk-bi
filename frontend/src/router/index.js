@@ -1,16 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import LoginView from '../views/LoginView.vue';
-import HomeView from '../views/HomeView.vue';
-import DashboardView from '../views/DashboardView.vue';
-import DataScreenView from '../views/DataScreenView.vue';
-import ScreenEditorView from '../views/ScreenEditorView.vue';
-import DataPrepareView from '../views/DataPrepareView.vue';
-import ModelingView from '../views/ModelingView.vue';
-import ReportPreviewView from '../views/ReportPreviewView.vue';
-import SystemView from '../views/SystemView.vue';
 import { getCurrentMenus } from '../api/menu';
 import { flattenAuthMenus, getAuthMenus, getAuthRole, hasAuthSession, saveAuthMenus } from '../utils/auth-session';
+const LoginView = () => import('../views/LoginView.vue');
+const HomeView = () => import('../views/HomeView.vue');
+const DashboardView = () => import('../views/DashboardView.vue');
+const DashboardEditorView = () => import('../views/DashboardEditorView.vue');
+const DataScreenView = () => import('../views/DataScreenView.vue');
+const ScreenEditorView = () => import('../views/ScreenEditorView.vue');
+const DataPrepareView = () => import('../views/DataPrepareView.vue');
+const ModelingView = () => import('../views/ModelingView.vue');
+const ReportPreviewView = () => import('../views/ReportPreviewView.vue');
+const SystemView = () => import('../views/SystemView.vue');
 const router = createRouter({
     history: createWebHistory(),
     routes: [
@@ -18,6 +19,7 @@ const router = createRouter({
         { path: '/login', name: 'login', component: LoginView },
         { path: '/home', name: 'home', component: HomeView, meta: { requiresAuth: true } },
         { path: '/home/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true } },
+        { path: '/home/dashboard/edit/:id', name: 'dashboard-edit', component: DashboardEditorView, meta: { requiresAuth: true } },
         { path: '/home/screen', name: 'screen', component: DataScreenView, meta: { requiresAuth: true } },
         { path: '/home/screen/edit/:id', name: 'screen-edit', component: ScreenEditorView, meta: { requiresAuth: true } },
         { path: '/preview/dashboard/:id', name: 'dashboard-preview', component: ReportPreviewView, meta: { scene: 'dashboard' } },

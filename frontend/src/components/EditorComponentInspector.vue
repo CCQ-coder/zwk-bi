@@ -25,6 +25,14 @@
               </div>
               <div class="summary-meta">实例 ID: {{ component.id }} / 引用组件 ID: {{ component.chartId }}</div>
             </div>
+            <div class="profile-card">
+              <div class="profile-kicker">属性模式</div>
+              <div class="profile-title">{{ componentKindLabel }}</div>
+              <div class="profile-desc">{{ componentKindDescription }}</div>
+              <div class="profile-chip-list">
+                <span v-for="tag in componentCapabilityTags" :key="tag" class="profile-chip">{{ tag }}</span>
+              </div>
+            </div>
           </section>
 
           <section class="inspector-section">
@@ -70,7 +78,7 @@
                 缺少：{{ missingFields.join('、') }}
               </div>
               <div v-else class="health-list">
-                当前配置满足画布预览要求，可直接联动预览与保存。
+                {{ healthReadyText }}
               </div>
             </div>
           </section>
@@ -106,36 +114,51 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane v-if="!isDecorationComponentType" label="数据" name="data">
+        <el-tab-pane v-if="showDataTab" label="数据" name="data">
           <section class="inspector-section">
             <div class="section-title">数据来源</div>
+            <div class="mode-card">
+              <div class="mode-card-kicker">绑定策略</div>
+              <div class="mode-card-title">{{ dataModeTitle }}</div>
+              <div class="mode-card-desc">{{ dataModeDescription }}</div>
+              <div class="mode-card-tags">
+                <span v-for="tag in dataCapabilityTags" :key="tag" class="mode-card-tag">{{ tag }}</span>
+              </div>
+            </div>
             <el-form label-position="top" class="chart-form">
-              <el-form-item label="数据来源模式">
-                <el-switch
-                  :model-value="isUseDatasetMode"
-                  active-text="采用数据集"
-                  inactive-text="页面编写"
-                  @change="onSourceModeSwitch"
-                />
+              <el-form-item label="接入主模式">
+                <el-radio-group :model-value="bindingEntryMode" class="page-source-group page-source-group--mode" @change="onBindingEntryModeChange">
+                  <el-radio-button value="DATASET">数据集</el-radio-button>
+                  <el-radio-button value="PAGE_SQL">在线编辑</el-radio-button>
+                </el-radio-group>
+                <div class="helper-text">
+                  {{ bindingEntryMode === 'DATASET'
+                    ? '数据库型组件可直接复用数据集；API、表格和 JSON 静态数据建议直接绑定页面数据源。'
+                    : '在线编辑模式会直接绑定当前页面数据源，并按数据库、API、表格、JSON 四种方式切换输入窗口。' }}
+                </div>
               </el-form-item>
-              <el-form-item v-if="isUseDatasetMode" label="数据集">
+
+              <el-form-item v-if="bindingEntryMode === 'PAGE_SQL'" label="在线编辑方式">
+                <el-radio-group :model-value="dataBindingMode" class="page-source-group page-source-group--submode" @change="onDataBindingModeChange">
+                  <el-radio-button v-for="item in PAGE_SOURCE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</el-radio-button>
+                </el-radio-group>
+                <div class="helper-text">先选择“在线编辑”，再决定当前组件直接连数据库、API、表格还是 JSON 静态数据。</div>
+              </el-form-item>
+
+              <el-form-item v-if="bindingEntryMode === 'DATASET'" label="数据集">
                 <el-select v-model="configForm.chart.datasetId" placeholder="请选择数据集" style="width: 100%" filterable :clearable="isStaticComponentType" @change="onDatasetChange">
                   <el-option v-for="dataset in datasets" :key="dataset.id" :label="dataset.name" :value="dataset.id" />
                 </el-select>
                 <div class="helper-text">{{ isStaticComponentType ? '静态组件可不绑定数据集；需要数据驱动时再选择数据集即可。' : '数据集模式仅使用已配置好的数据库型数据源与 SQL。' }}</div>
               </el-form-item>
               <template v-else>
-                <el-form-item label="页面来源类型">
-                  <el-radio-group v-model="configForm.chart.pageSourceKind" class="page-source-group" @change="onPageSourceKindChange">
-                    <el-radio-button v-for="item in PAGE_SOURCE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</el-radio-button>
-                  </el-radio-group>
-                </el-form-item>
                 <el-form-item :label="`${pageSourceKindLabel}数据源`">
                   <el-select v-model="configForm.chart.datasourceId" placeholder="请选择数据源" style="width: 100%" filterable clearable @change="onPageDatasourceChange">
                     <el-option v-for="source in pageSourceDatasources" :key="source.id" :label="source.name" :value="source.id" />
                   </el-select>
                   <div class="helper-text">{{ pageSourceHelperText }}</div>
                 </el-form-item>
+
                 <el-form-item v-if="configForm.chart.pageSourceKind === 'DATABASE'" label="页面编写 SQL">
                   <el-input
                     v-model="configForm.chart.sqlText"
@@ -144,14 +167,117 @@
                     placeholder="请输入查询 SQL（仅支持查询语句）"
                   />
                 </el-form-item>
-                <el-form-item v-else label="页面级配置 JSON">
-                  <el-input
-                    v-model="configForm.chart.runtimeConfigText"
-                    type="textarea"
-                    :rows="6"
-                    :placeholder="pageSourceConfigPlaceholder"
-                  />
-                </el-form-item>
+
+                <template v-else-if="configForm.chart.pageSourceKind === 'API'">
+                  <div class="runtime-editor-card">
+                    <div class="runtime-editor-head">
+                      <span>接口覆盖</span>
+                      <span class="runtime-editor-tip">请求地址和请求方式沿用数据源配置，这里只覆盖当前组件的 headers、query、body 和结果路径。</span>
+                    </div>
+
+                    <el-tabs v-model="apiRuntimeTab" class="runtime-tabs">
+                      <el-tab-pane label="请求头" name="headers">
+                        <div class="kv-editor-list">
+                          <div v-for="row in apiRuntimeForm.headers" :key="row.id" class="kv-editor-row">
+                            <el-input v-model="row.key" placeholder="键" />
+                            <el-input v-model="row.value" placeholder="值" />
+                            <el-button text size="small" @click="removeApiRuntimeRow('headers', row.id)">删除</el-button>
+                          </div>
+                        </div>
+                        <div class="action-row action-row--compact">
+                          <el-button size="small" link type="primary" @click="addApiRuntimeRow('headers')">新增请求头</el-button>
+                        </div>
+                      </el-tab-pane>
+
+                      <el-tab-pane label="QUERY 参数" name="query">
+                        <div class="kv-editor-list">
+                          <div v-for="row in apiRuntimeForm.query" :key="row.id" class="kv-editor-row">
+                            <el-input v-model="row.key" placeholder="键" />
+                            <el-input v-model="row.value" placeholder="值" />
+                            <el-button text size="small" @click="removeApiRuntimeRow('query', row.id)">删除</el-button>
+                          </div>
+                        </div>
+                        <div class="action-row action-row--compact">
+                          <el-button size="small" link type="primary" @click="addApiRuntimeRow('query')">新增 Query 参数</el-button>
+                        </div>
+                      </el-tab-pane>
+
+                      <el-tab-pane label="请求体" name="body">
+                        <el-input
+                          v-model="apiRuntimeForm.bodyText"
+                          type="textarea"
+                          :rows="5"
+                          placeholder="可选。支持 JSON 或普通文本，留空则沿用数据源默认请求体。"
+                        />
+                      </el-tab-pane>
+                    </el-tabs>
+
+                    <el-form-item label="结果路径覆盖（可选）" class="runtime-form-item">
+                      <el-input v-model="apiRuntimeForm.resultPath" placeholder="例如 data.records" />
+                    </el-form-item>
+                  </div>
+                </template>
+
+                <template v-else-if="configForm.chart.pageSourceKind === 'TABLE'">
+                  <div class="runtime-editor-card">
+                    <div class="runtime-editor-head">
+                      <span>表格覆盖</span>
+                      <span class="runtime-editor-tip">默认读取数据源中的表格文本，只有填写覆盖项时才会替换当前组件使用的数据。</span>
+                    </div>
+
+                    <div class="runtime-form-grid">
+                      <el-form-item label="分隔格式" class="runtime-form-item">
+                        <el-select v-model="tableRuntimeForm.delimiter" placeholder="沿用数据源">
+                          <el-option label="沿用数据源" value="" />
+                          <el-option label="CSV" value="CSV" />
+                          <el-option label="TSV" value="TSV" />
+                        </el-select>
+                      </el-form-item>
+
+                      <el-form-item label="首行设置" class="runtime-form-item">
+                        <el-select v-model="tableRuntimeForm.hasHeader" placeholder="沿用数据源">
+                          <el-option label="沿用数据源" value="" />
+                          <el-option label="首行为表头" value="true" />
+                          <el-option label="首行即数据" value="false" />
+                        </el-select>
+                      </el-form-item>
+
+                      <el-form-item label="表格内容覆盖（可选）" class="runtime-form-item runtime-form-item--full">
+                        <el-input
+                          v-model="tableRuntimeForm.text"
+                          type="textarea"
+                          :rows="7"
+                          placeholder="可选。留空则直接使用数据源里的 CSV/TSV 内容。"
+                        />
+                      </el-form-item>
+                    </div>
+                  </div>
+                </template>
+
+                <template v-else>
+                  <div class="runtime-editor-card">
+                    <div class="runtime-editor-head">
+                      <span>JSON 覆盖</span>
+                      <span class="runtime-editor-tip">静态 JSON 已保存在数据源中，这里只做当前组件的结果路径或内容覆盖。</span>
+                    </div>
+
+                    <div class="runtime-form-grid">
+                      <el-form-item label="结果路径覆盖（可选）" class="runtime-form-item runtime-form-item--full">
+                        <el-input v-model="jsonRuntimeForm.resultPath" placeholder="例如 data.records" />
+                      </el-form-item>
+
+                      <el-form-item label="JSON 内容覆盖（可选）" class="runtime-form-item runtime-form-item--full">
+                        <el-input
+                          v-model="jsonRuntimeForm.text"
+                          type="textarea"
+                          :rows="7"
+                          placeholder='可选。留空则直接使用数据源里的 JSON 内容，例如 [{"region":"华东","value":120}]'
+                        />
+                      </el-form-item>
+                    </div>
+                  </div>
+                </template>
+
                 <div class="action-row">
                   <el-button size="small" type="primary" :loading="previewLoading" @click="onPageSourceQuery">预览数据</el-button>
                 </div>
@@ -163,17 +289,17 @@
                 </div>
                 <div class="suggestion-body">{{ suggestionSummary.join(' · ') }}</div>
               </div>
-              <el-form-item v-if="currentChartMeta.requiresDimension || currentChartMeta.allowsOptionalDimension" :label="currentChartMeta.requiresDimension ? '维度字段' : '维度字段（可选）'">
+              <el-form-item v-if="currentChartMeta.requiresDimension || currentChartMeta.allowsOptionalDimension || isTableComponentType || isFilterComponentType || isMetricComponentType" :label="dimensionFieldLabel">
                 <el-select v-model="configForm.chart.xField" placeholder="选择维度字段" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
               </el-form-item>
-              <el-form-item v-if="currentChartMeta.requiresMetric" label="度量字段">
+              <el-form-item v-if="currentChartMeta.requiresMetric || isTableComponentType || isMetricComponentType" :label="metricFieldLabel">
                 <el-select v-model="configForm.chart.yField" placeholder="选择度量字段" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
               </el-form-item>
-              <el-form-item v-if="currentChartMeta.allowsGroup" label="分组字段">
+              <el-form-item v-if="currentChartMeta.allowsGroup || isTableComponentType || isMetricComponentType" :label="groupFieldLabel">
                 <el-select v-model="configForm.chart.groupField" placeholder="可选" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
@@ -193,6 +319,15 @@
 
         <el-tab-pane label="样式" name="style">
           <div class="style-sections">
+            <div class="style-family-card">
+              <div class="style-family-head">
+                <span>当前开放属性</span>
+                <span class="style-family-badge">{{ componentKindLabel }}</span>
+              </div>
+              <div class="style-family-tags">
+                <span v-for="tag in styleCapabilityTags" :key="tag" class="style-family-tag">{{ tag }}</span>
+              </div>
+            </div>
 
             <!-- 基础样式 -->
             <div class="ss-block">
@@ -210,7 +345,7 @@
             </div>
 
             <!-- 标题 -->
-            <div class="ss-section">
+            <div v-if="showTitleSection" class="ss-section">
               <div class="ss-hd" @click="toggleSection('title')">
                 <span class="ss-chevron" :class="{ open: openSections.has('title') }">&#9654;</span>
                 <span class="ss-hd-label">标题</span>
@@ -233,7 +368,7 @@
             </div>
 
             <!-- 图例 -->
-            <div v-if="currentChartMeta.supportsLegend" class="ss-section">
+            <div v-if="showLegendSection" class="ss-section">
               <div class="ss-hd" @click="toggleSection('legend')">
                 <span class="ss-chevron" :class="{ open: openSections.has('legend') }">&#9654;</span>
                 <span class="ss-hd-label">图例</span>
@@ -275,7 +410,7 @@
             </div>
 
             <!-- 标签 -->
-            <div class="ss-section">
+            <div v-if="showLabelSection" class="ss-section">
               <div class="ss-hd" @click="toggleSection('label')">
                 <span class="ss-chevron" :class="{ open: openSections.has('label') }">&#9654;</span>
                 <span class="ss-hd-label">数据标签</span>
@@ -290,7 +425,7 @@
             </div>
 
             <!-- 提示框 -->
-            <div class="ss-section">
+            <div v-if="showTooltipSection" class="ss-section">
               <div class="ss-hd">
                 <span class="ss-chevron" style="opacity:0">&#9654;</span>
                 <span class="ss-hd-label">提示框</span>
@@ -299,7 +434,7 @@
             </div>
 
             <!-- 横轴 -->
-            <div v-if="currentChartMeta.supportsAxisNames" class="ss-section">
+            <div v-if="showAxisSections" class="ss-section">
               <div class="ss-hd" @click="toggleSection('xaxis')">
                 <span class="ss-chevron" :class="{ open: openSections.has('xaxis') }">&#9654;</span>
                 <span class="ss-hd-label">横轴</span>
@@ -314,7 +449,7 @@
             </div>
 
             <!-- 纵轴 -->
-            <div v-if="currentChartMeta.supportsAxisNames" class="ss-section">
+            <div v-if="showAxisSections" class="ss-section">
               <div class="ss-hd">
                 <span class="ss-chevron" style="opacity:0">&#9654;</span>
                 <span class="ss-hd-label">纵轴</span>
@@ -323,7 +458,7 @@
             </div>
 
             <!-- 高级 -->
-            <div v-if="currentChartMeta.supportsSmooth || currentChartMeta.supportsAreaFill || currentChartMeta.supportsBarStyle" class="ss-section">
+            <div v-if="showChartAdvancedSection" class="ss-section">
               <div class="ss-hd" @click="toggleSection('adv')">
                 <span class="ss-chevron" :class="{ open: openSections.has('adv') }">&#9654;</span>
                 <span class="ss-hd-label">高级</span>
@@ -349,7 +484,7 @@
             </div>
 
             <!-- 表格样式（仅表格类型） -->
-            <template v-if="configForm.chart.chartType === 'table'">
+            <template v-if="isTableComponentType">
               <div class="ss-section-divider">表格样式</div>
               <div class="ss-section">
                 <div class="ss-hd" @click="toggleSection('table-header')">
@@ -444,6 +579,179 @@
               </div>
             </template>
 
+            <!-- 指标组件样式（指标类型） -->
+            <template v-if="isMetricComponentType">
+              <div class="ss-section-divider">指标样式</div>
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('metric-value')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('metric-value') }">&#9654;</span>
+                  <span class="ss-hd-label">数值展示</span>
+                </div>
+                <div v-show="openSections.has('metric-value')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">数值字号</span>
+                    <el-input-number v-model="configForm.style.metricValueFontSize" :min="16" :max="120" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">数值颜色</span>
+                    <el-color-picker v-model="configForm.style.metricValueColor" size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">前缀文本</span>
+                    <el-input v-model="configForm.style.metricPrefix" size="small" placeholder="如 ¥ / %" style="width:90px" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">后缀文本</span>
+                    <el-input v-model="configForm.style.metricSuffix" size="small" placeholder="如 万元 / 件" style="width:90px" />
+                  </div>
+                </div>
+              </div>
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('metric-trend')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('metric-trend') }">&#9654;</span>
+                  <span class="ss-hd-label">趋势配色</span>
+                </div>
+                <div v-show="openSections.has('metric-trend')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">上升颜色</span>
+                    <el-color-picker v-model="configForm.style.metricTrendUpColor" size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">下降颜色</span>
+                    <el-color-picker v-model="configForm.style.metricTrendDownColor" size="small" />
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 词云样式 -->
+            <template v-if="isWordCloudType">
+              <div class="ss-section-divider">词云样式</div>
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('wordcloud')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('wordcloud') }">&#9654;</span>
+                  <span class="ss-hd-label">词云参数</span>
+                </div>
+                <div v-show="openSections.has('wordcloud')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">最小字号</span>
+                    <el-input-number v-model="configForm.style.wordCloudMinSize" :min="8" :max="32" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">最大字号</span>
+                    <el-input-number v-model="configForm.style.wordCloudMaxSize" :min="20" :max="120" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">旋转角度</span>
+                    <el-input-number v-model="configForm.style.wordCloudRotation" :min="0" :max="90" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 列表样式 -->
+            <template v-if="isListType">
+              <div class="ss-section-divider">列表样式</div>
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('list-style')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('list-style') }">&#9654;</span>
+                  <span class="ss-hd-label">列表参数</span>
+                </div>
+                <div v-show="openSections.has('list-style')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">行间距 (px)</span>
+                    <el-input-number v-model="configForm.style.listItemGap" :min="0" :max="24" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">最大条数</span>
+                    <el-input-number v-model="configForm.style.listMaxItems" :min="1" :max="50" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">滚动动画</span>
+                    <el-switch v-model="configForm.style.listScrollAnimation" size="small" />
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 筛选器样式 -->
+            <template v-if="isFilterComponentType">
+              <div class="ss-section-divider">筛选器样式</div>
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('filter-style')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('filter-style') }">&#9654;</span>
+                  <span class="ss-hd-label">按钮设置</span>
+                </div>
+                <div v-show="openSections.has('filter-style')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">按钮尺寸</span>
+                    <el-select v-model="configForm.style.filterBtnSize" size="small" style="width:90px">
+                      <el-option label="小" value="small" />
+                      <el-option label="默认" value="default" />
+                      <el-option label="大" value="large" />
+                    </el-select>
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">选中颜色</span>
+                    <el-color-picker v-model="configForm.style.filterActiveColor" size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">排列方向</span>
+                    <el-select v-model="configForm.style.filterLayout" size="small" style="width:90px">
+                      <el-option label="水平" value="horizontal" />
+                      <el-option label="垂直" value="vertical" />
+                    </el-select>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 装饰组件样式 -->
+            <template v-if="isDecorationComponentType">
+              <div class="ss-section-divider">装饰效果</div>
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('decor-style')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('decor-style') }">&#9654;</span>
+                  <span class="ss-hd-label">动效与光效</span>
+                </div>
+                <div v-show="openSections.has('decor-style')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">动画速度 (s)</span>
+                    <el-input-number v-model="configForm.style.decorAnimSpeed" :min="0.5" :max="20" :step="0.5" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">光效颜色</span>
+                    <el-color-picker v-model="configForm.style.decorGlowColor" show-alpha size="small" />
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 图标组件样式 -->
+            <template v-if="isVectorIconComponentType">
+              <div class="ss-section-divider">图标样式</div>
+              <div class="ss-section">
+                <div class="ss-hd" @click="toggleSection('icon-style')">
+                  <span class="ss-chevron" :class="{ open: openSections.has('icon-style') }">&#9654;</span>
+                  <span class="ss-hd-label">图标设置</span>
+                </div>
+                <div v-show="openSections.has('icon-style')" class="ss-body">
+                  <div class="ss-row">
+                    <span class="ss-key">图标尺寸</span>
+                    <el-input-number v-model="configForm.style.iconSize" :min="16" :max="256" size="small" controls-position="right" style="width:90px" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">描边颜色</span>
+                    <el-color-picker v-model="configForm.style.iconStrokeColor" size="small" />
+                  </div>
+                  <div class="ss-row">
+                    <span class="ss-key">填充颜色</span>
+                    <el-color-picker v-model="configForm.style.iconFillColor" show-alpha size="small" />
+                  </div>
+                </div>
+              </div>
+            </template>
+
             <!-- 组件高级设置（通用） -->
             <div class="ss-section-divider">组件高级</div>
             <div class="ss-section">
@@ -480,7 +788,7 @@
           </div>
         </el-tab-pane>
 
-        <el-tab-pane v-if="!isDecorationComponentType" label="交互" name="interaction">
+        <el-tab-pane v-if="showInteractionTab" label="交互" name="interaction">
           <section class="inspector-section">
             <div class="section-title">交互配置</div>
             <div class="layout-grid">
@@ -646,6 +954,15 @@ const chartTypeGroups = [
       { label: '角标边框', value: 'decor_border_corner' },
       { label: '霓虹边框', value: 'decor_border_glow' },
       { label: '网格边框', value: 'decor_border_grid' },
+      { label: '流光边框', value: 'decor_border_stream' },
+      { label: '脉冲边框', value: 'decor_border_pulse' },
+      { label: '支架边框', value: 'decor_border_bracket' },
+      { label: '电路边框', value: 'decor_border_circuit' },
+      { label: '标题牌', value: 'decor_title_plate' },
+      { label: '发光分隔条', value: 'decor_divider_glow' },
+      { label: '目标环', value: 'decor_target_ring' },
+      { label: '扫描面板', value: 'decor_scan_panel' },
+      { label: '六边形徽记', value: 'decor_hex_badge' },
     ],
   },
   {
@@ -680,12 +997,47 @@ const chartTypeGroups = [
   },
 ]
 
+const TABLE_LIKE_CHART_TYPES = new Set(['table', 'table_summary', 'table_pivot', 'table_rank'])
+const METRIC_WIDGET_TYPES = new Set(['single_field', 'number_flipper', 'metric_indicator', 'business_trend'])
+const CONTENT_WIDGET_TYPES = new Set(['text_block', 'hyperlink', 'iframe_single', 'iframe_tabs', 'image_list', 'text_list', 'clock_display', 'word_cloud', 'qr_code'])
+const PURE_STATIC_NO_DATA_TYPES = new Set(['text_block', 'hyperlink', 'iframe_single', 'iframe_tabs', 'clock_display', 'qr_code'])
+
 const PAGE_SOURCE_OPTIONS: Array<{ label: string; value: DatasourceSourceKind }> = [
   { label: '数据库', value: 'DATABASE' },
   { label: 'API 接口', value: 'API' },
   { label: '表格', value: 'TABLE' },
   { label: 'JSON 静态数据', value: 'JSON_STATIC' },
 ]
+
+type InspectorBindingEntryMode = 'DATASET' | 'PAGE_SQL'
+type InspectorDataBindingMode = DatasourceSourceKind
+type TableRuntimeDelimiter = '' | 'CSV' | 'TSV'
+type TableRuntimeHeaderMode = '' | 'true' | 'false'
+type ApiRuntimeSection = 'headers' | 'query'
+
+interface RuntimeKeyValueRow {
+  id: string
+  key: string
+  value: string
+}
+
+interface ApiRuntimeFormState {
+  headers: RuntimeKeyValueRow[]
+  query: RuntimeKeyValueRow[]
+  bodyText: string
+  resultPath: string
+}
+
+interface TableRuntimeFormState {
+  delimiter: TableRuntimeDelimiter
+  hasHeader: TableRuntimeHeaderMode
+  text: string
+}
+
+interface JsonRuntimeFormState {
+  resultPath: string
+  text: string
+}
 
 const emit = defineEmits<{
   (e: 'apply-layout', patch: Partial<DashboardComponent>): void
@@ -715,6 +1067,31 @@ const toggleSection = (name: string) => {
 }
 
 let previewTimer: number | null = null
+let runtimeRowSeed = 0
+
+const createRuntimeRow = (patch?: Partial<Omit<RuntimeKeyValueRow, 'id'>>): RuntimeKeyValueRow => ({
+  id: `runtime-row-${runtimeRowSeed++}`,
+  key: patch?.key ?? '',
+  value: patch?.value ?? '',
+})
+
+const createEmptyApiRuntimeForm = (): ApiRuntimeFormState => ({
+  headers: [createRuntimeRow()],
+  query: [createRuntimeRow()],
+  bodyText: '',
+  resultPath: '',
+})
+
+const createEmptyTableRuntimeForm = (): TableRuntimeFormState => ({
+  delimiter: '',
+  hasHeader: '',
+  text: '',
+})
+
+const createEmptyJsonRuntimeForm = (): JsonRuntimeFormState => ({
+  resultPath: '',
+  text: '',
+})
 
 const layoutForm = reactive({ posX: 0, posY: 0, width: 320, height: 220, zIndex: 0 })
 const configForm = reactive<ComponentInstanceConfig>({
@@ -722,11 +1099,114 @@ const configForm = reactive<ComponentInstanceConfig>({
   style: { ...DEFAULT_COMPONENT_STYLE },
   interaction: { ...DEFAULT_COMPONENT_INTERACTION },
 })
+const apiRuntimeForm = reactive<ApiRuntimeFormState>(createEmptyApiRuntimeForm())
+const tableRuntimeForm = reactive<TableRuntimeFormState>(createEmptyTableRuntimeForm())
+const jsonRuntimeForm = reactive<JsonRuntimeFormState>(createEmptyJsonRuntimeForm())
+const apiRuntimeTab = ref<'headers' | 'query' | 'body'>('headers')
 
+const currentChartType = computed(() => configForm.chart.chartType || '')
 const currentChartMeta = computed(() => getChartTypeMeta(configForm.chart.chartType))
 const isDecorationComponentType = computed(() => isDecorationChartType(configForm.chart.chartType))
 const isStaticComponentType = computed(() => isStaticWidgetChartType(configForm.chart.chartType))
+const isVectorIconComponentType = computed(() => currentChartType.value.startsWith('icon_'))
+const isTableComponentType = computed(() => TABLE_LIKE_CHART_TYPES.has(currentChartType.value))
+const isFilterComponentType = computed(() => currentChartType.value === 'filter_button')
+const isMetricComponentType = computed(() => METRIC_WIDGET_TYPES.has(currentChartType.value))
+const isContentComponentType = computed(() => CONTENT_WIDGET_TYPES.has(currentChartType.value))
+const isWordCloudType = computed(() => currentChartType.value === 'word_cloud')
+const isListType = computed(() => currentChartType.value === 'text_list' || currentChartType.value === 'image_list')
+const isPureStaticNoDataComponentType = computed(() => (
+  isDecorationComponentType.value || isVectorIconComponentType.value || PURE_STATIC_NO_DATA_TYPES.has(currentChartType.value)
+))
+const componentKind = computed<'chart' | 'table' | 'metric' | 'content' | 'decoration' | 'icon' | 'control'>(() => {
+  if (isDecorationComponentType.value) return 'decoration'
+  if (isVectorIconComponentType.value) return 'icon'
+  if (isFilterComponentType.value) return 'control'
+  if (isTableComponentType.value) return 'table'
+  if (isMetricComponentType.value) return 'metric'
+  if (isContentComponentType.value) return 'content'
+  return 'chart'
+})
+const componentKindLabel = computed(() => ({
+  chart: '分析图表',
+  table: '表格组件',
+  metric: '指标组件',
+  content: '信息组件',
+  decoration: '装饰组件',
+  icon: '矢量图标',
+  control: '筛选控件',
+}[componentKind.value]))
+const componentKindDescription = computed(() => {
+  switch (componentKind.value) {
+    case 'table':
+      return '重点管理表头、行态、排序与容器边框，保留对数据结构的可读性。'
+    case 'metric':
+      return '以数值聚焦为主，突出标签、核心指标和卡片层级，不展示冗余图例。'
+    case 'content':
+      return '信息型组件优先关注容器层次与内容承载，字段绑定只保留必要项。'
+    case 'decoration':
+      return '装饰组件不参与取数，主要通过主题、边框、阴影与透明度塑造画面氛围。'
+    case 'icon':
+      return '矢量图标不参与取数，只保留适合符号类组件的轮廓与光效设置。'
+    case 'control':
+      return '筛选控件只保留筛选字段与默认值绑定，交互逻辑由全局筛选系统接管。'
+    default:
+      return '分析图表保留完整的数据、图例、坐标轴和高级样式链路，适合 BI 可视化编排。'
+  }
+})
+const componentCapabilityTags = computed(() => {
+  switch (componentKind.value) {
+    case 'table':
+      return ['表头样式', '行态控制', '排序能力', '容器边框']
+    case 'metric':
+      return ['指标聚焦', '标签可选', '卡片边框', '阴影层级']
+    case 'content':
+      return ['信息承载', '内容字段', '容器样式', '透明度']
+    case 'decoration':
+      return ['无数据依赖', '透明背景', '边框动画', '光效强调']
+    case 'icon':
+      return ['无数据依赖', '符号化表达', '描边容器', '阴影增强']
+    case 'control':
+      return ['字段筛选', '默认值', '页面联动', '轻交互']
+    default:
+      return ['数据绑定', '图例控制', '坐标轴', '图表高级']
+  }
+})
+const styleCapabilityTags = computed(() => {
+  switch (componentKind.value) {
+    case 'table':
+      return ['主题配色', '标题', '表头', '行样式', '功能设置', '容器高级']
+    case 'metric':
+      return ['主题配色', '标题', '数值标签', '边框阴影', '容器高级']
+    case 'content':
+      return ['主题配色', '标题', '边框描边', '透明度', '容器高级']
+    case 'decoration':
+      return ['主题色', '透明容器', '边框描边', '光效阴影']
+    case 'icon':
+      return ['主题色', '描边容器', '阴影发光', '透明度']
+    case 'control':
+      return ['主题配色', '标题', '边框描边', '容器高级']
+    default:
+      return ['主题配色', '标题', '图例', '标签', '坐标轴', '图表高级', '容器高级']
+  }
+})
+const showDataTab = computed(() => !isPureStaticNoDataComponentType.value)
+const showInteractionTab = computed(() => showDataTab.value && !isFilterComponentType.value)
+const showTitleSection = computed(() => !isDecorationComponentType.value && !isVectorIconComponentType.value)
+const showLegendSection = computed(() => componentKind.value === 'chart' && currentChartMeta.value.supportsLegend)
+const showLabelSection = computed(() => showDataTab.value && !isTableComponentType.value && !isFilterComponentType.value)
+const showTooltipSection = computed(() => showDataTab.value && !isFilterComponentType.value)
+const showAxisSections = computed(() => componentKind.value === 'chart' && currentChartMeta.value.supportsAxisNames)
+const showChartAdvancedSection = computed(() => (
+  componentKind.value === 'chart' && (
+    currentChartMeta.value.supportsSmooth ||
+    currentChartMeta.value.supportsAreaFill ||
+    currentChartMeta.value.supportsBarStyle
+  )
+))
 const isUseDatasetMode = computed(() => configForm.chart.sourceMode !== 'PAGE_SQL')
+const bindingEntryMode = computed<InspectorBindingEntryMode>(() => isUseDatasetMode.value ? 'DATASET' : 'PAGE_SQL')
+const dataBindingMode = computed<InspectorDataBindingMode>(() => configForm.chart.pageSourceKind)
 const missingFields = computed(() => isStaticComponentType.value ? [] : getMissingChartFields(configForm.chart))
 const suggestedFields = computed(() => suggestChartFields(previewColumns.value, configForm.chart.chartType))
 const pageSourceDatasources = computed(() => datasources.value.filter((item) => resolveDatasourceKind(item) === configForm.chart.pageSourceKind))
@@ -745,18 +1225,6 @@ const pageSourceHelperText = computed(() => {
       return ''
   }
 })
-const pageSourceConfigPlaceholder = computed(() => {
-  switch (configForm.chart.pageSourceKind) {
-    case 'API':
-      return '{\n  "apiQuery": { "page": 1 },\n  "apiHeaders": { "Authorization": "Bearer xxx" },\n  "apiBody": { "keyword": "tea" },\n  "apiResultPath": "data.records"\n}'
-    case 'TABLE':
-      return '{\n  "tableDelimiter": "CSV",\n  "tableHasHeader": true,\n  "tableText": "region,value\\n华东,120"\n}'
-    case 'JSON_STATIC':
-      return '{\n  "jsonText": "[{\\"region\\":\\"华东\\",\\"value\\":120}]",\n  "jsonResultPath": "data.list"\n}'
-    default:
-      return ''
-  }
-})
 const suggestionSummary = computed(() => {
   const entries = [
     suggestedFields.value.xField ? `维度 ${suggestedFields.value.xField}` : '',
@@ -765,6 +1233,83 @@ const suggestionSummary = computed(() => {
   ]
   return entries.filter(Boolean)
 })
+const dataModeTitle = computed(() => {
+  switch (componentKind.value) {
+    case 'table':
+      return '表格型组件建议优先绑定结构稳定的数据集，再补充维度与指标角色。'
+    case 'metric':
+      return '指标型组件以单一核心数值为主，可附加标签字段或对比字段强化语义。'
+    case 'content':
+      return '信息型组件只暴露必要绑定项，适合列表、词云等轻量数据组件。'
+    case 'control':
+      return '筛选控件只需要绑定筛选字段，页面运行时会自动接管联动逻辑。'
+    default:
+      return '图表型组件支持完整数据接入链路，可按维度、度量、分组逐步映射。'
+  }
+})
+const dataModeDescription = computed(() => {
+  if (bindingEntryMode.value === 'DATASET') {
+    return '当前处于数据集模式，适合复用已有 SQL 与字段定义；字段映射会随样例数据自动推荐。'
+  }
+  return '当前处于在线编辑模式，可以按数据库、API、表格、JSON 四种来源直接绑定当前页面组件。'
+})
+const dataCapabilityTags = computed(() => {
+  const tags = [bindingEntryMode.value === 'DATASET' ? '复用数据集' : '页面实时取数']
+  if (currentChartMeta.value.requiresDimension || isTableComponentType.value || isFilterComponentType.value || isMetricComponentType.value) {
+    tags.push('维度角色')
+  }
+  if (currentChartMeta.value.requiresMetric || isTableComponentType.value || isMetricComponentType.value) {
+    tags.push('指标角色')
+  }
+  if (currentChartMeta.value.allowsGroup || isTableComponentType.value || isMetricComponentType.value) {
+    tags.push('分组扩展')
+  }
+  return tags.slice(0, 4)
+})
+const dimensionFieldLabel = computed(() => {
+  if (isFilterComponentType.value) return '筛选字段'
+  if (isTableComponentType.value) return '主维度字段'
+  if (isMetricComponentType.value) return currentChartMeta.value.requiresDimension ? '标签字段' : '标签字段（可选）'
+  return currentChartMeta.value.requiresDimension ? '维度字段' : '维度字段（可选）'
+})
+const metricFieldLabel = computed(() => {
+  if (isTableComponentType.value) return '主指标字段'
+  if (isMetricComponentType.value) return '数值字段'
+  return '度量字段'
+})
+const groupFieldLabel = computed(() => {
+  if (isTableComponentType.value) return '分组 / 列字段'
+  if (isMetricComponentType.value) return '对比字段'
+  return '分组字段'
+})
+const healthReadyText = computed(() => {
+  switch (componentKind.value) {
+    case 'decoration':
+      return '当前组件无需绑定数据，适合直接调整边框、阴影和透明层级后保存。'
+    case 'icon':
+      return '当前图标组件无需绑定数据，建议重点调整主题色、容器边框和发光效果。'
+    case 'content':
+      return '当前配置满足信息组件的预览要求，可继续微调容器样式与内容承载方式。'
+    case 'metric':
+      return '当前指标组件已可预览，建议继续检查标签字段和数值字段是否表达清晰。'
+    case 'table':
+      return '当前表格组件已满足预览条件，可继续优化表头、行态与排序体验。'
+    case 'control':
+      return '当前筛选控件已满足预览条件，可直接保存并用于页面全局筛选。'
+    default:
+      return '当前配置满足画布预览要求，可直接联动预览与保存。'
+  }
+})
+const pageSourceRuntimeSignature = computed(() => JSON.stringify({
+  api: {
+    resultPath: apiRuntimeForm.resultPath,
+    bodyText: apiRuntimeForm.bodyText,
+    headers: apiRuntimeForm.headers.map((item) => ({ key: item.key, value: item.value })),
+    query: apiRuntimeForm.query.map((item) => ({ key: item.key, value: item.value })),
+  },
+  table: { ...tableRuntimeForm },
+  json: { ...jsonRuntimeForm },
+}))
 
 const currentComponentChartId = computed(() => props.component?.chartId ?? props.chart?.id ?? null)
 
@@ -821,10 +1366,140 @@ const queuePreview = () => {
       chartId: currentComponentChartId.value as number,
       configJson: buildCurrentConfigJson(),
     })
-  }, 160)
+  }, 300)
 }
 
 const resolveDatasourceKind = (datasource?: Datasource | null): DatasourceSourceKind => datasource?.sourceKind || 'DATABASE'
+const readObject = (value: unknown) => (!value || typeof value !== 'object' || Array.isArray(value) ? {} : value as Record<string, unknown>)
+const readString = (value: unknown) => typeof value === 'string' ? value : ''
+const readBoolean = (value: unknown, fallback = false) => typeof value === 'boolean' ? value : fallback
+
+const parseJsonObjectTextSafely = (jsonText?: string) => {
+  const trimmed = String(jsonText ?? '').trim()
+  if (!trimmed) return {} as Record<string, unknown>
+  try {
+    const parsed = JSON.parse(trimmed)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+const parseJsonValueText = (jsonText: string, errorMessage: string) => {
+  try {
+    return JSON.parse(jsonText)
+  } catch {
+    throw new Error(errorMessage)
+  }
+}
+
+const parseLooseJsonValue = (text: string) => {
+  const trimmed = text.trim()
+  if (!trimmed) return undefined
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    return trimmed
+  }
+}
+
+const stringifyUnknown = (value: unknown) => {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
+const rowsFromObject = (value: unknown) => {
+  const entries = Object.entries(readObject(value))
+  return entries.length
+    ? entries.map(([key, rowValue]) => createRuntimeRow({ key, value: stringifyUnknown(rowValue) }))
+    : [createRuntimeRow()]
+}
+
+const resetPageSourceForms = () => {
+  Object.assign(apiRuntimeForm, createEmptyApiRuntimeForm())
+  Object.assign(tableRuntimeForm, createEmptyTableRuntimeForm())
+  Object.assign(jsonRuntimeForm, createEmptyJsonRuntimeForm())
+  apiRuntimeTab.value = 'headers'
+}
+
+const syncPageSourceFormsFromRuntime = (runtimeConfigText?: string) => {
+  resetPageSourceForms()
+  const runtimeConfig = parseJsonObjectTextSafely(runtimeConfigText)
+  apiRuntimeForm.headers = rowsFromObject(runtimeConfig.apiHeaders ?? runtimeConfig.headers)
+  apiRuntimeForm.query = rowsFromObject(runtimeConfig.apiQuery ?? runtimeConfig.query)
+  apiRuntimeForm.bodyText = stringifyUnknown(runtimeConfig.apiBody ?? runtimeConfig.body)
+  apiRuntimeForm.resultPath = readString(runtimeConfig.apiResultPath ?? runtimeConfig.resultPath)
+
+  tableRuntimeForm.delimiter = (readString(runtimeConfig.tableDelimiter ?? runtimeConfig.delimiter).toUpperCase() as TableRuntimeDelimiter) || ''
+  tableRuntimeForm.hasHeader = typeof (runtimeConfig.tableHasHeader ?? runtimeConfig.hasHeader) === 'boolean'
+    ? String(readBoolean(runtimeConfig.tableHasHeader ?? runtimeConfig.hasHeader)) as TableRuntimeHeaderMode
+    : ''
+  tableRuntimeForm.text = readString(runtimeConfig.tableText ?? runtimeConfig.text)
+
+  jsonRuntimeForm.resultPath = readString(runtimeConfig.jsonResultPath ?? runtimeConfig.resultPath)
+  jsonRuntimeForm.text = readString(runtimeConfig.jsonText ?? runtimeConfig.text)
+}
+
+const buildRuntimeKeyValueObject = (rows: RuntimeKeyValueRow[]) => rows.reduce<Record<string, unknown>>((result, row) => {
+  const key = row.key.trim()
+  if (!key) return result
+  const parsedValue = parseLooseJsonValue(row.value)
+  result[key] = parsedValue === undefined ? '' : parsedValue
+  return result
+}, {})
+
+const buildPageSourceRuntimeConfig = () => {
+  if (configForm.chart.pageSourceKind === 'API') {
+    const runtimeConfig: Record<string, unknown> = {}
+    const headers = buildRuntimeKeyValueObject(apiRuntimeForm.headers)
+    const query = buildRuntimeKeyValueObject(apiRuntimeForm.query)
+    if (Object.keys(headers).length) runtimeConfig.apiHeaders = headers
+    if (Object.keys(query).length) runtimeConfig.apiQuery = query
+    const body = parseLooseJsonValue(apiRuntimeForm.bodyText)
+    if (body !== undefined) runtimeConfig.apiBody = body
+    if (apiRuntimeForm.resultPath.trim()) runtimeConfig.apiResultPath = apiRuntimeForm.resultPath.trim()
+    return runtimeConfig
+  }
+
+  if (configForm.chart.pageSourceKind === 'TABLE') {
+    const runtimeConfig: Record<string, unknown> = {}
+    if (tableRuntimeForm.delimiter) runtimeConfig.tableDelimiter = tableRuntimeForm.delimiter
+    if (tableRuntimeForm.hasHeader) runtimeConfig.tableHasHeader = tableRuntimeForm.hasHeader === 'true'
+    if (tableRuntimeForm.text.trim()) runtimeConfig.tableText = tableRuntimeForm.text
+    return runtimeConfig
+  }
+
+  if (configForm.chart.pageSourceKind === 'JSON_STATIC') {
+    const runtimeConfig: Record<string, unknown> = {}
+    if (jsonRuntimeForm.resultPath.trim()) runtimeConfig.jsonResultPath = jsonRuntimeForm.resultPath.trim()
+    if (jsonRuntimeForm.text.trim()) runtimeConfig.jsonText = jsonRuntimeForm.text
+    return runtimeConfig
+  }
+
+  return {}
+}
+
+const syncRuntimeConfigTextFromForms = () => {
+  if (configForm.chart.sourceMode !== 'PAGE_SQL' || configForm.chart.pageSourceKind === 'DATABASE') {
+    configForm.chart.runtimeConfigText = ''
+    return
+  }
+  const runtimeConfig = buildPageSourceRuntimeConfig()
+  configForm.chart.runtimeConfigText = Object.keys(runtimeConfig).length ? JSON.stringify(runtimeConfig, null, 2) : ''
+}
+
+const ensurePageSourceRuntimeValid = () => {
+  if (configForm.chart.pageSourceKind === 'JSON_STATIC' && jsonRuntimeForm.text.trim()) {
+    parseJsonValueText(jsonRuntimeForm.text, 'JSON 内容覆盖必须是合法 JSON')
+  }
+}
 
 const clearPreviewData = () => {
   previewColumns.value = []
@@ -832,18 +1507,16 @@ const clearPreviewData = () => {
   previewRowCount.value = 0
 }
 
-const ensureRuntimeConfigTextValid = () => {
-  if (configForm.chart.pageSourceKind === 'DATABASE') return
-  const text = configForm.chart.runtimeConfigText.trim()
-  if (!text) return
-  try {
-    const parsed = JSON.parse(text)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('页面级配置必须是 JSON 对象')
-    }
-  } catch {
-    throw new Error('页面级配置必须是 JSON 对象')
-  }
+const clearChartDataBinding = () => {
+  configForm.chart.datasetId = ''
+  configForm.chart.datasourceId = ''
+  configForm.chart.sqlText = ''
+  configForm.chart.runtimeConfigText = ''
+  configForm.chart.xField = ''
+  configForm.chart.yField = ''
+  configForm.chart.groupField = ''
+  resetPageSourceForms()
+  clearPreviewData()
 }
 
 const ensurePageDatasourceMatched = () => {
@@ -869,6 +1542,8 @@ const syncFromProps = async () => {
   configForm.chart = { ...normalized.chart }
   configForm.style = { ...normalized.style }
   configForm.interaction = { ...normalized.interaction }
+  syncPageSourceFormsFromRuntime(configForm.chart.runtimeConfigText)
+  syncRuntimeConfigTextFromForms()
 
   if (isUseDatasetMode.value && configForm.chart.datasetId) {
     await onDatasetChange(configForm.chart.datasetId)
@@ -888,43 +1563,82 @@ const syncFromProps = async () => {
 }
 
 watch(() => [props.component?.id, props.component?.configJson, props.chart?.id], syncFromProps, { immediate: true })
-watch(() => [configForm.chart, configForm.style, configForm.interaction, currentComponentChartId.value], queuePreview, { deep: true })
+
+// 用 JSON 签名代替 deep watch：只在序列化内容真正变化时才触发预览，
+// 避免 60+ 属性对象的深度比较在滑块拖拽等连续操作中造成卡顿。
+const configFormSignature = computed(() => JSON.stringify([configForm.chart, configForm.style, configForm.interaction, currentComponentChartId.value]))
+watch(configFormSignature, queuePreview)
+watch(pageSourceRuntimeSignature, () => {
+  if (syncingFromProps.value || isUseDatasetMode.value) return
+  syncRuntimeConfigTextFromForms()
+})
+watch(isPureStaticNoDataComponentType, (disabled) => {
+  if (!disabled || isDecorationComponentType.value) return
+  clearChartDataBinding()
+  if (activeTab.value === 'data' || activeTab.value === 'interaction') {
+    activeTab.value = 'style'
+  }
+})
 watch(isDecorationComponentType, (isDecoration) => {
   if (!isDecoration) return
-  configForm.chart.datasetId = ''
-  configForm.chart.xField = ''
-  configForm.chart.yField = ''
-  configForm.chart.groupField = ''
+  clearChartDataBinding()
   configForm.style.bgColor = 'rgba(0,0,0,0)'
   if (activeTab.value === 'data' || activeTab.value === 'interaction') {
     activeTab.value = 'style'
   }
 })
+watch(isFilterComponentType, (isFilter) => {
+  if (!isFilter) return
+  configForm.interaction.enableClickLinkage = false
+  configForm.interaction.clickAction = 'none'
+  configForm.interaction.linkageFieldMode = 'auto'
+  configForm.interaction.linkageField = ''
+  if (activeTab.value === 'interaction') {
+    activeTab.value = 'data'
+  }
+})
 
 const loadMeta = async () => {
-  const [datasetList, datasourceList] = await Promise.all([getDatasetList(), getDatasourceList()])
-  datasets.value = datasetList
-  datasources.value = datasourceList
-  if (props.component) {
-    await syncFromProps()
+  try {
+    const [datasetList, datasourceList] = await Promise.all([getDatasetList(), getDatasourceList()])
+    datasets.value = datasetList
+    datasources.value = datasourceList
+    if (props.component) {
+      await syncFromProps()
+    }
+  } catch {
+    datasets.value = []
+    datasources.value = []
   }
 }
 
-const onSourceModeSwitch = async (useDataset: boolean) => {
-  configForm.chart.sourceMode = useDataset ? 'DATASET' : 'PAGE_SQL'
-  if (useDataset) {
+const onBindingEntryModeChange = async (mode: InspectorBindingEntryMode) => {
+  if (mode === 'DATASET') {
+    configForm.chart.sourceMode = 'DATASET'
     configForm.chart.datasourceId = ''
     configForm.chart.sqlText = ''
-    configForm.chart.runtimeConfigText = ''
+    resetPageSourceForms()
+    syncRuntimeConfigTextFromForms()
     if (configForm.chart.datasetId) {
       await onDatasetChange(configForm.chart.datasetId)
       return
     }
   } else {
+    configForm.chart.sourceMode = 'PAGE_SQL'
     configForm.chart.datasetId = ''
-    clearPreviewData()
-    return
+    syncRuntimeConfigTextFromForms()
   }
+  clearPreviewData()
+}
+
+const onDataBindingModeChange = async (mode: InspectorDataBindingMode) => {
+  configForm.chart.sourceMode = 'PAGE_SQL'
+  configForm.chart.pageSourceKind = mode
+  configForm.chart.datasetId = ''
+  configForm.chart.datasourceId = ''
+  configForm.chart.sqlText = ''
+  resetPageSourceForms()
+  syncRuntimeConfigTextFromForms()
   clearPreviewData()
 }
 
@@ -943,11 +1657,13 @@ const onDatasetChange = async (datasetId: number | '' | null | undefined) => {
   }
 }
 
-const onPageSourceKindChange = () => {
-  configForm.chart.datasourceId = ''
-  configForm.chart.sqlText = ''
-  configForm.chart.runtimeConfigText = ''
-  clearPreviewData()
+const addApiRuntimeRow = (section: ApiRuntimeSection) => {
+  apiRuntimeForm[section] = [...apiRuntimeForm[section], createRuntimeRow()]
+}
+
+const removeApiRuntimeRow = (section: ApiRuntimeSection, rowId: string) => {
+  const nextRows = apiRuntimeForm[section].filter((item) => item.id !== rowId)
+  apiRuntimeForm[section] = nextRows.length ? nextRows : [createRuntimeRow()]
 }
 
 const onPageDatasourceChange = () => {
@@ -963,7 +1679,8 @@ const onPageSourceQuery = async () => {
       ElMessage.warning('请输入页面编写 SQL')
       return
     }
-    ensureRuntimeConfigTextValid()
+    ensurePageSourceRuntimeValid()
+    syncRuntimeConfigTextFromForms()
   } catch (error) {
     ElMessage.warning(error instanceof Error ? error.message : '页面来源配置不正确')
     return
@@ -1055,7 +1772,8 @@ const saveComponentConfig = async () => {
       if (configForm.chart.pageSourceKind === 'DATABASE' && !configForm.chart.sqlText.trim()) {
         return ElMessage.warning('请输入页面编写 SQL')
       }
-      ensureRuntimeConfigTextValid()
+      ensurePageSourceRuntimeValid()
+      syncRuntimeConfigTextFromForms()
     } catch (error) {
       return ElMessage.warning(error instanceof Error ? error.message : '页面来源配置不正确')
     }
@@ -1106,29 +1824,49 @@ onBeforeUnmount(() => {
   max-height: calc(100vh - 32px);
   overflow: hidden;
   padding: 18px;
-  border-radius: 20px;
-  border: 1px solid #d9e6f4;
-  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
-  box-shadow: 0 18px 38px rgba(21, 61, 112, 0.08);
+  border-radius: 22px;
+  border: 1px solid rgba(102, 152, 203, 0.22);
+  background:
+    radial-gradient(circle at top, rgba(78, 154, 255, 0.16), transparent 34%),
+    linear-gradient(180deg, rgba(8, 21, 35, 0.98) 0%, rgba(8, 16, 28, 0.98) 100%);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.34);
+}
+
+.inspector-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
+}
+
+.inspector-head,
+.inspector-tabs,
+.inspector-actions {
+  position: relative;
+  z-index: 1;
 }
 
 .inspector-head {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(92, 137, 185, 0.16);
 }
 
 .inspector-title {
   font-size: 16px;
   font-weight: 700;
-  color: #183153;
+  color: #f2f8ff;
 }
 
 .inspector-subtitle,
 .hint-text {
   font-size: 12px;
   line-height: 1.6;
-  color: #71829b;
+  color: rgba(191, 213, 234, 0.68);
 }
 
 .inspector-empty {
@@ -1143,18 +1881,79 @@ onBeforeUnmount(() => {
   margin-bottom: 12px;
 }
 
+.inspector-tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+
 .inspector-tabs :deep(.el-tabs__nav-wrap::after) {
   display: none;
 }
 
+.inspector-tabs :deep(.el-tabs__nav) {
+  gap: 6px;
+}
+
+.inspector-tabs :deep(.el-tabs__nav-scroll) {
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(8, 20, 34, 0.74);
+  border: 1px solid rgba(91, 138, 188, 0.14);
+}
+
 .inspector-tabs :deep(.el-tabs__item) {
+  height: 30px;
   padding: 0 12px;
+  border-radius: 999px;
   font-size: 12px;
+  color: rgba(191, 213, 234, 0.68);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.inspector-tabs :deep(.el-tabs__item.is-active) {
+  color: #f4fbff;
+  background: linear-gradient(135deg, rgba(56, 147, 255, 0.22), rgba(20, 90, 168, 0.58));
 }
 
 .inspector-tabs :deep(.el-tabs__content) {
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.inspector-shell :deep(.el-input__wrapper),
+.inspector-shell :deep(.el-select__wrapper),
+.inspector-shell :deep(.el-input-number .el-input__wrapper),
+.inspector-shell :deep(.el-color-picker__trigger) {
+  background: rgba(7, 22, 38, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(96, 153, 214, 0.16);
+}
+
+.inspector-shell :deep(.el-textarea__inner) {
+  background: rgba(7, 22, 38, 0.9);
+  border: 1px solid rgba(96, 153, 214, 0.16);
+  color: #edf6ff;
+}
+
+.inspector-shell :deep(.el-input__inner),
+.inspector-shell :deep(.el-select__placeholder),
+.inspector-shell :deep(.el-select__selected-item),
+.inspector-shell :deep(.el-radio-button__inner),
+.inspector-shell :deep(.el-checkbox__label) {
+  color: #edf6ff;
+}
+
+.inspector-shell :deep(.el-input-number) {
+  width: 100%;
+}
+
+.inspector-shell :deep(.el-radio-button__inner) {
+  background: rgba(7, 22, 38, 0.88);
+  border-color: rgba(96, 153, 214, 0.16);
+}
+
+.inspector-shell :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: linear-gradient(135deg, rgba(56, 147, 255, 0.32), rgba(20, 90, 168, 0.72));
+  border-color: rgba(111, 188, 255, 0.32);
+  box-shadow: none;
 }
 
 .inspector-section {
@@ -1166,20 +1965,23 @@ onBeforeUnmount(() => {
 .section-title {
   font-size: 13px;
   font-weight: 700;
-  color: #183153;
+  color: #eef7ff;
 }
 
-.summary-card {
+.summary-card,
+.profile-card,
+.mode-card,
+.style-family-card {
   padding: 14px;
   border-radius: 16px;
-  border: 1px solid #deebf7;
-  background: linear-gradient(180deg, #f6fbff 0%, #ffffff 100%);
+  border: 1px solid rgba(95, 146, 199, 0.16);
+  background: linear-gradient(180deg, rgba(10, 27, 44, 0.86) 0%, rgba(8, 17, 30, 0.92) 100%);
 }
 
 .summary-name {
   font-size: 15px;
   font-weight: 700;
-  color: #163050;
+  color: #f3f9ff;
 }
 
 .summary-tags {
@@ -1192,7 +1994,7 @@ onBeforeUnmount(() => {
 .summary-meta {
   margin-top: 10px;
   font-size: 12px;
-  color: #71829b;
+  color: rgba(191, 213, 234, 0.66);
 }
 
 .health-card,
@@ -1201,13 +2003,13 @@ onBeforeUnmount(() => {
 .filter-editor {
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid #deebf7;
-  background: #fff;
+  border: 1px solid rgba(95, 146, 199, 0.16);
+  background: rgba(8, 20, 34, 0.82);
 }
 
 .health-card--warning {
-  border-color: #f2cf8b;
-  background: linear-gradient(180deg, #fffaf0 0%, #ffffff 100%);
+  border-color: rgba(232, 182, 86, 0.32);
+  background: linear-gradient(180deg, rgba(58, 35, 7, 0.56) 0%, rgba(8, 20, 34, 0.9) 100%);
 }
 
 .health-head,
@@ -1226,7 +2028,7 @@ onBeforeUnmount(() => {
 .filter-editor-head span {
   font-size: 13px;
   font-weight: 700;
-  color: #183153;
+  color: #eff7ff;
 }
 
 .health-text,
@@ -1237,7 +2039,78 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   font-size: 12px;
   line-height: 1.6;
-  color: #71829b;
+  color: rgba(191, 213, 234, 0.68);
+}
+
+.profile-kicker,
+.mode-card-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(120, 188, 255, 0.72);
+}
+
+.profile-title,
+.mode-card-title {
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #f5fbff;
+}
+
+.profile-desc,
+.mode-card-desc {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(191, 213, 234, 0.72);
+}
+
+.profile-chip-list,
+.mode-card-tags,
+.style-family-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.profile-chip,
+.mode-card-tag,
+.style-family-tag {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(111, 188, 255, 0.16);
+  background: rgba(6, 23, 38, 0.72);
+  color: rgba(227, 240, 255, 0.82);
+  font-size: 11px;
+}
+
+.style-family-card {
+  padding: 12px 14px;
+}
+
+.style-family-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #eff7ff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.style-family-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(73, 160, 255, 0.14);
+  border: 1px solid rgba(73, 160, 255, 0.22);
+  color: #dff3ff;
+  font-size: 11px;
 }
 
 .preset-grid {
@@ -1256,9 +2129,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  border: 1px solid #dbe8f6;
+  border: 1px solid rgba(95, 146, 199, 0.18);
   border-radius: 14px;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  background: linear-gradient(180deg, rgba(10, 27, 44, 0.84) 0%, rgba(8, 17, 30, 0.92) 100%);
   text-align: left;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
@@ -1266,19 +2139,19 @@ onBeforeUnmount(() => {
 
 .preset-card:hover {
   transform: translateY(-1px);
-  border-color: #8fb7e5;
-  box-shadow: 0 10px 24px rgba(27, 83, 145, 0.08);
+  border-color: rgba(111, 188, 255, 0.34);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
 }
 
 .preset-card strong {
   font-size: 13px;
-  color: #183153;
+  color: #eff7ff;
 }
 
 .preset-card span {
   font-size: 12px;
   line-height: 1.6;
-  color: #71829b;
+  color: rgba(191, 213, 234, 0.68);
 }
 
 .filter-editor {
@@ -1306,8 +2179,8 @@ onBeforeUnmount(() => {
 .inspector-actions {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid #e6eef8;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 28%);
+  border-top: 1px solid rgba(92, 137, 185, 0.16);
+  background: linear-gradient(180deg, rgba(6, 16, 28, 0) 0%, rgba(6, 16, 28, 0.96) 28%);
 }
 
 .layout-grid {
@@ -1321,7 +2194,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 6px;
   font-size: 12px;
-  color: #50637b;
+  color: rgba(214, 230, 247, 0.82);
 }
 
 .field-item :deep(.el-input-number),
@@ -1349,13 +2222,98 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.page-source-group--mode {
+  width: 100%;
+}
+
+.page-source-group--mode :deep(.el-radio-button) {
+  flex: 1 1 auto;
+}
+
+.page-source-group--submode {
+  width: 100%;
+}
+
+.page-source-group--submode :deep(.el-radio-button) {
+  flex: 1 1 140px;
+}
+
+.runtime-editor-card {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(95, 146, 199, 0.16);
+  background: linear-gradient(180deg, rgba(10, 27, 44, 0.84) 0%, rgba(8, 17, 30, 0.92) 100%);
+}
+
+.runtime-editor-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.runtime-editor-head > span:first-child {
+  font-size: 13px;
+  font-weight: 700;
+  color: #eef7ff;
+}
+
+.runtime-editor-tip {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(191, 213, 234, 0.68);
+}
+
+.runtime-tabs :deep(.el-tabs__header) {
+  margin-bottom: 10px;
+}
+
+.runtime-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.kv-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kv-editor-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+}
+
+.kv-editor-row :deep(.el-input) {
+  width: 100%;
+}
+
+.runtime-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runtime-form-item {
+  margin-bottom: 0;
+}
+
+.runtime-form-item--full {
+  grid-column: 1 / -1;
+}
+
+.action-row--compact {
+  margin-top: 10px;
+}
+
 .schema-block {
   margin: 0;
   max-height: 280px;
   overflow: auto;
   padding: 12px;
   border-radius: 14px;
-  background: #0f2138;
+  border: 1px solid rgba(95, 146, 199, 0.16);
+  background: rgba(5, 15, 27, 0.95);
   color: #dce7f5;
   font-size: 12px;
   line-height: 1.65;
@@ -1378,6 +2336,11 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
+  .kv-editor-row,
+  .runtime-form-grid {
+    grid-template-columns: 1fr;
+  }
+
   .inspector-tabs :deep(.el-tabs__content) {
     overflow: visible;
     padding-right: 0;
@@ -1388,34 +2351,34 @@ onBeforeUnmount(() => {
 .style-sections {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
   padding: 4px 0 8px;
 }
 
 .ss-block {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
   padding: 0 0 6px;
-  border-bottom: 1px solid #e6eef8;
+  border-bottom: 1px solid rgba(92, 137, 185, 0.16);
   margin-bottom: 4px;
 }
 
 .ss-section {
-  border-radius: 8px;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1px solid #e8f0f8;
-  background: #fafcff;
+  border: 1px solid rgba(95, 146, 199, 0.16);
+  background: rgba(8, 20, 34, 0.78);
 }
 
 .ss-section-divider {
   font-size: 11px;
-  color: #7ba7c8;
+  color: rgba(120, 188, 255, 0.72);
   padding: 10px 4px 4px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  border-top: 1px solid #dde8f5;
+  border-top: 1px solid rgba(92, 137, 185, 0.16);
   margin-top: 6px;
 }
 
@@ -1430,12 +2393,12 @@ onBeforeUnmount(() => {
 }
 
 .ss-hd:hover {
-  background: #f0f6ff;
+  background: rgba(23, 53, 86, 0.52);
 }
 
 .ss-chevron {
   font-size: 8px;
-  color: #91aac8;
+  color: rgba(177, 204, 232, 0.56);
   transition: transform 0.18s;
   line-height: 1;
   flex-shrink: 0;
@@ -1443,20 +2406,20 @@ onBeforeUnmount(() => {
 
 .ss-chevron.open {
   transform: rotate(90deg);
-  color: #409eff;
+  color: #6fc1ff;
 }
 
 .ss-hd-label {
   flex: 1;
   font-size: 12px;
   font-weight: 600;
-  color: #2c3e5a;
+  color: #eff7ff;
 }
 
 .ss-body {
   padding: 4px 10px 8px;
-  border-top: 1px solid #e8f0f8;
-  background: #fff;
+  border-top: 1px solid rgba(95, 146, 199, 0.12);
+  background: rgba(5, 15, 27, 0.72);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1472,7 +2435,7 @@ onBeforeUnmount(() => {
 
 .ss-key {
   font-size: 12px;
-  color: #50637b;
+  color: rgba(214, 230, 247, 0.82);
   flex-shrink: 0;
 }
 

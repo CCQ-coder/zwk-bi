@@ -611,6 +611,51 @@ export const CHART_TYPE_META = {
         label: '网格边框',
         description: '包含刻度与网格肌理的装饰边框。',
     },
+    decor_border_stream: {
+        ...STATIC_NO_FIELD_META,
+        label: '流光边框',
+        description: '带流光扫过效果的边框装饰。',
+    },
+    decor_border_pulse: {
+        ...STATIC_NO_FIELD_META,
+        label: '脉冲边框',
+        description: '带节奏脉冲效果的高亮边框。',
+    },
+    decor_border_bracket: {
+        ...STATIC_NO_FIELD_META,
+        label: '支架边框',
+        description: '强调结构边界的支架式边框装饰。',
+    },
+    decor_border_circuit: {
+        ...STATIC_NO_FIELD_META,
+        label: '电路边框',
+        description: '适合科技主题大屏的链路式边框装饰。',
+    },
+    decor_title_plate: {
+        ...STATIC_NO_FIELD_META,
+        label: '标题牌',
+        description: '适合做模块标题区、章节头和主题抬头。',
+    },
+    decor_divider_glow: {
+        ...STATIC_NO_FIELD_META,
+        label: '发光分隔条',
+        description: '适合做版块间的分割线和节奏线。',
+    },
+    decor_target_ring: {
+        ...STATIC_NO_FIELD_META,
+        label: '目标环',
+        description: '适合做雷达、锁定和重点聚焦装饰。',
+    },
+    decor_scan_panel: {
+        ...STATIC_NO_FIELD_META,
+        label: '扫描面板',
+        description: '带扫描流光和网格纹理的科技面板。',
+    },
+    decor_hex_badge: {
+        ...STATIC_NO_FIELD_META,
+        label: '六边形徽记',
+        description: '适合做标签、徽章和中心标识装饰。',
+    },
     text_block: {
         ...STATIC_NO_FIELD_META,
         label: '文本组件',
@@ -733,6 +778,8 @@ export const CANVAS_RENDERABLE_CHART_TYPES = new Set([
 ]);
 export const DECORATION_CHART_TYPES = new Set([
     'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
+    'decor_border_stream', 'decor_border_pulse', 'decor_border_bracket', 'decor_border_circuit',
+    'decor_title_plate', 'decor_divider_glow', 'decor_target_ring', 'decor_scan_panel', 'decor_hex_badge',
 ]);
 export const TEXT_WIDGET_CHART_TYPES = new Set([
     'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',
@@ -1006,6 +1053,15 @@ export const chartTypeLabel = (type) => ({
     decor_border_corner: '角标边框',
     decor_border_glow: '霓虹边框',
     decor_border_grid: '网格边框',
+    decor_border_stream: '流光边框',
+    decor_border_pulse: '脉冲边框',
+    decor_border_bracket: '支架边框',
+    decor_border_circuit: '电路边框',
+    decor_title_plate: '标题牌',
+    decor_divider_glow: '发光分隔条',
+    decor_target_ring: '目标环',
+    decor_scan_panel: '扫描面板',
+    decor_hex_badge: '六边形徽记',
     text_block: '文本组件',
     single_field: '单字段组件',
     number_flipper: '数字翻牌器',

@@ -1,33 +1,66 @@
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Monitor, Plus } from '@element-plus/icons-vue';
 import TopNavBar from '../components/TopNavBar.vue';
 import { createDashboard, deleteDashboard, getDashboardComponents, getDashboardList, } from '../api/dashboard';
-import { buildReportConfig, parseReportConfig } from '../utils/report-config';
+import { buildReportConfig, normalizeCanvasConfig, normalizeCoverConfig, normalizePublishConfig, parseReportConfig, } from '../utils/report-config';
 const router = useRouter();
 const loading = ref(false);
 const saving = ref(false);
-const screens = ref([]);
+const rawScreens = ref([]);
 const countMap = ref(new Map());
 const createVisible = ref(false);
+const keyword = ref('');
+const statusFilter = ref('ALL');
 const form = reactive({ name: '' });
+const screenScene = (screen) => parseReportConfig(screen.configJson).scene === 'screen';
 const publishState = (screen) => {
     const cfg = parseReportConfig(screen.configJson);
-    return cfg?.publish?.status === 'PUBLISHED' ? '已发布' : '草稿';
+    return normalizePublishConfig(cfg.publish).status;
 };
+const coverUrl = (screen) => {
+    const cfg = parseReportConfig(screen.configJson);
+    return normalizeCoverConfig(cfg.cover).url;
+};
+const canvasLabel = (screen) => {
+    const cfg = parseReportConfig(screen.configJson);
+    const canvas = normalizeCanvasConfig(cfg.canvas, 'screen');
+    return `${canvas.width} × ${canvas.height}`;
+};
+const sortByCreatedAt = (list) => [...list].sort((left, right) => {
+    const leftTime = new Date(left.createdAt || 0).getTime();
+    const rightTime = new Date(right.createdAt || 0).getTime();
+    return rightTime - leftTime;
+});
+const allScreens = computed(() => sortByCreatedAt(rawScreens.value.filter((item) => screenScene(item))));
+const screens = computed(() => allScreens.value.filter((screen) => {
+    const nameMatched = !keyword.value.trim() || screen.name.toLowerCase().includes(keyword.value.trim().toLowerCase());
+    const statusMatched = statusFilter.value === 'ALL' || publishState(screen) === statusFilter.value;
+    return nameMatched && statusMatched;
+}));
+const publishedCount = computed(() => allScreens.value.filter((screen) => publishState(screen) === 'PUBLISHED').length);
+const coverReadyCount = computed(() => allScreens.value.filter((screen) => Boolean(coverUrl(screen))).length);
 const formatDate = (iso) => {
     if (!iso)
         return '';
-    const d = new Date(iso);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime()))
+        return iso;
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 };
 const loadScreens = async () => {
     loading.value = true;
     try {
         const list = await getDashboardList();
-        screens.value = list;
-        const entries = await Promise.all(list.map(async (s) => [s.id, (await getDashboardComponents(s.id)).length]));
+        rawScreens.value = list;
+        const entries = await Promise.all(list.filter((item) => screenScene(item)).map(async (screen) => [screen.id, (await getDashboardComponents(screen.id)).length]));
         countMap.value = new Map(entries);
     }
     finally {
@@ -62,7 +95,7 @@ const openPreview = (id) => {
 };
 const handleDelete = async (id) => {
     await deleteDashboard(id);
-    screens.value = screens.value.filter((s) => s.id !== id);
+    rawScreens.value = rawScreens.value.filter((screen) => screen.id !== id);
     countMap.value.delete(id);
     ElMessage.success('已删除');
 };
@@ -71,7 +104,17 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['hero-summary']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-card-time']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-card-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['page-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['toolbar-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-card-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['toolbar-search']} */ ;
+/** @type {__VLS_StyleScopedClasses['toolbar-select']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -88,18 +131,28 @@ const __VLS_1 = __VLS_0({
 __VLS_asFunctionalElement(__VLS_intrinsicElements.main, __VLS_intrinsicElements.main)({
     ...{ class: "page-main" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+    ...{ class: "hero-panel" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "list-header" },
+    ...{ class: "page-title" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "list-title" },
+    ...{ class: "page-subtitle" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "list-title-text" },
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "hero-actions" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "list-subtitle" },
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "hero-summary" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+(__VLS_ctx.allScreens.length);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+(__VLS_ctx.publishedCount);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+(__VLS_ctx.coverReadyCount);
 const __VLS_3 = {}.ElButton;
 /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
 // @ts-ignore
@@ -121,332 +174,386 @@ const __VLS_10 = {
 };
 __VLS_6.slots.default;
 var __VLS_6;
-const __VLS_11 = {}.ElRow;
-/** @type {[typeof __VLS_components.ElRow, typeof __VLS_components.elRow, typeof __VLS_components.ElRow, typeof __VLS_components.elRow, ]} */ ;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+    ...{ class: "toolbar-panel" },
+});
+const __VLS_11 = {}.ElInput;
+/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
 const __VLS_12 = __VLS_asFunctionalComponent(__VLS_11, new __VLS_11({
-    gutter: (18),
-    ...{ class: "screen-grid" },
+    modelValue: (__VLS_ctx.keyword),
+    placeholder: "搜索大屏名称",
+    clearable: true,
+    ...{ class: "toolbar-search" },
 }));
 const __VLS_13 = __VLS_12({
-    gutter: (18),
-    ...{ class: "screen-grid" },
+    modelValue: (__VLS_ctx.keyword),
+    placeholder: "搜索大屏名称",
+    clearable: true,
+    ...{ class: "toolbar-search" },
 }, ...__VLS_functionalComponentArgsRest(__VLS_12));
+const __VLS_15 = {}.ElSelect;
+/** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
+// @ts-ignore
+const __VLS_16 = __VLS_asFunctionalComponent(__VLS_15, new __VLS_15({
+    modelValue: (__VLS_ctx.statusFilter),
+    ...{ class: "toolbar-select" },
+}));
+const __VLS_17 = __VLS_16({
+    modelValue: (__VLS_ctx.statusFilter),
+    ...{ class: "toolbar-select" },
+}, ...__VLS_functionalComponentArgsRest(__VLS_16));
+__VLS_18.slots.default;
+const __VLS_19 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+// @ts-ignore
+const __VLS_20 = __VLS_asFunctionalComponent(__VLS_19, new __VLS_19({
+    label: "全部状态",
+    value: "ALL",
+}));
+const __VLS_21 = __VLS_20({
+    label: "全部状态",
+    value: "ALL",
+}, ...__VLS_functionalComponentArgsRest(__VLS_20));
+const __VLS_23 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+// @ts-ignore
+const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({
+    label: "已发布",
+    value: "PUBLISHED",
+}));
+const __VLS_25 = __VLS_24({
+    label: "已发布",
+    value: "PUBLISHED",
+}, ...__VLS_functionalComponentArgsRest(__VLS_24));
+const __VLS_27 = {}.ElOption;
+/** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+// @ts-ignore
+const __VLS_28 = __VLS_asFunctionalComponent(__VLS_27, new __VLS_27({
+    label: "草稿",
+    value: "DRAFT",
+}));
+const __VLS_29 = __VLS_28({
+    label: "草稿",
+    value: "DRAFT",
+}, ...__VLS_functionalComponentArgsRest(__VLS_28));
+var __VLS_18;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+    ...{ class: "screen-grid" },
+});
 __VLS_asFunctionalDirective(__VLS_directives.vLoading)(null, { ...__VLS_directiveBindingRestFields, value: (__VLS_ctx.loading) }, null, null);
-__VLS_14.slots.default;
 for (const [screen] of __VLS_getVForSourceType((__VLS_ctx.screens))) {
-    const __VLS_15 = {}.ElCol;
-    /** @type {[typeof __VLS_components.ElCol, typeof __VLS_components.elCol, typeof __VLS_components.ElCol, typeof __VLS_components.elCol, ]} */ ;
-    // @ts-ignore
-    const __VLS_16 = __VLS_asFunctionalComponent(__VLS_15, new __VLS_15({
-        key: (screen.id),
-        xs: (24),
-        sm: (12),
-        md: (8),
-        lg: (6),
-    }));
-    const __VLS_17 = __VLS_16({
-        key: (screen.id),
-        xs: (24),
-        sm: (12),
-        md: (8),
-        lg: (6),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_16));
-    __VLS_18.slots.default;
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
         ...{ onClick: (...[$event]) => {
                 __VLS_ctx.openEditor(screen.id);
             } },
+        key: (screen.id),
         ...{ class: "screen-card" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "screen-card-thumb" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "screen-thumb-inner" },
-    });
-    const __VLS_19 = {}.ElIcon;
-    /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
-    // @ts-ignore
-    const __VLS_20 = __VLS_asFunctionalComponent(__VLS_19, new __VLS_19({
-        ...{ class: "thumb-icon" },
-    }));
-    const __VLS_21 = __VLS_20({
-        ...{ class: "thumb-icon" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_20));
-    __VLS_22.slots.default;
-    const __VLS_23 = {}.Monitor;
-    /** @type {[typeof __VLS_components.Monitor, ]} */ ;
-    // @ts-ignore
-    const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({}));
-    const __VLS_25 = __VLS_24({}, ...__VLS_functionalComponentArgsRest(__VLS_24));
-    var __VLS_22;
+    if (__VLS_ctx.coverUrl(screen)) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.img)({
+            src: (__VLS_ctx.coverUrl(screen)),
+            alt: "大屏封面",
+            ...{ class: "screen-card-image" },
+        });
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "screen-thumb-empty" },
+        });
+        const __VLS_31 = {}.ElIcon;
+        /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
+        // @ts-ignore
+        const __VLS_32 = __VLS_asFunctionalComponent(__VLS_31, new __VLS_31({
+            ...{ class: "thumb-icon" },
+        }));
+        const __VLS_33 = __VLS_32({
+            ...{ class: "thumb-icon" },
+        }, ...__VLS_functionalComponentArgsRest(__VLS_32));
+        __VLS_34.slots.default;
+        const __VLS_35 = {}.Monitor;
+        /** @type {[typeof __VLS_components.Monitor, ]} */ ;
+        // @ts-ignore
+        const __VLS_36 = __VLS_asFunctionalComponent(__VLS_35, new __VLS_35({}));
+        const __VLS_37 = __VLS_36({}, ...__VLS_functionalComponentArgsRest(__VLS_36));
+        var __VLS_34;
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "screen-card-status" },
     });
-    const __VLS_27 = {}.ElTag;
+    const __VLS_39 = {}.ElTag;
     /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
     // @ts-ignore
-    const __VLS_28 = __VLS_asFunctionalComponent(__VLS_27, new __VLS_27({
+    const __VLS_40 = __VLS_asFunctionalComponent(__VLS_39, new __VLS_39({
         size: "small",
-        type: (__VLS_ctx.publishState(screen) === '已发布' ? 'success' : 'info'),
+        type: (__VLS_ctx.publishState(screen) === 'PUBLISHED' ? 'success' : 'info'),
     }));
-    const __VLS_29 = __VLS_28({
+    const __VLS_41 = __VLS_40({
         size: "small",
-        type: (__VLS_ctx.publishState(screen) === '已发布' ? 'success' : 'info'),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_28));
-    __VLS_30.slots.default;
-    (__VLS_ctx.publishState(screen));
-    var __VLS_30;
+        type: (__VLS_ctx.publishState(screen) === 'PUBLISHED' ? 'success' : 'info'),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_40));
+    __VLS_42.slots.default;
+    (__VLS_ctx.publishState(screen) === 'PUBLISHED' ? '已发布' : '草稿');
+    var __VLS_42;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "screen-card-body" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "screen-card-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "screen-card-name" },
     });
     (screen.name);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "screen-card-time" },
+    });
+    (__VLS_ctx.formatDate(screen.createdAt));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "screen-card-canvas" },
+    });
+    (__VLS_ctx.canvasLabel(screen));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "screen-card-meta" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (__VLS_ctx.countMap.get(screen.id) ?? 0);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    (__VLS_ctx.formatDate(screen.createdAt));
+    (__VLS_ctx.coverUrl(screen) ? '已配置封面' : '待生成封面');
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: () => { } },
         ...{ class: "screen-card-actions" },
     });
-    const __VLS_31 = {}.ElButton;
+    const __VLS_43 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_32 = __VLS_asFunctionalComponent(__VLS_31, new __VLS_31({
+    const __VLS_44 = __VLS_asFunctionalComponent(__VLS_43, new __VLS_43({
         ...{ 'onClick': {} },
         size: "small",
         type: "primary",
         plain: true,
     }));
-    const __VLS_33 = __VLS_32({
+    const __VLS_45 = __VLS_44({
         ...{ 'onClick': {} },
         size: "small",
         type: "primary",
         plain: true,
-    }, ...__VLS_functionalComponentArgsRest(__VLS_32));
-    let __VLS_35;
-    let __VLS_36;
-    let __VLS_37;
-    const __VLS_38 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_44));
+    let __VLS_47;
+    let __VLS_48;
+    let __VLS_49;
+    const __VLS_50 = {
         onClick: (...[$event]) => {
             __VLS_ctx.openEditor(screen.id);
         }
     };
-    __VLS_34.slots.default;
-    var __VLS_34;
-    const __VLS_39 = {}.ElButton;
+    __VLS_46.slots.default;
+    var __VLS_46;
+    const __VLS_51 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_40 = __VLS_asFunctionalComponent(__VLS_39, new __VLS_39({
+    const __VLS_52 = __VLS_asFunctionalComponent(__VLS_51, new __VLS_51({
         ...{ 'onClick': {} },
         size: "small",
         plain: true,
     }));
-    const __VLS_41 = __VLS_40({
+    const __VLS_53 = __VLS_52({
         ...{ 'onClick': {} },
         size: "small",
         plain: true,
-    }, ...__VLS_functionalComponentArgsRest(__VLS_40));
-    let __VLS_43;
-    let __VLS_44;
-    let __VLS_45;
-    const __VLS_46 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_52));
+    let __VLS_55;
+    let __VLS_56;
+    let __VLS_57;
+    const __VLS_58 = {
         onClick: (...[$event]) => {
             __VLS_ctx.openPreview(screen.id);
         }
     };
-    __VLS_42.slots.default;
-    var __VLS_42;
-    const __VLS_47 = {}.ElPopconfirm;
+    __VLS_54.slots.default;
+    var __VLS_54;
+    const __VLS_59 = {}.ElPopconfirm;
     /** @type {[typeof __VLS_components.ElPopconfirm, typeof __VLS_components.elPopconfirm, typeof __VLS_components.ElPopconfirm, typeof __VLS_components.elPopconfirm, ]} */ ;
     // @ts-ignore
-    const __VLS_48 = __VLS_asFunctionalComponent(__VLS_47, new __VLS_47({
+    const __VLS_60 = __VLS_asFunctionalComponent(__VLS_59, new __VLS_59({
         ...{ 'onConfirm': {} },
         title: "确认删除此大屏？",
     }));
-    const __VLS_49 = __VLS_48({
+    const __VLS_61 = __VLS_60({
         ...{ 'onConfirm': {} },
         title: "确认删除此大屏？",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_48));
-    let __VLS_51;
-    let __VLS_52;
-    let __VLS_53;
-    const __VLS_54 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_60));
+    let __VLS_63;
+    let __VLS_64;
+    let __VLS_65;
+    const __VLS_66 = {
         onConfirm: (...[$event]) => {
             __VLS_ctx.handleDelete(screen.id);
         }
     };
-    __VLS_50.slots.default;
+    __VLS_62.slots.default;
     {
-        const { reference: __VLS_thisSlot } = __VLS_50.slots;
-        const __VLS_55 = {}.ElButton;
+        const { reference: __VLS_thisSlot } = __VLS_62.slots;
+        const __VLS_67 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_56 = __VLS_asFunctionalComponent(__VLS_55, new __VLS_55({
+        const __VLS_68 = __VLS_asFunctionalComponent(__VLS_67, new __VLS_67({
             size: "small",
             type: "danger",
             plain: true,
         }));
-        const __VLS_57 = __VLS_56({
+        const __VLS_69 = __VLS_68({
             size: "small",
             type: "danger",
             plain: true,
-        }, ...__VLS_functionalComponentArgsRest(__VLS_56));
-        __VLS_58.slots.default;
-        var __VLS_58;
+        }, ...__VLS_functionalComponentArgsRest(__VLS_68));
+        __VLS_70.slots.default;
+        var __VLS_70;
     }
-    var __VLS_50;
-    var __VLS_18;
-}
-if (!__VLS_ctx.loading && !__VLS_ctx.screens.length) {
-    const __VLS_59 = {}.ElCol;
-    /** @type {[typeof __VLS_components.ElCol, typeof __VLS_components.elCol, typeof __VLS_components.ElCol, typeof __VLS_components.elCol, ]} */ ;
-    // @ts-ignore
-    const __VLS_60 = __VLS_asFunctionalComponent(__VLS_59, new __VLS_59({
-        span: (24),
-    }));
-    const __VLS_61 = __VLS_60({
-        span: (24),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_60));
-    __VLS_62.slots.default;
-    const __VLS_63 = {}.ElEmpty;
-    /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
-    // @ts-ignore
-    const __VLS_64 = __VLS_asFunctionalComponent(__VLS_63, new __VLS_63({
-        description: "暂无数据大屏，点击右上角新建",
-        imageSize: (100),
-        ...{ style: {} },
-    }));
-    const __VLS_65 = __VLS_64({
-        description: "暂无数据大屏，点击右上角新建",
-        imageSize: (100),
-        ...{ style: {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_64));
     var __VLS_62;
 }
-var __VLS_14;
-const __VLS_67 = {}.ElDialog;
+if (!__VLS_ctx.loading && !__VLS_ctx.screens.length) {
+    const __VLS_71 = {}.ElEmpty;
+    /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
+    // @ts-ignore
+    const __VLS_72 = __VLS_asFunctionalComponent(__VLS_71, new __VLS_71({
+        description: "暂无符合条件的数据大屏，可直接新建或先在编辑器中生成封面",
+        ...{ class: "empty-state" },
+    }));
+    const __VLS_73 = __VLS_72({
+        description: "暂无符合条件的数据大屏，可直接新建或先在编辑器中生成封面",
+        ...{ class: "empty-state" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_72));
+}
+const __VLS_75 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_68 = __VLS_asFunctionalComponent(__VLS_67, new __VLS_67({
-    modelValue: (__VLS_ctx.createVisible),
-    title: "新建数据大屏",
-    width: "420px",
-    destroyOnClose: true,
-}));
-const __VLS_69 = __VLS_68({
-    modelValue: (__VLS_ctx.createVisible),
-    title: "新建数据大屏",
-    width: "420px",
-    destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_68));
-__VLS_70.slots.default;
-const __VLS_71 = {}.ElForm;
-/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
-// @ts-ignore
-const __VLS_72 = __VLS_asFunctionalComponent(__VLS_71, new __VLS_71({
-    model: (__VLS_ctx.form),
-    labelWidth: "80px",
-}));
-const __VLS_73 = __VLS_72({
-    model: (__VLS_ctx.form),
-    labelWidth: "80px",
-}, ...__VLS_functionalComponentArgsRest(__VLS_72));
-__VLS_74.slots.default;
-const __VLS_75 = {}.ElFormItem;
-/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
-// @ts-ignore
 const __VLS_76 = __VLS_asFunctionalComponent(__VLS_75, new __VLS_75({
-    label: "名称",
+    modelValue: (__VLS_ctx.createVisible),
+    title: "新建数据大屏",
+    width: "420px",
+    destroyOnClose: true,
 }));
 const __VLS_77 = __VLS_76({
-    label: "名称",
+    modelValue: (__VLS_ctx.createVisible),
+    title: "新建数据大屏",
+    width: "420px",
+    destroyOnClose: true,
 }, ...__VLS_functionalComponentArgsRest(__VLS_76));
 __VLS_78.slots.default;
-const __VLS_79 = {}.ElInput;
-/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+const __VLS_79 = {}.ElForm;
+/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
 const __VLS_80 = __VLS_asFunctionalComponent(__VLS_79, new __VLS_79({
+    model: (__VLS_ctx.form),
+    labelWidth: "80px",
+}));
+const __VLS_81 = __VLS_80({
+    model: (__VLS_ctx.form),
+    labelWidth: "80px",
+}, ...__VLS_functionalComponentArgsRest(__VLS_80));
+__VLS_82.slots.default;
+const __VLS_83 = {}.ElFormItem;
+/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
+// @ts-ignore
+const __VLS_84 = __VLS_asFunctionalComponent(__VLS_83, new __VLS_83({
+    label: "名称",
+}));
+const __VLS_85 = __VLS_84({
+    label: "名称",
+}, ...__VLS_functionalComponentArgsRest(__VLS_84));
+__VLS_86.slots.default;
+const __VLS_87 = {}.ElInput;
+/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+// @ts-ignore
+const __VLS_88 = __VLS_asFunctionalComponent(__VLS_87, new __VLS_87({
     modelValue: (__VLS_ctx.form.name),
     placeholder: "请输入大屏名称",
     maxlength: "50",
     showWordLimit: true,
 }));
-const __VLS_81 = __VLS_80({
+const __VLS_89 = __VLS_88({
     modelValue: (__VLS_ctx.form.name),
     placeholder: "请输入大屏名称",
     maxlength: "50",
     showWordLimit: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_80));
-var __VLS_78;
-var __VLS_74;
+}, ...__VLS_functionalComponentArgsRest(__VLS_88));
+var __VLS_86;
+var __VLS_82;
 {
-    const { footer: __VLS_thisSlot } = __VLS_70.slots;
-    const __VLS_83 = {}.ElButton;
-    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-    // @ts-ignore
-    const __VLS_84 = __VLS_asFunctionalComponent(__VLS_83, new __VLS_83({
-        ...{ 'onClick': {} },
-    }));
-    const __VLS_85 = __VLS_84({
-        ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_84));
-    let __VLS_87;
-    let __VLS_88;
-    let __VLS_89;
-    const __VLS_90 = {
-        onClick: (...[$event]) => {
-            __VLS_ctx.createVisible = false;
-        }
-    };
-    __VLS_86.slots.default;
-    var __VLS_86;
+    const { footer: __VLS_thisSlot } = __VLS_78.slots;
     const __VLS_91 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
     const __VLS_92 = __VLS_asFunctionalComponent(__VLS_91, new __VLS_91({
         ...{ 'onClick': {} },
-        type: "primary",
-        loading: (__VLS_ctx.saving),
     }));
     const __VLS_93 = __VLS_92({
         ...{ 'onClick': {} },
-        type: "primary",
-        loading: (__VLS_ctx.saving),
     }, ...__VLS_functionalComponentArgsRest(__VLS_92));
     let __VLS_95;
     let __VLS_96;
     let __VLS_97;
     const __VLS_98 = {
-        onClick: (__VLS_ctx.handleCreate)
+        onClick: (...[$event]) => {
+            __VLS_ctx.createVisible = false;
+        }
     };
     __VLS_94.slots.default;
     var __VLS_94;
+    const __VLS_99 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_100 = __VLS_asFunctionalComponent(__VLS_99, new __VLS_99({
+        ...{ 'onClick': {} },
+        type: "primary",
+        loading: (__VLS_ctx.saving),
+    }));
+    const __VLS_101 = __VLS_100({
+        ...{ 'onClick': {} },
+        type: "primary",
+        loading: (__VLS_ctx.saving),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_100));
+    let __VLS_103;
+    let __VLS_104;
+    let __VLS_105;
+    const __VLS_106 = {
+        onClick: (__VLS_ctx.handleCreate)
+    };
+    __VLS_102.slots.default;
+    var __VLS_102;
 }
-var __VLS_70;
+var __VLS_78;
 /** @type {__VLS_StyleScopedClasses['page-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['page-main']} */ ;
-/** @type {__VLS_StyleScopedClasses['list-header']} */ ;
-/** @type {__VLS_StyleScopedClasses['list-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['list-title-text']} */ ;
-/** @type {__VLS_StyleScopedClasses['list-subtitle']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['page-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['page-subtitle']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-summary']} */ ;
+/** @type {__VLS_StyleScopedClasses['toolbar-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['toolbar-search']} */ ;
+/** @type {__VLS_StyleScopedClasses['toolbar-select']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-card-thumb']} */ ;
-/** @type {__VLS_StyleScopedClasses['screen-thumb-inner']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-card-image']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-thumb-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['thumb-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-card-status']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-card-body']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-card-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-card-name']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-card-time']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-card-canvas']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-card-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-card-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -456,11 +563,18 @@ const __VLS_self = (await import('vue')).defineComponent({
             TopNavBar: TopNavBar,
             loading: loading,
             saving: saving,
-            screens: screens,
             countMap: countMap,
             createVisible: createVisible,
+            keyword: keyword,
+            statusFilter: statusFilter,
             form: form,
             publishState: publishState,
+            coverUrl: coverUrl,
+            canvasLabel: canvasLabel,
+            allScreens: allScreens,
+            screens: screens,
+            publishedCount: publishedCount,
+            coverReadyCount: coverReadyCount,
             formatDate: formatDate,
             openCreate: openCreate,
             handleCreate: handleCreate,

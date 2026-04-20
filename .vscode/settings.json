@@ -7,5 +7,12 @@
             "path": "C:/Users/the/.jdks/ms-17.0.18",
             "default": true
         }
-    ]
+    ],
+    "terminal.integrated.env.windows": {
+        "JAVA_HOME": "C:\\Users\\the\\.jdks\\ms-17.0.18",
+        "MAVEN_HOME": "E:\\Program Files\\JetBrains\\IntelliJ IDEA 2025.3.4\\plugins\\maven\\lib\\maven3",
+        "M2_HOME": "E:\\Program Files\\JetBrains\\IntelliJ IDEA 2025.3.4\\plugins\\maven\\lib\\maven3",
+        "MAVEN_CMD": "E:\\Program Files\\JetBrains\\IntelliJ IDEA 2025.3.4\\plugins\\maven\\lib\\maven3\\bin\\mvn.cmd",
+        "Path": "C:\\Users\\the\\.jdks\\ms-17.0.18\\bin;E:\\Program Files\\JetBrains\\IntelliJ IDEA 2025.3.4\\plugins\\maven\\lib\\maven3\\bin;${env:Path}"
+    }
 }

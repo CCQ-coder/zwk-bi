@@ -1,10 +1,10 @@
-import { computed, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import TopNavBar from '../components/TopNavBar.vue';
-import DatasourcePanel from '../components/DatasourcePanel.vue';
-import DatasetPanel from '../components/DatasetPanel.vue';
-import ExtractPanel from '../components/ExtractPanel.vue';
-import ComponentAssetPanel from '../components/ComponentAssetPanel.vue';
+const DatasourcePanel = defineAsyncComponent(() => import('../components/DatasourcePanel.vue'));
+const DatasetPanel = defineAsyncComponent(() => import('../components/DatasetPanel.vue'));
+const ExtractPanel = defineAsyncComponent(() => import('../components/ExtractPanel.vue'));
+const ComponentAssetPanel = defineAsyncComponent(() => import('../components/ComponentAssetPanel.vue'));
 const route = useRoute();
 const router = useRouter();
 const activeTab = ref('datasource');
@@ -70,68 +70,80 @@ const __VLS_7 = {}.ElTabPane;
 const __VLS_8 = __VLS_asFunctionalComponent(__VLS_7, new __VLS_7({
     label: "数据源管理",
     name: "datasource",
+    lazy: true,
 }));
 const __VLS_9 = __VLS_8({
     label: "数据源管理",
     name: "datasource",
+    lazy: true,
 }, ...__VLS_functionalComponentArgsRest(__VLS_8));
 __VLS_10.slots.default;
-/** @type {[typeof DatasourcePanel, ]} */ ;
+const __VLS_11 = {}.DatasourcePanel;
+/** @type {[typeof __VLS_components.DatasourcePanel, ]} */ ;
 // @ts-ignore
-const __VLS_11 = __VLS_asFunctionalComponent(DatasourcePanel, new DatasourcePanel({}));
-const __VLS_12 = __VLS_11({}, ...__VLS_functionalComponentArgsRest(__VLS_11));
+const __VLS_12 = __VLS_asFunctionalComponent(__VLS_11, new __VLS_11({}));
+const __VLS_13 = __VLS_12({}, ...__VLS_functionalComponentArgsRest(__VLS_12));
 var __VLS_10;
-const __VLS_14 = {}.ElTabPane;
+const __VLS_15 = {}.ElTabPane;
 /** @type {[typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, ]} */ ;
 // @ts-ignore
-const __VLS_15 = __VLS_asFunctionalComponent(__VLS_14, new __VLS_14({
+const __VLS_16 = __VLS_asFunctionalComponent(__VLS_15, new __VLS_15({
     label: "数据集管理",
     name: "dataset",
+    lazy: true,
 }));
-const __VLS_16 = __VLS_15({
+const __VLS_17 = __VLS_16({
     label: "数据集管理",
     name: "dataset",
-}, ...__VLS_functionalComponentArgsRest(__VLS_15));
-__VLS_17.slots.default;
-/** @type {[typeof DatasetPanel, ]} */ ;
+    lazy: true,
+}, ...__VLS_functionalComponentArgsRest(__VLS_16));
+__VLS_18.slots.default;
+const __VLS_19 = {}.DatasetPanel;
+/** @type {[typeof __VLS_components.DatasetPanel, ]} */ ;
 // @ts-ignore
-const __VLS_18 = __VLS_asFunctionalComponent(DatasetPanel, new DatasetPanel({}));
-const __VLS_19 = __VLS_18({}, ...__VLS_functionalComponentArgsRest(__VLS_18));
-var __VLS_17;
-const __VLS_21 = {}.ElTabPane;
+const __VLS_20 = __VLS_asFunctionalComponent(__VLS_19, new __VLS_19({}));
+const __VLS_21 = __VLS_20({}, ...__VLS_functionalComponentArgsRest(__VLS_20));
+var __VLS_18;
+const __VLS_23 = {}.ElTabPane;
 /** @type {[typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, ]} */ ;
 // @ts-ignore
-const __VLS_22 = __VLS_asFunctionalComponent(__VLS_21, new __VLS_21({
+const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({
     label: "组件管理",
     name: "components",
+    lazy: true,
 }));
-const __VLS_23 = __VLS_22({
+const __VLS_25 = __VLS_24({
     label: "组件管理",
     name: "components",
-}, ...__VLS_functionalComponentArgsRest(__VLS_22));
-__VLS_24.slots.default;
-/** @type {[typeof ComponentAssetPanel, ]} */ ;
+    lazy: true,
+}, ...__VLS_functionalComponentArgsRest(__VLS_24));
+__VLS_26.slots.default;
+const __VLS_27 = {}.ComponentAssetPanel;
+/** @type {[typeof __VLS_components.ComponentAssetPanel, ]} */ ;
 // @ts-ignore
-const __VLS_25 = __VLS_asFunctionalComponent(ComponentAssetPanel, new ComponentAssetPanel({}));
-const __VLS_26 = __VLS_25({}, ...__VLS_functionalComponentArgsRest(__VLS_25));
-var __VLS_24;
-const __VLS_28 = {}.ElTabPane;
+const __VLS_28 = __VLS_asFunctionalComponent(__VLS_27, new __VLS_27({}));
+const __VLS_29 = __VLS_28({}, ...__VLS_functionalComponentArgsRest(__VLS_28));
+var __VLS_26;
+const __VLS_31 = {}.ElTabPane;
 /** @type {[typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, typeof __VLS_components.ElTabPane, typeof __VLS_components.elTabPane, ]} */ ;
 // @ts-ignore
-const __VLS_29 = __VLS_asFunctionalComponent(__VLS_28, new __VLS_28({
+const __VLS_32 = __VLS_asFunctionalComponent(__VLS_31, new __VLS_31({
     label: "数据抽取",
     name: "extract",
+    lazy: true,
 }));
-const __VLS_30 = __VLS_29({
+const __VLS_33 = __VLS_32({
     label: "数据抽取",
     name: "extract",
-}, ...__VLS_functionalComponentArgsRest(__VLS_29));
-__VLS_31.slots.default;
-/** @type {[typeof ExtractPanel, ]} */ ;
+    lazy: true,
+}, ...__VLS_functionalComponentArgsRest(__VLS_32));
+__VLS_34.slots.default;
+const __VLS_35 = {}.ExtractPanel;
+/** @type {[typeof __VLS_components.ExtractPanel, ]} */ ;
 // @ts-ignore
-const __VLS_32 = __VLS_asFunctionalComponent(ExtractPanel, new ExtractPanel({}));
-const __VLS_33 = __VLS_32({}, ...__VLS_functionalComponentArgsRest(__VLS_32));
-var __VLS_31;
+const __VLS_36 = __VLS_asFunctionalComponent(__VLS_35, new __VLS_35({}));
+const __VLS_37 = __VLS_36({}, ...__VLS_functionalComponentArgsRest(__VLS_36));
+var __VLS_34;
 var __VLS_6;
 /** @type {__VLS_StyleScopedClasses['page-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['page-main']} */ ;

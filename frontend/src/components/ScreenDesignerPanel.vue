@@ -4,21 +4,30 @@
     <aside
       v-if="screenId"
       class="screen-left-panel"
-      :class="{ 'screen-left-panel--collapsed': sidebarCollapsed }"
-      :style="sidebarCollapsed ? {} : { width: leftPanelWidth + 'px' }"
+      :class="{ 'screen-left-panel--collapsed': effectiveSidebarCollapsed }"
+      :style="effectiveSidebarCollapsed ? {} : { width: leftPanelWidth + 'px' }"
       @mouseenter="hoverExpandSidebar"
       @mouseleave="hoverCollapseSidebar"
     >
       <!-- 头部 -->
       <div class="lp-head">
-        <button class="lp-toggle-btn" @click.stop="toggleSidebar" :title="sidebarCollapsed ? '展开面板' : '收起面板'">
+        <button class="lp-toggle-btn" @click.stop="toggleSidebar" :title="effectiveSidebarCollapsed ? '展开面板' : '收起面板'">
           <span class="lp-toggle-icon">☰</span>
         </button>
-        <span v-if="!sidebarCollapsed" class="lp-title" :title="currentDashboard?.name ?? '编辑大屏'">{{ currentDashboard?.name ?? '编辑大屏' }}</span>
+        <template v-if="!effectiveSidebarCollapsed">
+          <div class="lp-head-main">
+            <div class="lp-overline">BI SCREEN STUDIO</div>
+            <span class="lp-title" :title="currentDashboard?.name ?? '编辑大屏'">{{ currentDashboard?.name ?? '编辑大屏' }}</span>
+          </div>
+          <div class="lp-head-badges">
+            <span class="lp-head-pill">{{ templateAssets.length }} 资产</span>
+            <span class="lp-head-pill lp-head-pill--accent">{{ components.length }} 组件</span>
+          </div>
+        </template>
       </div>
 
       <!-- 折叠状态下的图标快捷菜单 -->
-      <div v-if="sidebarCollapsed" class="lp-icon-menu">
+      <div v-if="effectiveSidebarCollapsed" class="lp-icon-menu">
         <el-tooltip content="组件" placement="right">
           <div class="lp-icon-item" @click="sidebarCollapsed = false">
             <el-icon><Grid /></el-icon>
@@ -32,7 +41,7 @@
       </div>
 
       <!-- 展开状态下的完整内容 -->
-      <div v-if="!sidebarCollapsed" class="lp-shell lp-shell--dual">
+      <div v-if="!effectiveSidebarCollapsed" class="lp-shell lp-shell--dual">
         <div class="lp-pane lp-pane--components">
           <div class="lp-pane-head">
             <div class="lp-pane-title">组件</div>
@@ -79,62 +88,79 @@
             <el-button v-if="assetType" link size="small" style="font-size:11px;color:#4db3ff" @click="assetType = ''">清除</el-button>
           </div>
 
-          <!-- 组件列表 Tabs -->
-          <el-tabs v-model="libraryTab" class="lp-tabs">
-            <el-tab-pane label="模板库" name="templates">
-              <div class="lp-asset-scroll">
-                <div
-                  v-for="template in filteredTemplates"
-                  :key="template.id"
-                  class="lp-asset-card"
-                  :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
-                  draggable="true"
-                  @click="selectedTemplateId = template.id"
-                  @dblclick="quickAddTemplate(template)"
-                  @dragstart="onTemplateDragStart($event, template)"
-                  @dragend="onTemplateDragEnd"
-                >
-                  <div class="lp-ac-row">
-                    <span class="lp-ac-name">{{ template.name }}</span>
-                    <div class="lp-ac-tags">
-                      <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
-                      <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
+          <div class="lp-library-panel">
+            <div class="lp-library-head">
+              <div>
+                <div class="lp-library-kicker">模板库</div>
+                <div class="lp-library-note">列表只展示简略信息，悬停即可预览，双击或拖入画布使用。</div>
+              </div>
+            </div>
+
+            <div class="lp-asset-scroll">
+              <el-popover
+                v-for="template in filteredTemplates"
+                :key="template.id"
+                placement="right-start"
+                :width="340"
+                trigger="hover"
+                :show-after="120"
+                popper-class="lp-preview-popper"
+              >
+                <template #reference>
+                  <div
+                    class="lp-asset-card lp-asset-card--compact"
+                    :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
+                    draggable="true"
+                    @click="selectedTemplateId = template.id"
+                    @dblclick="quickAddTemplate(template)"
+                    @dragstart="onTemplateDragStart($event, template)"
+                    @dragend="onTemplateDragEnd"
+                  >
+                    <div class="lp-ac-row">
+                      <span class="lp-ac-name">{{ template.name }}</span>
+                      <div class="lp-ac-tags">
+                        <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
+                        <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
+                      </div>
+                    </div>
+                    <div class="lp-ac-subline">
+                      <span class="lp-ac-size">{{ getTemplateLayoutText(template) }}</span>
+                      <span class="lp-ac-lite-badge">{{ getAssetBadgeText(template.chartType) }}</span>
                     </div>
                   </div>
-                  <div class="lp-ac-foot">
-                    <span class="lp-ac-hint">拖入画布 · {{ getTemplateDatasetName(template) }}</span>
-                    <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddTemplate(template)">加入</el-button>
+                </template>
+
+                <div class="lp-hover-preview">
+                  <div class="lp-hover-head">
+                    <div>
+                      <div class="lp-hover-title">{{ template.name }}</div>
+                      <div class="lp-hover-subtitle">{{ chartTypeLabel(template.chartType) }} · {{ getTemplateLayoutText(template) }}</div>
+                    </div>
+                    <span class="lp-hover-pill">{{ getAssetBadgeText(template.chartType) }}</span>
                   </div>
+
+                  <div class="lp-hover-stage">
+                    <ComponentStaticPreview
+                      v-if="isTemplateStaticAsset(template)"
+                      :chart-type="getTemplateAssetConfig(template).chart.chartType"
+                      :chart-config="getTemplateAssetConfig(template).chart"
+                      :show-title="false"
+                      dark
+                    />
+                    <ComponentTemplatePreview
+                      v-else
+                      :chart-config="getTemplateAssetConfig(template).chart"
+                      :style-config="getTemplateAssetConfig(template).style"
+                    />
+                  </div>
+
+                  <div class="lp-hover-meta">{{ template.description || summarizeTemplateConfig(template.configJson) || '拖入画布后继续配置样式和交互。' }}</div>
                 </div>
-                <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
-              </div>
-            </el-tab-pane>
-            <el-tab-pane label="图表源" name="charts">
-              <div class="lp-asset-scroll">
-                <div
-                  v-for="chart in filteredCharts"
-                  :key="chart.id"
-                  class="lp-asset-card"
-                  :class="{ 'lp-asset-card--selected': selectedChartId === chart.id }"
-                  draggable="true"
-                  @click="selectedChartId = chart.id"
-                  @dblclick="quickAddChart(chart)"
-                  @dragstart="onChartDragStart($event, chart)"
-                  @dragend="onChartDragEnd"
-                >
-                  <div class="lp-ac-row">
-                    <span class="lp-ac-name">{{ chart.name }}</span>
-                    <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(chart.chartType) }}</el-tag>
-                  </div>
-                  <div class="lp-ac-foot">
-                    <span class="lp-ac-hint">拖入画布 · {{ getChartDatasetName(chart.datasetId, chart.chartType) }}</span>
-                    <el-button link type="primary" size="small" class="lp-ac-add" @click.stop="quickAddChart(chart)">加入</el-button>
-                  </div>
-                </div>
-                <el-empty v-if="!filteredCharts.length && !loading" description="暂无匹配图表" :image-size="42" />
-              </div>
-            </el-tab-pane>
-          </el-tabs>
+              </el-popover>
+
+              <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
+            </div>
+          </div>
         </div>
 
         <div class="lp-pane lp-pane--layers">
@@ -162,8 +188,8 @@
               @click="selectLayerComponent(component)"
             >
               <div class="lp-layer-item-main">
-                <span class="lp-layer-name">组件</span>
-                <span class="lp-layer-meta">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }} · Z{{ component.zIndex ?? 0 }}</span>
+                <span class="lp-layer-name">{{ getComponentDisplayName(component) }}</span>
+                <span class="lp-layer-meta">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }} · {{ getComponentStatusText(component) }} · Z{{ component.zIndex ?? 0 }}</span>
               </div>
               <div class="lp-layer-actions">
                 <el-button link size="small" @click.stop="bringSpecificComponentToFront(component)">置顶</el-button>
@@ -176,7 +202,7 @@
       </div>
 
       <!-- 拖拽缩放手柄 (仅展开时可用) -->
-      <div v-if="!sidebarCollapsed" class="lp-resize-handle" @mousedown.prevent="startPanelResize" />
+      <div v-if="!effectiveSidebarCollapsed" class="lp-resize-handle" @mousedown.prevent="startPanelResize" />
     </aside>
 
     <!-- 列表模式：侧边栏 -->
@@ -457,18 +483,33 @@
                 v-for="component in components"
                 :key="component.id"
                 class="stage-card"
-                :class="{ active: activeCompId === component.id }"
+                :class="{
+                  active: activeCompId === component.id,
+                  'stage-card--decoration': isDecorationComponent(component),
+                  'stage-card--static': isStaticWidget(component) && !isDecorationComponent(component),
+                  'stage-card--data': !isStaticWidget(component),
+                }"
                 :style="getCardStyle(component)"
                 @mousedown="focusComponent(component)"
               >
                 <div class="stage-card-header" @mousedown.stop.prevent="startDrag($event, component)">
-                  <div class="stage-card-header-main" />
+                  <div class="stage-card-header-main">
+                    <span class="stage-card-name">{{ getComponentDisplayName(component) }}</span>
+                    <span class="stage-card-meta">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }} · {{ getComponentStatusText(component) }}</span>
+                  </div>
                   <el-button class="remove-btn" text size="small" @click.stop="confirmRemoveComponent(component)">
                     <el-icon><Close /></el-icon>
                   </el-button>
                 </div>
 
-                <div class="stage-card-body">
+                <div
+                  class="stage-card-body"
+                  :class="{
+                    'stage-card-body--decoration': isDecorationComponent(component),
+                    'stage-card-body--static': isStaticWidget(component) && !isDecorationComponent(component),
+                    'stage-card-body--data': !isStaticWidget(component),
+                  }"
+                >
                   <div v-if="isFilterButtonChart(component)" class="filter-button-wrapper">
                     <el-button size="small" type="primary" style="width:100%;height:100%">
                       <el-icon style="margin-right:4px"><Filter /></el-icon>
@@ -740,10 +781,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Grid, Operation, PictureFilled, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
-import html2canvas from 'html2canvas'
-import * as echarts from 'echarts'
 import ComponentDataFallback from './ComponentDataFallback.vue'
 import ComponentStaticPreview from './ComponentStaticPreview.vue'
+import ComponentTemplatePreview from './ComponentTemplatePreview.vue'
 import EditorComponentInspector from './EditorComponentInspector.vue'
 import {
   addDashboardComponent,
@@ -768,6 +808,7 @@ import {
   chartTypeLabel,
   getMissingChartFields,
   isCanvasRenderableChartType,
+  isDecorationChartType,
   isStaticWidgetChartType,
   materializeChartData,
   mergeComponentRequestFilters,
@@ -775,6 +816,7 @@ import {
   normalizeComponentConfig,
   postProcessChartOption,
 } from '../utils/component-config'
+import { echarts, type ECharts } from '../utils/echarts'
 import {
   buildPublishedLink,
   buildReportConfig,
@@ -829,6 +871,15 @@ const makeScatterIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org
 const makeTreemapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="20" height="18" fill="currentColor" opacity=".8" rx="1"/><rect x="25" y="3" width="12" height="10" fill="currentColor" opacity=".5" rx="1"/><rect x="25" y="15" width="12" height="6" fill="currentColor" opacity=".35" rx="1"/><rect x="3" y="23" width="34" height="6" fill="currentColor" opacity=".25" rx="1"/></svg>`
 const makeTableIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="32" height="7" fill="currentColor" rx="1"/><rect x="4" y="13" width="32" height="5" fill="currentColor" opacity=".4" rx="1"/><rect x="4" y="20" width="32" height="5" fill="currentColor" opacity=".25" rx="1"/><line x1="18" y1="4" x2="18" y2="25" stroke="white" stroke-width="1" opacity=".4"/></svg>`
 const makeDecorFrameIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M6 6H14V8H8V14H6V6ZM26 6H34V14H32V8H26V6ZM6 18H8V24H14V26H6V18ZM32 18H34V26H26V24H32V18Z" fill="currentColor"/><rect x="11" y="11" width="18" height="10" rx="2" fill="currentColor" opacity=".18"/></svg>`
+const makeDecorTitlePlateIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M4 16H12" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/><path d="M28 16H36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/><rect x="12" y="10" width="16" height="12" rx="6" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="1.4"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="24" cy="16" r="1.5" fill="currentColor"/></svg>`
+const makeDecorDividerIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M4 16H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/><path d="M25 16H36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/><circle cx="20" cy="16" r="4" fill="currentColor" opacity=".2" stroke="currentColor" stroke-width="1.5"/></svg>`
+const makeDecorTargetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".68"/><circle cx="20" cy="16" r="5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".4"/><path d="M20 4V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M20 22V28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 16H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M26 16H32" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
+const makeDecorScanIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="currentColor" opacity=".08" stroke="currentColor" stroke-width="1.4"/><path d="M9 12H31" stroke="currentColor" stroke-width="2" opacity=".72"/><path d="M9 18H31" stroke="currentColor" stroke-width="1" opacity=".32"/><path d="M9 24H23" stroke="currentColor" stroke-width="1" opacity=".22"/></svg>`
+const makeDecorHexIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M15 5H25L32 16L25 27H15L8 16Z" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="1.4"/><path d="M18 11H22L25 16L22 21H18L15 16Z" fill="currentColor" opacity=".55"/></svg>`
+const makeDecorStreamIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"/><path d="M8 10H24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 22H32" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".75"/></svg>`
+const makeDecorPulseIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="7" width="26" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".35"/><rect x="11" y="11" width="18" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".7"/></svg>`
+const makeDecorBracketIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M7 11V6H14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M33 11V6H26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M7 21V26H14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M33 21V26H26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`
+const makeDecorCircuitIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M6 8H14V14H26V8H34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 24H18V18H30V24H34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14" cy="14" r="2" fill="currentColor"/><circle cx="18" cy="18" r="2" fill="currentColor"/><circle cx="26" cy="14" r="2" fill="currentColor"/><circle cx="30" cy="18" r="2" fill="currentColor"/></svg>`
 const makeTextBlockIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="5" width="28" height="22" rx="4" fill="currentColor" opacity=".12"/><rect x="10" y="10" width="20" height="3" rx="1.5" fill="currentColor"/><rect x="10" y="16" width="16" height="3" rx="1.5" fill="currentColor" opacity=".72"/><rect x="10" y="22" width="12" height="3" rx="1.5" fill="currentColor" opacity=".48"/></svg>`
 const makeMetricWidgetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="32" height="24" rx="5" fill="currentColor" opacity=".12"/><path d="M10 21V11H13.4L16.5 18.2L19.6 11H23V21H20.6V15.4L18.4 21H14.6L12.4 15.4V21H10Z" fill="currentColor"/><rect x="26" y="10" width="6" height="12" rx="2" fill="currentColor" opacity=".84"/></svg>`
 const makeListWidgetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="10" r="2" fill="currentColor"/><circle cx="9" cy="16" r="2" fill="currentColor" opacity=".72"/><circle cx="9" cy="22" r="2" fill="currentColor" opacity=".48"/><rect x="14" y="8.5" width="18" height="3" rx="1.5" fill="currentColor"/><rect x="14" y="14.5" width="15" height="3" rx="1.5" fill="currentColor" opacity=".72"/><rect x="14" y="20.5" width="12" height="3" rx="1.5" fill="currentColor" opacity=".48"/></svg>`
@@ -882,6 +933,15 @@ const DECORATION_COMPONENT_ITEMS: ChartTypeItem[] = [
   createTypeItem('decor_border_corner', makeDecorFrameIcon()),
   createTypeItem('decor_border_glow', makeDecorFrameIcon()),
   createTypeItem('decor_border_grid', makeDecorFrameIcon()),
+  createTypeItem('decor_border_stream', makeDecorStreamIcon()),
+  createTypeItem('decor_border_pulse', makeDecorPulseIcon()),
+  createTypeItem('decor_border_bracket', makeDecorBracketIcon()),
+  createTypeItem('decor_border_circuit', makeDecorCircuitIcon()),
+  createTypeItem('decor_title_plate', makeDecorTitlePlateIcon()),
+  createTypeItem('decor_divider_glow', makeDecorDividerIcon()),
+  createTypeItem('decor_target_ring', makeDecorTargetIcon()),
+  createTypeItem('decor_scan_panel', makeDecorScanIcon()),
+  createTypeItem('decor_hex_badge', makeDecorHexIcon()),
 ]
 
 const TEXT_COMPONENT_ITEMS: ChartTypeItem[] = [
@@ -917,11 +977,45 @@ const CHART_CATEGORIES: ChartCategory[] = [
   { label: '矢量图标组件', types: VECTOR_ICON_COMPONENT_ITEMS },
 ]
 
+const CHART_TYPE_ICON_MAP = new Map(
+  CHART_CATEGORIES.flatMap((category) => category.types.map((item) => [item.type, item.svgIcon] as const))
+)
+
+const getAssetTypeIcon = (type: string) => CHART_TYPE_ICON_MAP.get(type) ?? makeVectorGlyphIcon()
+const getAssetTone = (type: string) => {
+  if (isDecorationChartType(type)) return 'decoration'
+  if (isStaticWidgetChartType(type)) return 'static'
+  return 'data'
+}
+const getAssetBadgeText = (type: string) => {
+  if (isDecorationChartType(type)) return '装饰'
+  if (isStaticWidgetChartType(type)) return '免数据'
+  return '数据'
+}
+
+// 缓存模板/组件配置解析结果，避免 v-for 内多次 JSON.parse
+const _templateConfigCache = new WeakMap<ChartTemplate, ReturnType<typeof normalizeComponentAssetConfig>>()
+const getTemplateAssetConfig = (template: ChartTemplate) => {
+  let cached = _templateConfigCache.get(template)
+  if (!cached) { cached = normalizeComponentAssetConfig(template.configJson); _templateConfigCache.set(template, cached) }
+  return cached
+}
+const isTemplateStaticAsset = (template: ChartTemplate) => isStaticWidgetChartType(getTemplateAssetConfig(template).chart.chartType || template.chartType)
+
 const STATIC_TEMPLATE_LIBRARY: StaticAssetSeed[] = [
   { type: 'decor_border_frame', name: '默认边框装饰', description: '适合用作区块包裹和背景版强调。', layout: { width: 520, height: 220 } },
   { type: 'decor_border_corner', name: '角标边框', description: '四角强调型装饰边框。', layout: { width: 520, height: 220 } },
   { type: 'decor_border_glow', name: '霓虹边框', description: '适合高亮核心指标区。', layout: { width: 520, height: 220 } },
   { type: 'decor_border_grid', name: '网格边框', description: '适合信息密集型区域背景。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_stream', name: '流光边框', description: '适合做顶部主图和核心看板的动效边框。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_pulse', name: '脉冲边框', description: '适合做告警、重点指标和状态变化区域。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_bracket', name: '支架边框', description: '适合做模块边界与结构化布局。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_circuit', name: '电路边框', description: '适合做科技感数据区域和链路说明。', layout: { width: 520, height: 220 } },
+  { type: 'decor_title_plate', name: '标题牌', description: '适合章节标题、指标模块抬头和栏位标识。', layout: { width: 420, height: 96 } },
+  { type: 'decor_divider_glow', name: '发光分隔条', description: '适合区块之间的节奏分隔和视觉导向。', layout: { width: 520, height: 64 } },
+  { type: 'decor_target_ring', name: '目标环', description: '适合重点指标、地图落点和雷达锁定效果。', layout: { width: 220, height: 220 } },
+  { type: 'decor_scan_panel', name: '扫描面板', description: '带扫描流光的科技底板，可作为信息区背景。', layout: { width: 520, height: 260 } },
+  { type: 'decor_hex_badge', name: '六边形徽记', description: '适合中心徽章、状态标签和图标承载。', layout: { width: 220, height: 220 } },
   { type: 'text_block', name: '文本组件', description: '用于公告、说明和长文本排版。', layout: { width: 420, height: 220 } },
   { type: 'single_field', name: '单字段组件', description: '适合展示单值和摘要。', layout: { width: 320, height: 180 } },
   { type: 'number_flipper', name: '数字翻牌器', description: '适合大屏 KPI 强调。', layout: { width: 320, height: 180 } },
@@ -972,14 +1066,18 @@ const toggleCategory = (label: string) => {
 }
 
 const sidebarCollapsed = ref(false)
+const compactEditorMode = ref(false)
 let sidebarHoverTimer: number | null = null
 
+const effectiveSidebarCollapsed = computed(() => sidebarCollapsed.value || compactEditorMode.value)
+
 const toggleSidebar = () => {
+  if (compactEditorMode.value) return
   sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
 const hoverExpandSidebar = () => {
-  if (!sidebarCollapsed.value) return
+  if (compactEditorMode.value || !sidebarCollapsed.value) return
   if (sidebarHoverTimer !== null) { clearTimeout(sidebarHoverTimer); sidebarHoverTimer = null }
   sidebarHoverTimer = window.setTimeout(() => { sidebarCollapsed.value = false }, 200)
 }
@@ -993,12 +1091,14 @@ const leftPanelWidth = ref(520)
 const startPanelResize = (e: MouseEvent) => {
   const startX = e.clientX
   const startWidth = leftPanelWidth.value
-  const onMove = (ev: MouseEvent) => {
-    leftPanelWidth.value = Math.max(420, Math.min(880, startWidth + ev.clientX - startX))
-  }
+  let rafId = 0
+  let lastX = startX
+  const applyFrame = () => { rafId = 0; leftPanelWidth.value = Math.max(420, Math.min(880, startWidth + lastX - startX)) }
+  const onMove = (ev: MouseEvent) => { lastX = ev.clientX; if (!rafId) rafId = requestAnimationFrame(applyFrame) }
   const onUp = () => {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
+    if (rafId) { cancelAnimationFrame(rafId); applyFrame() }
   }
   document.addEventListener('mousemove', onMove)
   document.addEventListener('mouseup', onUp)
@@ -1077,7 +1177,7 @@ const publishForm = reactive({
 })
 
 const chartRefs = new Map<number, HTMLElement>()
-const chartInstances = new Map<number, echarts.ECharts>()
+const chartInstances = new Map<number, ECharts>()
 let interactionFrame: number | null = null
 let pendingPointer: { x: number; y: number } | null = null
 
@@ -1171,7 +1271,7 @@ const toggleOverlay = async () => {
   await saveOverlay()
 }
 
-// 幕布拖动
+// 幕布拖动 (rAF 节流)
 const startCurtainDrag = (e: MouseEvent) => {
   overlaySelected.value = true
   activeCompId.value = null
@@ -1179,21 +1279,21 @@ const startCurtainDrag = (e: MouseEvent) => {
   const startY = e.clientY
   const ox = overlayConfig.x
   const oy = overlayConfig.y
-  const onMove = (ev: MouseEvent) => {
-    const scale = canvasScale.value || 1
-    overlayConfig.x = Math.max(0, Math.round(ox + (ev.clientX - startX) / scale))
-    overlayConfig.y = Math.max(0, Math.round(oy + (ev.clientY - startY) / scale))
-  }
+  let rafId = 0
+  let lastEv: MouseEvent = e
+  const applyFrame = () => { rafId = 0; const scale = canvasScale.value || 1; overlayConfig.x = Math.max(0, Math.round(ox + (lastEv.clientX - startX) / scale)); overlayConfig.y = Math.max(0, Math.round(oy + (lastEv.clientY - startY) / scale)) }
+  const onMove = (ev: MouseEvent) => { lastEv = ev; if (!rafId) rafId = requestAnimationFrame(applyFrame) }
   const onUp = () => {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
+    if (rafId) { cancelAnimationFrame(rafId); applyFrame() }
     saveOverlay()
   }
   document.addEventListener('mousemove', onMove)
   document.addEventListener('mouseup', onUp)
 }
 
-// 幕布调整大小
+// 幕布调整大小 (rAF 节流)
 const startCurtainResize = (e: MouseEvent, handle: string) => {
   overlaySelected.value = true
   activeCompId.value = null
@@ -1201,10 +1301,13 @@ const startCurtainResize = (e: MouseEvent, handle: string) => {
   const startY = e.clientY
   const ox = overlayConfig.x; const ow = overlayConfig.w
   const oy = overlayConfig.y; const oh = overlayConfig.h
-  const onMove = (ev: MouseEvent) => {
+  let rafId = 0
+  let lastEv: MouseEvent = e
+  const applyFrame = () => {
+    rafId = 0
     const scale = canvasScale.value || 1
-    const dx = (ev.clientX - startX) / scale
-    const dy = (ev.clientY - startY) / scale
+    const dx = (lastEv.clientX - startX) / scale
+    const dy = (lastEv.clientY - startY) / scale
     if (handle.includes('e')) overlayConfig.w = Math.max(100, Math.round(ow + dx))
     if (handle.includes('s')) overlayConfig.h = Math.max(60, Math.round(oh + dy))
     if (handle.includes('w')) {
@@ -1218,9 +1321,11 @@ const startCurtainResize = (e: MouseEvent, handle: string) => {
       overlayConfig.y = ny
     }
   }
+  const onMove = (ev: MouseEvent) => { lastEv = ev; if (!rafId) rafId = requestAnimationFrame(applyFrame) }
   const onUp = () => {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
+    if (rafId) { cancelAnimationFrame(rafId); applyFrame() }
     saveOverlay()
   }
   document.addEventListener('mousemove', onMove)
@@ -1279,8 +1384,30 @@ const draftPublishedLink = computed(() => currentDashboard.value
 const roleOptions = ['ADMIN', 'ANALYST', 'VIEWER']
 const activeComponent = computed(() => components.value.find((item) => item.id === activeCompId.value) ?? null)
 const activeChart = computed(() => activeComponent.value ? chartMap.value.get(activeComponent.value.chartId) ?? null : null)
-const getComponentConfig = (component: DashboardComponent) => normalizeComponentConfig(component.configJson, chartMap.value.get(component.chartId))
+const _componentConfigCache = new Map<string, ReturnType<typeof normalizeComponentConfig>>()
+const getComponentConfig = (component: DashboardComponent) => {
+  const cacheKey = `${component.id}:${component.configJson ?? ''}`
+  let cached = _componentConfigCache.get(cacheKey)
+  if (!cached) {
+    cached = normalizeComponentConfig(component.configJson, chartMap.value.get(component.chartId))
+    _componentConfigCache.set(cacheKey, cached)
+    // 限制缓存条目数量，防止长时间编辑内存膨胀
+    if (_componentConfigCache.size > 200) {
+      const firstKey = _componentConfigCache.keys().next().value as string
+      _componentConfigCache.delete(firstKey)
+    }
+  }
+  return cached
+}
 const getComponentChartConfig = (component: DashboardComponent) => getComponentConfig(component).chart
+const getComponentDisplayName = (component: DashboardComponent) => getComponentChartConfig(component).name?.trim()
+  || chartMap.value.get(component.chartId)?.name
+  || '未命名组件'
+const getComponentStatusText = (component: DashboardComponent) => {
+  if (showNoField(component)) return '待补字段'
+  if (!isStaticWidget(component) && !isRenderableChart(component)) return '预览受限'
+  return '可预览'
+}
 const layeredComponents = computed(() => [...components.value].sort((left, right) => {
   const zIndexDelta = (right.zIndex ?? 0) - (left.zIndex ?? 0)
   if (zIndexDelta !== 0) return zIndexDelta
@@ -1321,15 +1448,16 @@ const canvasMinHeight = computed(() => {
   return Math.max(currentCanvasConfig.value.height, bgBottom, 560, occupied)
 })
 
+const RULER_STEP = 200 // 加大标尺间距减少 DOM 数量
 const hRulerMarks = computed(() => {
   const marks: number[] = []
-  for (let i = 0; i <= canvasWorkWidth.value; i += 100) marks.push(i)
+  for (let i = 0; i <= canvasWorkWidth.value; i += RULER_STEP) marks.push(i)
   return marks
 })
 
 const vRulerMarks = computed(() => {
   const marks: number[] = []
-  for (let i = 0; i <= canvasMinHeight.value; i += 100) marks.push(i)
+  for (let i = 0; i <= canvasMinHeight.value; i += RULER_STEP) marks.push(i)
   return marks
 })
 
@@ -1486,6 +1614,11 @@ const isFilterButtonChart = (component: DashboardComponent) => getComponentChart
 const isStaticWidget = (component: DashboardComponent) => {
   const type = getComponentChartConfig(component).chartType ?? ''
   return isStaticWidgetChartType(type)
+}
+
+const isDecorationComponent = (component: DashboardComponent) => {
+  const type = getComponentChartConfig(component).chartType ?? ''
+  return isDecorationChartType(type)
 }
 
 const isRenderableChart = (component: DashboardComponent) => {
@@ -1889,6 +2022,31 @@ const waitForPaint = () => new Promise<void>((resolve) => {
   })
 })
 
+const prepareStageCloneForCapture = (clonedDocument: Document) => {
+  const clonedStage = clonedDocument.querySelector('.screen-stage') as HTMLElement | null
+  if (!clonedStage) return
+  clonedStage.classList.add('screen-stage--capturing')
+  clonedStage.style.transform = 'none'
+  clonedStage.style.transformOrigin = '0 0'
+  clonedStage.querySelectorAll('.stage-card.active').forEach((element) => element.classList.remove('active'))
+  clonedStage.querySelectorAll('.canvas-curtain--selected').forEach((element) => element.classList.remove('canvas-curtain--selected'))
+
+  // html2canvas clones the DOM but <canvas> elements lose their pixel data.
+  // Manually copy each original ECharts canvas into the cloned counterpart.
+  const originalStage = canvasRef.value
+  if (!originalStage) return
+  const originalCanvases = originalStage.querySelectorAll('canvas')
+  const clonedCanvases = clonedStage.querySelectorAll('canvas')
+  originalCanvases.forEach((orig, idx) => {
+    const cloned = clonedCanvases[idx]
+    if (!cloned) return
+    cloned.width = orig.width
+    cloned.height = orig.height
+    const ctx = cloned.getContext('2d')
+    if (ctx) ctx.drawImage(orig, 0, 0)
+  })
+}
+
 const captureScreenCover = async () => {
   const dashboard = currentDashboard.value
   const stage = canvasRef.value
@@ -1912,7 +2070,7 @@ const captureScreenCover = async () => {
     await waitForPaint()
     handleWindowResize()
 
-    const canvas = await html2canvas(stage, {
+    const captureOptions = {
       backgroundColor: null,
       useCORS: true,
       logging: false,
@@ -1923,9 +2081,12 @@ const captureScreenCover = async () => {
       height: overlayConfig.h,
       scrollX: 0,
       scrollY: 0,
-      windowWidth: stage.scrollWidth,
-      windowHeight: stage.scrollHeight,
-    })
+      windowWidth: Math.max(stage.scrollWidth, overlayConfig.x + overlayConfig.w),
+      windowHeight: Math.max(stage.scrollHeight, overlayConfig.y + overlayConfig.h),
+      onclone: prepareStageCloneForCapture,
+    }
+    const { default: html2canvas } = await import('html2canvas')
+    const canvas = await html2canvas(stage, captureOptions as Parameters<typeof html2canvas>[1])
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((result: Blob | null) => resolve(result), 'image/png'))
     if (!blob) {
       throw new Error('封面截图生成失败')
@@ -2265,6 +2426,7 @@ const summarizeTemplateConfig = (configJson: string) => {
 }
 
 const handleWindowResize = () => {
+  compactEditorMode.value = window.innerWidth <= 1100
   chartInstances.forEach((instance) => instance.resize())
 }
 
@@ -2279,6 +2441,7 @@ onBeforeUnmount(() => {
   cleanupInteractionFrame()
   window.removeEventListener('resize', handleWindowResize)
   disposeCharts()
+  if (sidebarHoverTimer !== null) { clearTimeout(sidebarHoverTimer); sidebarHoverTimer = null }
 })
 </script>
 
@@ -3016,15 +3179,35 @@ onBeforeUnmount(() => {
 .stage-card-header {
   display: flex;
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
-  margin-bottom: 0;
+  margin-bottom: 8px;
   cursor: move;
-  min-height: 0;
+  min-height: 24px;
 }
 
 .stage-card-header-main {
-  display: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stage-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(236, 244, 255, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage-card-meta {
+  font-size: 11px;
+  color: rgba(190, 212, 240, 0.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stage-card-body {
@@ -3241,7 +3424,7 @@ onBeforeUnmount(() => {
 /* ─── 编辑器模式布局 ─────────────────────────────────────────────────────────── */
 .screen-root--editor {
   display: grid;
-  grid-template-columns: v-bind("sidebarCollapsed ? '60px' : leftPanelWidth + 'px'") 1fr 300px;
+  grid-template-columns: v-bind("effectiveSidebarCollapsed ? '60px' : leftPanelWidth + 'px'") 1fr 300px;
   grid-template-rows: 1fr;
   gap: 0;
   height: 100%;
@@ -3249,35 +3432,59 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+.screen-root--editor .screen-main,
+.screen-root--editor .screen-inspector {
+  position: relative;
+  z-index: 2;
+}
+
 .screen-root--editor .screen-toolbar {
-  background: #0d1622;
+  position: relative;
+  z-index: 4;
+  background: linear-gradient(180deg, rgba(12, 20, 32, 0.96) 0%, rgba(7, 14, 24, 0.98) 100%);
   border: none;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(110,188,255,0.08);
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.02);
   margin: 0;
-  padding: 8px 14px;
+  padding: 12px 18px;
   flex-shrink: 0;
 }
 
+.screen-root--editor .screen-main {
+  background: linear-gradient(180deg, #07111c 0%, #0a1420 100%);
+}
+
+.screen-root--editor .screen-inspector {
+  z-index: 3;
+  background: linear-gradient(180deg, #0d1826 0%, #09121d 100%);
+  border-left: 1px solid rgba(110,188,255,0.08);
+  overflow: hidden;
+}
+
 .screen-root--editor .screen-title {
-  color: rgba(255,255,255,0.85);
+  color: rgba(255,255,255,0.92);
+  font-size: 20px;
+  letter-spacing: 0.02em;
 }
 
 .screen-root--editor .screen-comp-count {
-  color: rgba(255,255,255,0.35);
+  color: rgba(183,206,235,0.44);
 }
 
 .screen-root--editor .screen-actions :deep(.el-button) {
-  --el-button-bg-color: rgba(255,255,255,0.07);
-  --el-button-border-color: rgba(255,255,255,0.12);
-  --el-button-text-color: rgba(255,255,255,0.75);
+  --el-button-bg-color: rgba(255,255,255,0.06);
+  --el-button-border-color: rgba(255,255,255,0.1);
+  --el-button-text-color: rgba(241,248,255,0.76);
   --el-button-hover-bg-color: rgba(255,255,255,0.12);
+  border-radius: 10px;
+  min-height: 32px;
+  backdrop-filter: blur(14px);
 }
 
 .screen-root--editor .screen-actions :deep(.el-button--primary) {
-  --el-button-bg-color: #2a6fba;
-  --el-button-border-color: #2a6fba;
+  --el-button-bg-color: linear-gradient(135deg, #2594ff 0%, #1370ff 100%);
+  --el-button-border-color: rgba(87,176,255,0.45);
   --el-button-text-color: #fff;
 }
 
@@ -3288,10 +3495,13 @@ onBeforeUnmount(() => {
 /* ─── 左侧综合面板 ───────────────────────────────────────────────────────────── */
 .screen-left-panel {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  background: #0d1b2e;
-  border-right: 1px solid rgba(255,255,255,0.07);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(61,148,255,0.14), transparent 26%),
+    linear-gradient(180deg, #0d1b2e 0%, #091321 100%);
+  border-right: 1px solid rgba(255,255,255,0.06);
   overflow: hidden;
   min-height: 0;
   min-width: 0;
@@ -3304,38 +3514,103 @@ onBeforeUnmount(() => {
   min-width: 60px;
 }
 
+@media (max-width: 1100px) {
+  .screen-root--editor {
+    grid-template-columns: 60px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .screen-root--editor .screen-inspector {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-height: 280px;
+    overflow: auto;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    background: #0d1622;
+  }
+
+  .screen-root--editor .bg-inspector {
+    padding-bottom: 12px;
+  }
+}
+
 .lp-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
   flex-shrink: 0;
 }
 
 .lp-toggle-btn {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  background: rgba(255,255,255,0.07);
-  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04));
+  border-radius: 10px;
   cursor: pointer;
   padding: 0;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 
 .lp-toggle-btn:hover {
-  background: rgba(255,255,255,0.13);
+  background: rgba(77,179,255,0.14);
+  border-color: rgba(77,179,255,0.24);
+  transform: translateY(-1px);
 }
 
 .lp-toggle-icon {
   font-size: 14px;
   color: rgba(255,255,255,0.7);
   line-height: 1;
+}
+
+.lp-head-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lp-overline {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: rgba(122,185,255,0.62);
+}
+
+.lp-head-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lp-head-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: rgba(221,236,255,0.72);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lp-head-pill--accent {
+  background: rgba(77,179,255,0.14);
+  border-color: rgba(77,179,255,0.22);
+  color: #cfeaff;
 }
 
 /* 折叠状态图标菜单 */
@@ -3373,10 +3648,9 @@ onBeforeUnmount(() => {
 }
 
 .lp-title {
-  flex: 1;
   font-size: 13px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.85);
+  font-weight: 700;
+  color: rgba(255,255,255,0.92);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3388,7 +3662,7 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.95fr);
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(7, 18, 32, 0.18), rgba(7, 18, 32, 0.3));
+  background: linear-gradient(180deg, rgba(7, 18, 32, 0.18), rgba(7, 18, 32, 0.34));
 }
 
 .lp-shell--dual {
@@ -3457,13 +3731,13 @@ onBeforeUnmount(() => {
 }
 
 .lp-pane-head {
-  padding: 10px 12px 6px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 14px 14px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
   flex-shrink: 0;
 }
 
 .lp-pane-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: rgba(255,255,255,0.88);
 }
@@ -3472,7 +3746,7 @@ onBeforeUnmount(() => {
   margin-top: 4px;
   font-size: 11px;
   line-height: 1.5;
-  color: rgba(255,255,255,0.34);
+  color: rgba(188,214,240,0.46);
 }
 
 .lp-search {
@@ -3562,11 +3836,11 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 6px 4px 5px;
-  border-radius: 7px;
+  padding: 8px 5px 7px;
+  border-radius: 10px;
   cursor: pointer;
-  border: 1px solid transparent;
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.03);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
   transition: all 0.15s;
   min-width: 0;
 }
@@ -3620,9 +3894,37 @@ onBeforeUnmount(() => {
 .lp-divider-text {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255,255,255,0.38);
+  color: rgba(174,206,239,0.52);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.lp-library-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 8px 10px;
+}
+
+.lp-library-head {
+  padding: 8px 6px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  margin-bottom: 8px;
+}
+
+.lp-library-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(228,240,255,0.9);
+}
+
+.lp-library-note {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgba(178,205,232,0.46);
 }
 
 /* 组件列表 Tabs */
@@ -3679,33 +3981,74 @@ onBeforeUnmount(() => {
 }
 
 .lp-asset-card {
-  padding: 8px 10px;
-  border-radius: 9px;
+  padding: 10px;
+  border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.07);
-  background: rgba(255,255,255,0.03);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.18s;
   flex-shrink: 0;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.14);
 }
 
 .lp-asset-card:hover {
   border-color: rgba(77,179,255,0.3);
-  background: rgba(77,179,255,0.06);
+  background: linear-gradient(180deg, rgba(77,179,255,0.12), rgba(255,255,255,0.04));
+  transform: translateY(-1px);
 }
 
 .lp-asset-card--selected {
   border-color: rgba(77,179,255,0.6);
-  background: rgba(77,179,255,0.12);
+  background: linear-gradient(180deg, rgba(77,179,255,0.16), rgba(255,255,255,0.05));
+  box-shadow: 0 12px 28px rgba(10,44,80,0.34);
 }
 
 .lp-asset-card--builtin {
   border-color: rgba(52,187,131,0.3);
-  background: rgba(52,187,131,0.05);
+  background: linear-gradient(180deg, rgba(52,187,131,0.1), rgba(255,255,255,0.03));
 }
 
 .lp-asset-card--builtin:hover {
   border-color: rgba(52,187,131,0.5);
   background: rgba(52,187,131,0.1);
+}
+
+.lp-asset-card--compact {
+  padding: 10px 12px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.lp-asset-card--compact .lp-ac-row {
+  align-items: flex-start;
+}
+
+.lp-ac-subline {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lp-ac-size {
+  font-size: 11px;
+  color: rgba(186,213,238,0.58);
+}
+
+.lp-ac-lite-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: rgba(232,242,255,0.72);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .lp-ac-row {
@@ -3714,6 +4057,92 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 6px;
   min-width: 0;
+}
+
+.lp-ac-preview {
+  position: relative;
+  margin-top: 10px;
+  min-height: 62px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  overflow: hidden;
+}
+
+.lp-ac-preview::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 18px 18px;
+  opacity: 0.34;
+}
+
+.lp-ac-preview--data {
+  background: linear-gradient(135deg, rgba(37,148,255,0.16), rgba(16,54,95,0.46));
+}
+
+.lp-ac-preview--static {
+  background: linear-gradient(135deg, rgba(84,112,255,0.16), rgba(36,57,112,0.44));
+}
+
+.lp-ac-preview--decoration {
+  background: linear-gradient(135deg, rgba(66,209,176,0.14), rgba(9,65,82,0.42));
+}
+
+.lp-ac-preview-icon,
+.lp-ac-preview-badge {
+  position: relative;
+  z-index: 1;
+}
+
+.lp-ac-preview-icon {
+  display: inline-flex;
+  width: 42px;
+  height: 30px;
+  color: #dff4ff;
+}
+
+.lp-ac-preview-icon :deep(svg) {
+  width: 100%;
+  height: 100%;
+}
+
+.lp-ac-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(240,248,255,0.86);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.lp-ac-meta {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lp-ac-desc,
+.lp-ac-field {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.lp-ac-desc {
+  color: rgba(222,236,255,0.68);
+}
+
+.lp-ac-field {
+  color: rgba(138,196,255,0.72);
 }
 
 .lp-ac-name {
@@ -3745,12 +4174,13 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 4px;
+  margin-top: 8px;
+  gap: 8px;
 }
 
 .lp-ac-hint {
   font-size: 11px;
-  color: rgba(255,255,255,0.3);
+  color: rgba(180,208,238,0.46);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3760,6 +4190,125 @@ onBeforeUnmount(() => {
 .lp-ac-add {
   font-size: 11px !important;
   flex-shrink: 0;
+}
+
+:deep(.lp-preview-popper) {
+  border-radius: 16px;
+  border: 1px solid rgba(110,188,255,0.12);
+  background: linear-gradient(180deg, rgba(10,19,31,0.98) 0%, rgba(8,15,24,0.98) 100%);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.35);
+  padding: 12px;
+}
+
+:deep(.lp-preview-popper .el-popper__arrow::before) {
+  border-color: rgba(110,188,255,0.12);
+  background: rgba(10,19,31,0.98);
+}
+
+.lp-hover-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lp-hover-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lp-hover-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #eef7ff;
+}
+
+.lp-hover-subtitle {
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(180,208,238,0.56);
+}
+
+.lp-hover-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(77,179,255,0.12);
+  border: 1px solid rgba(77,179,255,0.18);
+  color: #d8efff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.lp-hover-stage {
+  height: 170px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(110,188,255,0.12);
+  background: radial-gradient(circle at top, rgba(77,179,255,0.12), transparent 36%), linear-gradient(180deg, rgba(10,24,40,0.95), rgba(8,17,28,0.96));
+}
+
+.lp-hover-chart {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  position: relative;
+}
+
+.lp-hover-chart::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 18px 18px;
+  opacity: 0.28;
+}
+
+.lp-hover-chart--data {
+  background: linear-gradient(135deg, rgba(36,126,255,0.18), rgba(17,44,93,0.3));
+}
+
+.lp-hover-chart--static {
+  background: linear-gradient(135deg, rgba(98,92,255,0.16), rgba(25,40,88,0.3));
+}
+
+.lp-hover-chart--decoration {
+  background: linear-gradient(135deg, rgba(38,183,153,0.16), rgba(12,53,65,0.3));
+}
+
+.lp-hover-chart-icon,
+.lp-hover-chart-label {
+  position: relative;
+  z-index: 1;
+}
+
+.lp-hover-chart-icon {
+  width: 82px;
+  height: 56px;
+  color: #ddf4ff;
+}
+
+.lp-hover-chart-icon :deep(svg) {
+  width: 100%;
+  height: 100%;
+}
+
+.lp-hover-chart-label {
+  color: rgba(232,244,255,0.86);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lp-hover-meta {
+  font-size: 12px;
+  line-height: 1.65;
+  color: rgba(193,216,240,0.68);
 }
 
 .lp-layer-order-tip {
@@ -3787,8 +4336,8 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 10px;
   border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 10px;
-  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }

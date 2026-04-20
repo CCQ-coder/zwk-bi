@@ -34,10 +34,20 @@ docker compose up -d
 
 2. 启动后端
 
+后端要求 Java 17；运行前请确认 `java -version` 指向 JDK 17，且 Maven 已加入 PATH，或直接使用本机可用的 `mvn.cmd`。
+
 ```bash
 cd backend
 mvn spring-boot:run
 ```
+
+也可以直接使用仓库内的一键脚本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\backend\start-backend.ps1
+```
+
+工作区的 `.vscode/settings.json` 已为新开的 VS Code 终端固定 `JAVA_HOME` 和 Maven 路径；如果当前终端已经打开，请新开一个终端窗口后再执行启动命令。
 
 后端支持通过环境变量覆盖默认运行配置，避免把本机账号、密码和密钥写死在代码里：
 
@@ -67,6 +77,7 @@ npm run dev
 - 预览层支持发布控制、分享链接、查询组件筛选和图表点击联动
 - RBAC 已改为数据库驱动: 当前用户菜单来自 `sys_user_role -> sys_role_menu -> sys_menu`，前端导航按接口动态渲染
 - 数据集字段元数据已结构化入库到 `bi_dataset_field`，数据集创建/更新和应用启动时都会自动同步字段定义
+- 茶饮演示数据集已内置化，并新增 5 个茶饮图表模板与一个“茶饮经营分析”演示仪表板，旧库可通过 Flyway 自动补齐
 
 ## 本次改造对应的后端与数据库更新
 - 后端已支持组件实例配置持久化: `bi_dashboard_component.config_json`
@@ -82,12 +93,15 @@ npm run dev
 - 增量迁移脚本已新增: `database/mysql/migration_v6_component_config.sql`
 - 增量迁移脚本已新增: `database/mysql/migration_v8_rbac_menu_and_dataset_fields.sql`
 - 增量迁移脚本已新增: `database/mysql/migration_v17_datasource_source_kind_and_config.sql`
+- 增量迁移脚本已新增: `database/mysql/migration_v18_repair_orphan_tea_demo_datasets.sql`
+- 增量迁移脚本已新增: `database/mysql/migration_v19_seed_tea_demo_report_assets.sql`
 
 默认情况下，不再需要手工记忆执行数据库升级脚本：
 
 - 新库初始化可直接使用 `database/mysql/init.sql`
 - 已有库在启动后端时会由 Flyway 自动从 baseline v4 升级到当前版本
 - `database/mysql/migration_v5.sql`、`database/mysql/migration_v6_component_config.sql`、`database/mysql/migration_v8_rbac_menu_and_dataset_fields.sql` 保留为离线兜底脚本，仅在无法通过应用启动自动迁移时手动执行
+- 茶饮演示资产相关兜底脚本为 `database/mysql/migration_v18_repair_orphan_tea_demo_datasets.sql` 与 `database/mysql/migration_v19_seed_tea_demo_report_assets.sql`
 
 如需手工兜底，可执行:
 
@@ -96,6 +110,8 @@ SOURCE database/mysql/migration_v5.sql;
 SOURCE database/mysql/migration_v6_component_config.sql;
 SOURCE database/mysql/migration_v8_rbac_menu_and_dataset_fields.sql;
 SOURCE database/mysql/migration_v17_datasource_source_kind_and_config.sql;
+SOURCE database/mysql/migration_v18_repair_orphan_tea_demo_datasets.sql;
+SOURCE database/mysql/migration_v19_seed_tea_demo_report_assets.sql;
 ```
 
 ## 本次功能的全链路校验

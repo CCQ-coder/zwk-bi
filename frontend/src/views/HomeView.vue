@@ -2,532 +2,1021 @@
   <div class="workbench-page" v-loading="loading">
     <TopNavBar active="workbench" />
 
-    <main class="content-area">
-      <section class="left-column">
-        <el-card class="panel-card user-card" shadow="never">
-          <div class="profile-line">
-            <div class="profile-avatar">A</div>
-            <div>
-              <div class="profile-name">{{ displayName }}</div>
-              <div class="profile-id">ID: {{ userId }}</div>
-            </div>
+    <main class="workbench-main">
+      <section class="hero-card">
+        <div class="hero-copy">
+          <span class="hero-eyebrow">分析工作台</span>
+          <h1 class="hero-title">{{ displayName }}，继续推进你的数据产品</h1>
+          <p class="hero-description">
+            把数据接入、加工、组件设计、仪表板和大屏发布放到一条可执行链路里，不再依赖首页假入口和弹窗式模块切换。
+          </p>
+          <div class="hero-actions">
+            <el-button type="primary" size="large" @click="goTo(primaryAction.path)">{{ primaryAction.label }}</el-button>
+            <el-button size="large" @click="goTo('/home/prepare/datasource')">接入数据源</el-button>
+            <el-button size="large" @click="goTo('/home/screen')">管理数据大屏</el-button>
           </div>
-          <div class="metrics-grid">
-            <div class="metric-item">
-              <div class="metric-label">仪表板</div>
-              <div class="metric-value">{{ dashboardCount }}</div>
-            </div>
-            <div class="metric-item">
-              <div class="metric-label">数据大屏</div>
-              <div class="metric-value">0</div>
-            </div>
-            <div class="metric-item">
-              <div class="metric-label">数据集</div>
-              <div class="metric-value">{{ datasetCount }}</div>
-            </div>
-          </div>
-        </el-card>
+        </div>
 
-        <el-card class="panel-card" shadow="never">
-          <template #header>
-            <div class="card-head">快速创建</div>
-          </template>
-          <div class="quick-grid">
-            <button class="quick-btn" @click="openModule('dashboard')">
-              <span class="dot dot-blue"></span>
-              <span>仪表板</span>
-            </button>
-            <button class="quick-btn" @click="openModule('chart')">
-              <span class="dot dot-green"></span>
-              <span>数据大屏</span>
-            </button>
-            <button class="quick-btn" @click="openModule('dataset')">
-              <span class="dot dot-cyan"></span>
-              <span>数据集</span>
-            </button>
-            <button class="quick-btn" @click="openModule('datasource')">
-              <span class="dot dot-purple"></span>
-              <span>数据源</span>
-            </button>
+        <div class="hero-highlight">
+          <div class="highlight-label">发布完成度</div>
+          <div class="highlight-value">{{ publishedReportCount }}</div>
+          <div class="highlight-meta">已发布报告 / 共 {{ reportList.length }} 个分析资产</div>
+          <el-progress :percentage="publishProgress" :stroke-width="10" :show-text="false" color="#2f7cf6" />
+
+          <div class="highlight-user">
+            <span class="highlight-avatar">{{ avatarText }}</span>
+            <div>
+              <div class="highlight-name">{{ displayName }}</div>
+              <div class="highlight-id">账号 ID {{ userId }}</div>
+            </div>
           </div>
-          <button class="template-btn">使用模板新建</button>
-        </el-card>
+        </div>
       </section>
 
-      <section class="right-column">
-        <el-card class="panel-card" shadow="never">
-          <template #header>
-            <div class="head-row">
-              <span class="card-head">模板中心</span>
-              <div class="head-actions">
-                <button class="text-btn">查看全部</button>
-                <button class="text-btn">收起</button>
+      <section class="metric-grid">
+        <article v-for="metric in summaryMetrics" :key="metric.label" class="metric-card">
+          <span class="metric-kicker">{{ metric.kicker }}</span>
+          <strong class="metric-value">{{ metric.value }}</strong>
+          <span class="metric-label">{{ metric.label }}</span>
+          <span class="metric-note">{{ metric.note }}</span>
+        </article>
+      </section>
+
+      <section class="main-grid">
+        <div class="main-column">
+          <el-card class="surface-card" shadow="never">
+            <template #header>
+              <div class="section-head">
+                <div>
+                  <div class="section-title">本轮待推进</div>
+                  <div class="section-subtitle">把接入、加工、构建和发布串成一条真实工作流</div>
+                </div>
+                <span class="section-number">{{ completedOnboardingCount }}/{{ onboardingSteps.length }}</span>
               </div>
+            </template>
+
+            <el-progress :percentage="onboardingProgress" :stroke-width="12" :show-text="false" color="#1a9b88" />
+
+            <div class="workflow-list">
+              <button
+                v-for="item in onboardingSteps"
+                :key="item.label"
+                class="workflow-item"
+                @click="goTo(item.path)"
+              >
+                <span class="workflow-dot" :class="{ 'workflow-dot--done': item.done }"></span>
+                <div class="workflow-copy">
+                  <span class="workflow-label">{{ item.label }}</span>
+                  <span class="workflow-tip">{{ item.tip }}</span>
+                </div>
+                <el-tag size="small" :type="item.done ? 'success' : 'warning'">{{ item.done ? '已完成' : '待处理' }}</el-tag>
+              </button>
             </div>
-          </template>
+          </el-card>
 
-          <div class="template-tabs">
-            <button class="tab-chip tab-chip--active">推荐仪表板</button>
-            <button class="tab-chip">数据大屏</button>
-          </div>
+          <el-card class="surface-card" shadow="never">
+            <template #header>
+              <div class="section-head">
+                <div>
+                  <div class="section-title">快捷入口</div>
+                  <div class="section-subtitle">直接进入真实页面，而不是再用首页弹窗承载完整模块</div>
+                </div>
+              </div>
+            </template>
 
-          <div class="template-grid">
-            <article v-for="item in templateCards" :key="item.name" class="template-card">
-              <div class="template-thumb" :style="{ background: item.bg }"></div>
-              <div class="template-name">{{ item.name }}</div>
-            </article>
-          </div>
-        </el-card>
+            <div class="action-grid">
+              <button
+                v-for="action in quickActions"
+                :key="action.key"
+                class="action-card"
+                @click="goTo(action.path)"
+              >
+                <span class="action-stat">{{ action.stat }}</span>
+                <strong class="action-title">{{ action.title }}</strong>
+                <span class="action-desc">{{ action.description }}</span>
+              </button>
+            </div>
+          </el-card>
 
-        <el-card class="panel-card" shadow="never">
-          <div class="asset-tabs">
-            <button
-              class="asset-tab"
-              :class="{ 'asset-tab--active': activeAssetTab === 'favorite' }"
-              @click="activeAssetTab = 'favorite'"
-            >
-              我的收藏
-            </button>
-            <button
-              class="asset-tab"
-              :class="{ 'asset-tab--active': activeAssetTab === 'recent' }"
-              @click="activeAssetTab = 'recent'"
-            >
-              最近使用
-            </button>
-            <button
-              class="asset-tab"
-              :class="{ 'asset-tab--active': activeAssetTab === 'shared' }"
-              @click="activeAssetTab = 'shared'"
-            >
-              我的分享
-            </button>
-          </div>
+          <el-card class="surface-card" shadow="never">
+            <template #header>
+              <div class="section-head">
+                <div>
+                  <div class="section-title">最近资产</div>
+                  <div class="section-subtitle">优先展示最近真实改动的数据资产和报告资产</div>
+                </div>
+              </div>
+            </template>
 
-          <div class="asset-toolbar">
-            <el-select v-model="assetFilter" style="width: 140px">
-              <el-option label="全部类型" value="all" />
-              <el-option label="数据源" value="datasource" />
-              <el-option label="数据集" value="dataset" />
-              <el-option label="图表" value="chart" />
-            </el-select>
-            <el-input v-model="searchKeyword" placeholder="搜索关键词" style="width: 260px" clearable />
-          </div>
+            <div v-if="recentAssets.length" class="asset-list">
+              <button
+                v-for="asset in recentAssets"
+                :key="asset.id"
+                class="asset-item"
+                @click="goTo(asset.path)"
+              >
+                <div class="asset-main">
+                  <span class="asset-type">{{ asset.typeLabel }}</span>
+                  <div class="asset-name">{{ asset.name }}</div>
+                  <div class="asset-secondary">{{ asset.secondary }}</div>
+                </div>
 
-          <el-table :data="filteredAssets" border empty-text="暂无数据">
-            <el-table-column prop="name" label="名称" min-width="220" />
-            <el-table-column prop="type" label="类型" width="140" />
-            <el-table-column prop="creator" label="创建人" width="140" />
-            <el-table-column prop="editor" label="最近编辑人" width="140" />
-            <el-table-column prop="updateTime" label="最近编辑时间" width="180" />
-            <el-table-column prop="operation" label="操作" width="120" />
-          </el-table>
-        </el-card>
+                <div class="asset-meta">
+                  <el-tag size="small" :type="asset.statusType">{{ asset.statusLabel }}</el-tag>
+                  <span class="asset-time">{{ formatDate(asset.createdAt) }}</span>
+                </div>
+              </button>
+            </div>
+            <el-empty v-else description="还没有可展示的资产，先从接入数据源开始" />
+          </el-card>
+        </div>
+
+        <div class="side-column">
+          <el-card class="surface-card spotlight-card" shadow="never">
+            <template #header>
+              <div class="section-head">
+                <div>
+                  <div class="section-title">最近大屏</div>
+                  <div class="section-subtitle">封面、状态和组件数直接可见</div>
+                </div>
+                <el-button link @click="goTo('/home/screen')">查看全部</el-button>
+              </div>
+            </template>
+
+            <div v-if="recentScreens.length" class="spotlight-list">
+              <button
+                v-for="screen in recentScreens"
+                :key="screen.id"
+                class="spotlight-item"
+                @click="openScreen(screen.id)"
+              >
+                <div class="spotlight-cover">
+                  <img v-if="getCoverUrl(screen)" :src="getCoverUrl(screen)" alt="大屏封面" />
+                  <div v-else class="spotlight-cover-fallback">未生成封面</div>
+                </div>
+
+                <div class="spotlight-body">
+                  <div class="spotlight-head">
+                    <span class="spotlight-name">{{ screen.name }}</span>
+                    <el-tag size="small" :type="getPublishStatus(screen) === 'PUBLISHED' ? 'success' : 'info'">
+                      {{ getPublishStatus(screen) === 'PUBLISHED' ? '已发布' : '草稿' }}
+                    </el-tag>
+                  </div>
+                  <div class="spotlight-meta">
+                    {{ getComponentCount(screen.id) }} 个组件 · {{ getCanvasLabel(screen) }}
+                  </div>
+                  <div class="spotlight-time">最近更新 {{ formatDate(screen.createdAt) }}</div>
+                </div>
+              </button>
+            </div>
+            <el-empty v-else description="还没有数据大屏，先创建一个新的大屏" />
+          </el-card>
+
+          <el-card class="surface-card" shadow="never">
+            <template #header>
+              <div class="section-head">
+                <div>
+                  <div class="section-title">仪表板概览</div>
+                  <div class="section-subtitle">最近更新的仪表板和发布状态</div>
+                </div>
+                <el-button link @click="goTo('/home/dashboard')">进入仪表板</el-button>
+              </div>
+            </template>
+
+            <div v-if="recentDashboards.length" class="dashboard-list">
+              <button
+                v-for="dashboard in recentDashboards"
+                :key="dashboard.id"
+                class="dashboard-item"
+                @click="openDashboard(dashboard.id)"
+              >
+                <div>
+                  <div class="dashboard-name">{{ dashboard.name }}</div>
+                  <div class="dashboard-meta">{{ getComponentCount(dashboard.id) }} 个组件 · {{ formatDate(dashboard.createdAt) }}</div>
+                </div>
+                <el-tag size="small" :type="getPublishStatus(dashboard) === 'PUBLISHED' ? 'success' : 'info'">
+                  {{ getPublishStatus(dashboard) === 'PUBLISHED' ? '已发布' : '草稿' }}
+                </el-tag>
+              </button>
+            </div>
+            <el-empty v-else description="还没有仪表板，先去添加图表组件" />
+          </el-card>
+        </div>
       </section>
     </main>
-
-    <el-dialog v-model="moduleDialogVisible" :title="moduleTitle" width="80%" top="4vh">
-      <component :is="activeModuleComponent" />
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { getDatasourceList, type Datasource } from '../api/datasource'
-import { getDatasetList, type Dataset } from '../api/dataset'
+import { useRouter } from 'vue-router'
 import { getChartList, type Chart } from '../api/chart'
-import { getDefaultDashboard } from '../api/dashboard'
-import DatasourcePanel from '../components/DatasourcePanel.vue'
-import DatasetPanel from '../components/DatasetPanel.vue'
-import ChartDesignerPanel from '../components/ChartDesignerPanel.vue'
-import DashboardPanel from '../components/DashboardPanel.vue'
+import { getDashboardComponents, getDashboardList, type Dashboard } from '../api/dashboard'
+import { getDatasetList, type Dataset } from '../api/dataset'
+import { getDatasourceList, type Datasource, type DatasourceSourceKind } from '../api/datasource'
 import TopNavBar from '../components/TopNavBar.vue'
+import {
+  normalizeCanvasConfig,
+  normalizeCoverConfig,
+  normalizePublishConfig,
+  parseReportConfig,
+  type PublishStatus,
+} from '../utils/report-config'
+import { flattenAuthMenus, getAuthDisplayName, getAuthMenus } from '../utils/auth-session'
 
-type ModuleKey = 'datasource' | 'dataset' | 'chart' | 'dashboard'
-type AssetTab = 'favorite' | 'recent' | 'shared'
+type AssetStatusType = 'success' | 'info' | 'warning'
+
+interface WorkspaceAsset {
+  id: string
+  name: string
+  typeLabel: string
+  secondary: string
+  createdAt: string
+  statusLabel: string
+  statusType: AssetStatusType
+  path: string
+}
+
+interface QuickAction {
+  key: string
+  title: string
+  description: string
+  stat: string
+  path: string
+}
+
+const SOURCE_KIND_LABELS: Record<DatasourceSourceKind, string> = {
+  DATABASE: '数据库',
+  API: 'API 接口',
+  TABLE: '表格文件',
+  JSON_STATIC: '静态 JSON',
+}
 
 const loading = ref(false)
+const router = useRouter()
 
 const datasourceList = ref<Datasource[]>([])
 const datasetList = ref<Dataset[]>([])
 const chartList = ref<Chart[]>([])
-const dashboardCount = ref(0)
+const reportList = ref<Dashboard[]>([])
+const componentCountMap = ref<Record<number, number>>({})
 
-const activeAssetTab = ref<AssetTab>('favorite')
-const assetFilter = ref<'all' | 'datasource' | 'dataset' | 'chart'>('all')
-const searchKeyword = ref('')
+const displayName = computed(() => getAuthDisplayName())
+const userId = computed(() => localStorage.getItem('bi_user_id') || '--')
+const avatarText = computed(() => displayName.value.slice(0, 1) || '用')
 
-const moduleDialogVisible = ref(false)
-const activeModule = ref<ModuleKey>('dashboard')
+const allowedPaths = computed(() => new Set(
+  flattenAuthMenus(getAuthMenus()).map((item) => item.path).filter(Boolean)
+))
 
-const displayName = computed(() => {
-  return localStorage.getItem('bi_display_name') || localStorage.getItem('bi_username') || '未登录用户'
-})
+const canAccess = (path: string) => !allowedPaths.value.size
+  || allowedPaths.value.has(path)
+  || Array.from(allowedPaths.value).some((item) => path.startsWith(`${item}/`))
 
-const userId = computed(() => {
-  return localStorage.getItem('bi_user_id') || '--'
-})
-
-const templateCards = computed(() => {
-  const colors = [
-    'linear-gradient(135deg, #f9e5d1, #d9e8ff)',
-    'linear-gradient(135deg, #d5e5ff, #e8f0ff)',
-    'linear-gradient(135deg, #ffeccb, #edf4ff)',
-    'linear-gradient(135deg, #d8f2ee, #e7ecff)'
-  ]
-  return chartList.value.slice(0, 4).map((chart, index) => ({
-    name: chart.name,
-    bg: colors[index % colors.length]
-  }))
-})
-
-const moduleMap = {
-  datasource: DatasourcePanel,
-  dataset: DatasetPanel,
-  chart: ChartDesignerPanel,
-  dashboard: DashboardPanel
+const getReportScene = (report: Dashboard): 'dashboard' | 'screen' => {
+  const config = parseReportConfig(report.configJson)
+  return config.scene === 'screen' ? 'screen' : 'dashboard'
 }
 
-const moduleTitleMap: Record<ModuleKey, string> = {
-  datasource: '数据源管理',
-  dataset: '数据集 SQL',
-  chart: '图表设计',
-  dashboard: '仪表盘'
+const getPublishStatus = (report: Dashboard): PublishStatus => {
+  const config = parseReportConfig(report.configJson)
+  return normalizePublishConfig(config.publish).status
 }
 
-const activeModuleComponent = computed(() => moduleMap[activeModule.value])
-const moduleTitle = computed(() => moduleTitleMap[activeModule.value])
-
-const datasetCount = computed(() => datasetList.value.length)
-
-const allAssets = computed(() => {
-  const datasourceAssets = datasourceList.value.map((item) => ({
-    name: item.name,
-    type: 'datasource',
-    creator: displayName.value,
-    editor: displayName.value,
-    updateTime: item.createdAt || '',
-    operation: '查看'
-  }))
-
-  const datasetAssets = datasetList.value.map((item) => ({
-    name: item.name,
-    type: 'dataset',
-    creator: displayName.value,
-    editor: displayName.value,
-    updateTime: item.createdAt || '',
-    operation: '查看'
-  }))
-
-  const chartAssets = chartList.value.map((item) => ({
-    name: item.name,
-    type: 'chart',
-    creator: displayName.value,
-    editor: displayName.value,
-    updateTime: item.createdAt || '',
-    operation: '查看'
-  }))
-
-  return [...datasourceAssets, ...datasetAssets, ...chartAssets]
-})
-
-const filteredAssets = computed(() => {
-  let list = allAssets.value
-  if (assetFilter.value !== 'all') {
-    list = list.filter((item) => item.type === assetFilter.value)
-  }
-
-  if (searchKeyword.value.trim()) {
-    const keyword = searchKeyword.value.trim().toLowerCase()
-    list = list.filter((item) => item.name.toLowerCase().includes(keyword))
-  }
-
-  if (activeAssetTab.value === 'recent') {
-    return list.slice().reverse()
-  }
-
-  if (activeAssetTab.value === 'shared') {
-    return list.filter((item, index) => index % 2 === 0)
-  }
-
-  return list
-})
-
-const openModule = (module: ModuleKey) => {
-  activeModule.value = module
-  moduleDialogVisible.value = true
+const getCoverUrl = (report: Dashboard) => {
+  const config = parseReportConfig(report.configJson)
+  return normalizeCoverConfig(config.cover).url
 }
 
-onMounted(async () => {
+const getCanvasLabel = (report: Dashboard) => {
+  const scene = getReportScene(report)
+  const config = parseReportConfig(report.configJson)
+  const canvas = normalizeCanvasConfig(config.canvas, scene)
+  return `${canvas.width} × ${canvas.height}`
+}
+
+const getComponentCount = (dashboardId: number) => componentCountMap.value[dashboardId] ?? 0
+
+const sortByCreatedAt = <T extends { createdAt: string }>(list: T[]) => [...list].sort((left, right) => {
+  const leftTime = new Date(left.createdAt || 0).getTime()
+  const rightTime = new Date(right.createdAt || 0).getTime()
+  return rightTime - leftTime
+})
+
+const dashboards = computed(() => sortByCreatedAt(reportList.value.filter((item) => getReportScene(item) === 'dashboard')))
+const screens = computed(() => sortByCreatedAt(reportList.value.filter((item) => getReportScene(item) === 'screen')))
+const publishedReportCount = computed(() => reportList.value.filter((item) => getPublishStatus(item) === 'PUBLISHED').length)
+const publishProgress = computed(() => {
+  if (!reportList.value.length) return 0
+  return Math.round((publishedReportCount.value / reportList.value.length) * 100)
+})
+
+const primaryAction = computed(() => {
+  if (!datasourceList.value.length) {
+    return { label: '先接入第一个数据源', path: '/home/prepare/datasource' }
+  }
+  if (!datasetList.value.length) {
+    return { label: '继续创建数据集', path: '/home/prepare/dataset' }
+  }
+  const latestDraftScreen = screens.value.find((item) => getPublishStatus(item) === 'DRAFT')
+  if (latestDraftScreen) {
+    return { label: '继续编辑最近大屏', path: `/home/screen/edit/${latestDraftScreen.id}` }
+  }
+  return { label: '进入仪表板工作区', path: '/home/dashboard' }
+})
+
+const summaryMetrics = computed(() => [
+  {
+    label: '数据源',
+    kicker: '接入层',
+    value: datasourceList.value.length,
+    note: datasourceList.value.length ? '已连接数据库、接口或文件' : '还没有任何数据接入',
+  },
+  {
+    label: '数据集',
+    kicker: '加工层',
+    value: datasetList.value.length,
+    note: datasetList.value.length ? '可直接供图表与报表使用' : '还没有沉淀可复用数据集',
+  },
+  {
+    label: '图表组件',
+    kicker: '分析层',
+    value: chartList.value.length,
+    note: chartList.value.length ? '图表模板已可复用' : '还没有完成图表设计',
+  },
+  {
+    label: '仪表板',
+    kicker: '业务视图',
+    value: dashboards.value.length,
+    note: dashboards.value.length ? `${dashboards.value.filter((item) => getPublishStatus(item) === 'PUBLISHED').length} 个已发布` : '尚未形成分析看板',
+  },
+  {
+    label: '数据大屏',
+    kicker: '展示层',
+    value: screens.value.length,
+    note: screens.value.length ? `${screens.value.filter((item) => Boolean(getCoverUrl(item))).length} 个已生成封面` : '尚未搭建展示大屏',
+  },
+])
+
+const onboardingSteps = computed(() => [
+  {
+    label: '接入至少一个数据源',
+    tip: datasourceList.value.length ? `${datasourceList.value.length} 个数据源已接入` : '支持数据库、API、表格和静态 JSON',
+    done: datasourceList.value.length > 0,
+    path: '/home/prepare/datasource',
+  },
+  {
+    label: '沉淀可复用数据集',
+    tip: datasetList.value.length ? `${datasetList.value.length} 个数据集可直接复用` : '把原始数据整理成业务字段模型',
+    done: datasetList.value.length > 0,
+    path: '/home/prepare/dataset',
+  },
+  {
+    label: '完成图表设计与组件装配',
+    tip: chartList.value.length ? `${chartList.value.length} 个图表组件已创建` : '先设计图表组件，再进入仪表板或大屏',
+    done: chartList.value.length > 0,
+    path: '/home/prepare/components',
+  },
+  {
+    label: '发布至少一个报告',
+    tip: publishedReportCount.value ? `${publishedReportCount.value} 个报告已发布` : '让仪表板或大屏真正进入可分享状态',
+    done: publishedReportCount.value > 0,
+    path: screens.value.length ? '/home/screen' : '/home/dashboard',
+  },
+])
+
+const completedOnboardingCount = computed(() => onboardingSteps.value.filter((item) => item.done).length)
+const onboardingProgress = computed(() => Math.round((completedOnboardingCount.value / onboardingSteps.value.length) * 100))
+
+const quickActions = computed<QuickAction[]>(() => ([
+  {
+    key: 'datasource',
+    title: '接入数据源',
+    description: '创建数据库、API、表格或静态 JSON 数据源',
+    stat: `${datasourceList.value.length} 个已接入`,
+    path: '/home/prepare/datasource',
+  },
+  {
+    key: 'dataset',
+    title: '加工数据集',
+    description: '整理 SQL、字段和抽取逻辑，形成可复用数据模型',
+    stat: `${datasetList.value.length} 个数据集`,
+    path: '/home/prepare/dataset',
+  },
+  {
+    key: 'chart',
+    title: '设计图表组件',
+    description: '进入组件设计页面，沉淀图表资产供后续复用',
+    stat: `${chartList.value.length} 个图表`,
+    path: '/home/prepare/components',
+  },
+  {
+    key: 'dashboard',
+    title: '管理仪表板',
+    description: '查看仪表板布局、发布状态和组件构成',
+    stat: `${dashboards.value.length} 个仪表板`,
+    path: '/home/dashboard',
+  },
+  {
+    key: 'screen',
+    title: '管理数据大屏',
+    description: '统一查看大屏封面、状态和进入编辑器',
+    stat: `${screens.value.length} 个大屏`,
+    path: '/home/screen',
+  },
+]).filter((item) => canAccess(item.path)))
+
+const recentAssets = computed<WorkspaceAsset[]>(() => {
+  const datasourceAssets: WorkspaceAsset[] = datasourceList.value.map((item) => ({
+    id: `datasource-${item.id}`,
+    name: item.name,
+    typeLabel: '数据源',
+    secondary: `${SOURCE_KIND_LABELS[item.sourceKind]} · ${item.datasourceType || '未标注类型'}`,
+    createdAt: item.createdAt,
+    statusLabel: SOURCE_KIND_LABELS[item.sourceKind],
+    statusType: 'info',
+    path: '/home/prepare/datasource',
+  }))
+
+  const datasetAssets: WorkspaceAsset[] = datasetList.value.map((item) => ({
+    id: `dataset-${item.id}`,
+    name: item.name,
+    typeLabel: '数据集',
+    secondary: item.datasourceId ? `来源数据源 #${item.datasourceId}` : '未绑定数据源',
+    createdAt: item.createdAt,
+    statusLabel: '可建模',
+    statusType: 'success',
+    path: '/home/prepare/dataset',
+  }))
+
+  const reportAssets: WorkspaceAsset[] = reportList.value.map((item) => ({
+    id: `${getReportScene(item)}-${item.id}`,
+    name: item.name,
+    typeLabel: getReportScene(item) === 'screen' ? '数据大屏' : '仪表板',
+    secondary: `${getComponentCount(item.id)} 个组件 · ${getCanvasLabel(item)}`,
+    createdAt: item.createdAt,
+    statusLabel: getPublishStatus(item) === 'PUBLISHED' ? '已发布' : '草稿',
+    statusType: getPublishStatus(item) === 'PUBLISHED' ? 'success' : 'warning',
+    path: getReportScene(item) === 'screen' ? `/home/screen/edit/${item.id}` : `/home/dashboard/edit/${item.id}`,
+  }))
+
+  return sortByCreatedAt([...datasourceAssets, ...datasetAssets, ...reportAssets]).slice(0, 8)
+})
+
+const recentScreens = computed(() => screens.value.slice(0, 3))
+const recentDashboards = computed(() => dashboards.value.slice(0, 5))
+
+const formatDate = (value?: string) => {
+  if (!value) return '刚刚'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const goTo = (path: string) => {
+  router.push(path)
+}
+
+const openDashboard = (id: number) => {
+  router.push(`/home/dashboard/edit/${id}`)
+}
+
+const openScreen = (id: number) => {
+  router.push(`/home/screen/edit/${id}`)
+}
+
+const loadData = async () => {
   loading.value = true
   try {
-    const [datasources, datasets, charts, dashboard] = await Promise.all([
+    const [datasources, datasets, charts, dashboards] = await Promise.all([
       getDatasourceList(),
       getDatasetList(),
       getChartList(),
-      getDefaultDashboard()
+      getDashboardList(),
     ])
+
     datasourceList.value = datasources
     datasetList.value = datasets
     chartList.value = charts
-    dashboardCount.value = dashboard.kpi.dashboardCount
+    reportList.value = dashboards
+
+    const countEntries = await Promise.all(
+      dashboards.map(async (item) => [item.id, (await getDashboardComponents(item.id)).length] as const)
+    )
+    componentCountMap.value = Object.fromEntries(countEntries)
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadData)
 </script>
 
 <style scoped>
 .workbench-page {
   min-height: 100vh;
-  background: #f0f2f5;
+  background:
+    radial-gradient(circle at top left, rgba(71, 130, 218, 0.12), transparent 28%),
+    linear-gradient(180deg, #eef4fb 0%, #f6f9fc 48%, #edf3f8 100%);
 }
 
-.content-area {
-  padding: 14px;
+.workbench-main {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.hero-card {
   display: grid;
-  grid-template-columns: 360px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  padding: 24px;
+  border-radius: 28px;
+  background:
+    linear-gradient(135deg, rgba(9, 37, 68, 0.96) 0%, rgba(19, 63, 113, 0.96) 52%, rgba(33, 87, 150, 0.92) 100%),
+    #0f2b51;
+  color: #ffffff;
+  box-shadow: 0 20px 48px rgba(17, 41, 74, 0.16);
 }
 
-.left-column,
-.right-column {
+.hero-copy {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.panel-card {
-  border-radius: 4px;
+.hero-eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #c8dcff;
+  font-size: 12px;
+  letter-spacing: 0.08em;
 }
 
-.user-card :deep(.el-card__body) {
-  padding-top: 22px;
+.hero-title {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.2;
+  font-weight: 700;
 }
 
-.profile-line {
+.hero-description {
+  margin: 0;
+  max-width: 760px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: rgba(228, 239, 255, 0.84);
+}
+
+.hero-actions {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.hero-highlight {
+  padding: 20px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
   gap: 14px;
 }
 
-.profile-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #6aa7ff, #2764db);
-  color: #ffffff;
-  font-size: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.highlight-label {
+  font-size: 13px;
+  color: #d0e2ff;
 }
 
-.profile-name {
-  font-size: 28px;
+.highlight-value {
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.highlight-meta {
+  font-size: 13px;
+  color: rgba(224, 236, 255, 0.82);
+}
+
+.highlight-user {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.highlight-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(58, 132, 246, 0.95);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.highlight-name {
+  font-size: 14px;
   font-weight: 600;
 }
 
-.profile-id {
-  margin-top: 4px;
-  color: #6b7280;
+.highlight-id {
+  font-size: 12px;
+  color: rgba(219, 232, 255, 0.76);
 }
 
-.metrics-grid {
-  margin-top: 18px;
+.metric-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric-card {
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(204, 219, 234, 0.9);
+  box-shadow: 0 12px 28px rgba(23, 45, 74, 0.05);
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.metric-label {
-  color: #667085;
-  font-size: 14px;
+.metric-kicker {
+  font-size: 12px;
+  color: #6c819b;
 }
 
 .metric-value {
-  margin-top: 8px;
   font-size: 34px;
-  font-weight: 700;
-  color: #111827;
+  line-height: 1;
+  color: #173255;
 }
 
-.card-head {
-  font-size: 20px;
+.metric-label {
+  font-size: 15px;
   font-weight: 600;
+  color: #173255;
 }
 
-.quick-grid {
+.metric-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #637b98;
+}
+
+.main-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.86fr);
+  gap: 18px;
 }
 
-.quick-btn {
-  border: 1px solid #d6dbe8;
-  background: #ffffff;
-  border-radius: 6px;
-  min-height: 58px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 15px;
-  color: #30384d;
-}
-
-.quick-btn:hover {
-  border-color: #9db6ff;
-}
-
-.dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-}
-
-.dot-blue {
-  background: #2f6df6;
-}
-
-.dot-green {
-  background: #14b8a6;
-}
-
-.dot-cyan {
-  background: #22c1f1;
-}
-
-.dot-purple {
-  background: #7c3aed;
-}
-
-.template-btn {
-  margin-top: 14px;
-  width: 100%;
-  border: 1px solid #d6dbe8;
-  background: #ffffff;
-  border-radius: 6px;
-  height: 54px;
-  cursor: pointer;
-  font-size: 15px;
-}
-
-.head-row {
+.main-column,
+.side-column {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 18px;
 }
 
-.head-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.text-btn {
+.surface-card {
   border: none;
-  background: transparent;
-  color: #6b7280;
-  cursor: pointer;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 16px 40px rgba(22, 43, 69, 0.08);
 }
 
-.template-tabs {
+.surface-card :deep(.el-card__header) {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.section-head {
   display: flex;
-  gap: 8px;
-}
-
-.tab-chip {
-  border: 1px solid #d0d7e7;
-  background: #f5f7fb;
-  color: #4b5563;
-  border-radius: 6px;
-  height: 30px;
-  padding: 0 12px;
-}
-
-.tab-chip--active {
-  background: #eaf0ff;
-  color: #2f6df6;
-  border-color: #b7c8f6;
-}
-
-.template-grid {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 14px;
 }
 
-.template-card {
-  border: 1px solid #d6dbe8;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #ffffff;
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #183153;
 }
 
-.template-thumb {
-  height: 94px;
+.section-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #6a819d;
 }
 
-.template-name {
-  font-size: 15px;
-  padding: 8px 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.section-number {
+  font-size: 28px;
+  font-weight: 700;
+  color: #153d6d;
 }
 
-.asset-tabs {
+.workflow-list {
+  margin-top: 16px;
   display: flex;
-  gap: 20px;
-  border-bottom: 1px solid #e5e7eb;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.asset-tab {
-  border: none;
-  background: transparent;
-  height: 42px;
-  color: #3f495c;
+.workflow-item {
+  width: 100%;
+  border: 1px solid #d9e5f1;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
   cursor: pointer;
 }
 
-.asset-tab--active {
-  color: #2f6df6;
-  font-weight: 600;
-  border-bottom: 2px solid #2f6df6;
+.workflow-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffbf66;
+  flex: none;
 }
 
-.asset-toolbar {
-  margin: 14px 0;
+.workflow-dot--done {
+  background: #22a385;
+}
+
+.workflow-copy {
+  flex: 1;
+  min-width: 0;
   display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.workflow-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #183153;
+}
+
+.workflow-tip {
+  font-size: 12px;
+  color: #6b819d;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.action-card {
+  border: 1px solid #dbe6f1;
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.action-card:hover {
+  transform: translateY(-2px);
+  border-color: #a9c6ef;
+  box-shadow: 0 16px 28px rgba(22, 56, 95, 0.08);
+}
+
+.action-stat {
+  font-size: 12px;
+  color: #5d7ea7;
+}
+
+.action-title {
+  font-size: 18px;
+  color: #183153;
+}
+
+.action-desc {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #6f86a3;
+}
+
+.asset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.asset-item {
+  width: 100%;
+  border: 1px solid #dde7f1;
+  border-radius: 20px;
+  background: #ffffff;
+  padding: 16px;
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 16px;
+  text-align: left;
+  cursor: pointer;
 }
 
-@media (max-width: 1200px) {
-  .content-area {
-    grid-template-columns: 1fr;
+.asset-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.asset-type {
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #edf5ff;
+  font-size: 12px;
+  color: #2d5b92;
+}
+
+.asset-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #173255;
+}
+
+.asset-secondary {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #6b819d;
+}
+
+.asset-meta {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.asset-time {
+  font-size: 12px;
+  color: #7790ac;
+}
+
+.spotlight-list,
+.dashboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.spotlight-item {
+  width: 100%;
+  border: 1px solid #dbe4ee;
+  border-radius: 22px;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  cursor: pointer;
+}
+
+.spotlight-cover {
+  height: 180px;
+  background: linear-gradient(135deg, #11345d 0%, #254d7a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spotlight-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.spotlight-cover-fallback {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+}
+
+.spotlight-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spotlight-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.spotlight-name,
+.dashboard-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #173255;
+}
+
+.spotlight-meta,
+.spotlight-time,
+.dashboard-meta {
+  font-size: 13px;
+  color: #6f86a3;
+}
+
+.dashboard-item {
+  width: 100%;
+  padding: 15px 16px;
+  border-radius: 18px;
+  border: 1px solid #dde7f2;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+@media (max-width: 1280px) {
+  .metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .template-grid {
-    grid-template-columns: 1fr 1fr;
+  .main-grid {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 768px) {
-  .template-grid {
+@media (max-width: 900px) {
+  .workbench-main {
+    padding: 14px;
+  }
+
+  .hero-card {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .hero-title {
+    font-size: 28px;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .action-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 
-  .quick-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .asset-toolbar {
+  .hero-actions,
+  .asset-item,
+  .dashboard-item,
+  .spotlight-head,
+  .section-head {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .asset-meta {
+    align-items: flex-start;
+  }
+
+  .spotlight-cover {
+    height: 150px;
   }
 }
 </style>

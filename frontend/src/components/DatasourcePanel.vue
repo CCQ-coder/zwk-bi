@@ -268,62 +268,167 @@
             </el-form-item>
 
             <el-form-item label="结果路径" class="form-item--full">
-              <el-input v-model="form.apiResultPath" placeholder="可选，例如 data.list" />
+              <el-input v-model="apiRuntimeForm.resultPath" placeholder="可选，例如 data.list" />
             </el-form-item>
 
-            <el-form-item label="请求头 JSON" class="form-item--full">
-              <el-input v-model="form.apiHeadersText" type="textarea" :rows="4" placeholder='例如 {"Authorization":"Bearer token"}' />
-            </el-form-item>
+            <div class="runtime-editor-card form-item--full">
+              <div class="runtime-editor-head">
+                <div>
+                  <div class="runtime-editor-title">请求配置</div>
+                  <div class="runtime-editor-tip">与页面编辑侧保持一致，按项维护 headers、query 和 body，保存时自动组装为 API 数据源配置。</div>
+                </div>
+              </div>
 
-            <el-form-item label="Query 参数 JSON" class="form-item--full">
-              <el-input v-model="form.apiQueryText" type="textarea" :rows="4" placeholder='例如 {"page":1,"size":20}' />
-            </el-form-item>
+              <el-tabs v-model="apiRuntimeTab" class="runtime-tabs">
+                <el-tab-pane label="请求头" name="headers">
+                  <div class="kv-editor-list">
+                    <div v-for="row in apiRuntimeForm.headers" :key="row.id" class="kv-editor-row">
+                      <el-input v-model="row.key" placeholder="名称，例如 Authorization" />
+                      <el-input v-model="row.value" placeholder="值，支持 JSON 或纯文本" />
+                      <el-button text size="small" @click="removeApiRuntimeRow('headers', row.id)">删除</el-button>
+                    </div>
+                  </div>
+                  <div class="action-row action-row--compact">
+                    <el-button size="small" link type="primary" @click="addApiRuntimeRow('headers')">新增请求头</el-button>
+                  </div>
+                </el-tab-pane>
 
-            <el-form-item label="请求体" class="form-item--full">
-              <el-input v-model="form.apiBodyText" type="textarea" :rows="5" placeholder="可输入 JSON 或普通文本；GET 请求可留空" />
-            </el-form-item>
+                <el-tab-pane label="Query 参数" name="query">
+                  <div class="kv-editor-list">
+                    <div v-for="row in apiRuntimeForm.query" :key="row.id" class="kv-editor-row">
+                      <el-input v-model="row.key" placeholder="参数名，例如 page" />
+                      <el-input v-model="row.value" placeholder="值，支持 JSON 或纯文本" />
+                      <el-button text size="small" @click="removeApiRuntimeRow('query', row.id)">删除</el-button>
+                    </div>
+                  </div>
+                  <div class="action-row action-row--compact">
+                    <el-button size="small" link type="primary" @click="addApiRuntimeRow('query')">新增 Query 参数</el-button>
+                  </div>
+                </el-tab-pane>
+
+                <el-tab-pane label="请求体" name="body">
+                  <el-input
+                    v-model="apiRuntimeForm.bodyText"
+                    type="textarea"
+                    :rows="6"
+                    placeholder="可输入 JSON 或普通文本；GET 请求可留空"
+                  />
+                </el-tab-pane>
+              </el-tabs>
+            </div>
           </div>
           <div class="form-tip">页面编写模式下可继续通过页面级 JSON 覆盖 query、headers、body 或 resultPath。</div>
         </template>
 
         <template v-else-if="form.sourceKind === 'TABLE'">
           <div class="form-grid">
-            <el-form-item label="分隔格式">
-              <el-radio-group v-model="form.tableDelimiter">
-                <el-radio-button value="CSV">CSV</el-radio-button>
-                <el-radio-button value="TSV">TSV</el-radio-button>
-              </el-radio-group>
-            </el-form-item>
+            <div class="runtime-editor-card form-item--full">
+              <div class="runtime-editor-head">
+                <div>
+                  <div class="runtime-editor-title">表格内容</div>
+                  <div class="runtime-editor-tip">直接维护组件要消费的 CSV 或 TSV 原始内容。保存后，页面编辑阶段仍可按实例覆盖分隔格式、表头规则或整段文本。</div>
+                </div>
+                <div class="runtime-editor-actions">
+                  <el-button size="small" link type="primary" @click="applyTableExample('CSV')">填充 CSV 示例</el-button>
+                  <el-button size="small" link type="primary" @click="applyTableExample('TSV')">填充 TSV 示例</el-button>
+                  <el-button size="small" link @click="clearTableDraft">清空内容</el-button>
+                </div>
+              </div>
 
-            <el-form-item label="首行为表头">
-              <el-switch v-model="form.tableHasHeader" active-text="是" inactive-text="否" />
-            </el-form-item>
+              <div class="runtime-stat-grid">
+                <div class="runtime-stat-card">
+                  <span>分隔格式</span>
+                  <strong>{{ form.tableDelimiter }}</strong>
+                </div>
+                <div class="runtime-stat-card">
+                  <span>表头规则</span>
+                  <strong>{{ tableDraftStats.headerLabel }}</strong>
+                </div>
+                <div class="runtime-stat-card">
+                  <span>估算数据行</span>
+                  <strong>{{ tableDraftStats.rowCount }}</strong>
+                </div>
+                <div class="runtime-stat-card">
+                  <span>首行列数</span>
+                  <strong>{{ tableDraftStats.columnCount }}</strong>
+                </div>
+              </div>
 
-            <el-form-item label="表格内容" prop="tableText" class="form-item--full">
-              <el-input
-                v-model="form.tableText"
-                type="textarea"
-                :rows="12"
-                placeholder="请输入 CSV 或 TSV 文本，页面编写时可通过运行时配置覆盖"
-              />
-            </el-form-item>
+              <div class="runtime-form-grid">
+                <el-form-item label="分隔格式" class="runtime-form-item">
+                  <el-radio-group v-model="form.tableDelimiter">
+                    <el-radio-button value="CSV">CSV</el-radio-button>
+                    <el-radio-button value="TSV">TSV</el-radio-button>
+                  </el-radio-group>
+                </el-form-item>
+
+                <el-form-item label="首行为表头" class="runtime-form-item">
+                  <el-switch v-model="form.tableHasHeader" active-text="是" inactive-text="否" />
+                </el-form-item>
+
+                <el-form-item label="表格内容" prop="tableText" class="runtime-form-item runtime-form-item--full">
+                  <el-input
+                    v-model="form.tableText"
+                    type="textarea"
+                    :rows="12"
+                    placeholder="请输入 CSV 或 TSV 文本，页面编写时可通过运行时配置覆盖"
+                  />
+                </el-form-item>
+              </div>
+            </div>
           </div>
+          <div class="form-tip">表格数据源更适合小体量静态或临时数据，后续在页面里可只覆盖当前组件需要的文本片段。</div>
         </template>
 
         <template v-else>
           <div class="form-grid">
-            <el-form-item label="结果路径" class="form-item--full">
-              <el-input v-model="form.jsonResultPath" placeholder="可选，例如 data.records" />
-            </el-form-item>
+            <div class="runtime-editor-card form-item--full">
+              <div class="runtime-editor-head">
+                <div>
+                  <div class="runtime-editor-title">JSON 内容</div>
+                  <div class="runtime-editor-tip">静态 JSON 直接作为数据源内容保存，适合示例数据、轻量配置表和手工整理后的结构化数据。</div>
+                </div>
+                <div class="runtime-editor-actions">
+                  <el-button size="small" link type="primary" @click="applyJsonExample('array')">填充数组示例</el-button>
+                  <el-button size="small" link type="primary" @click="applyJsonExample('object')">填充对象示例</el-button>
+                  <el-button size="small" link type="primary" @click="formatJsonDraft">格式化 JSON</el-button>
+                </div>
+              </div>
 
-            <el-form-item label="JSON 内容" prop="jsonText" class="form-item--full">
-              <el-input
-                v-model="form.jsonText"
-                type="textarea"
-                :rows="12"
-                placeholder='请输入 JSON 数组或对象，例如 [{"name":"华东","value":120}]'
-              />
-            </el-form-item>
+              <div class="runtime-stat-grid">
+                <div class="runtime-stat-card">
+                  <span>根节点类型</span>
+                  <strong>{{ jsonDraftStats.rootType }}</strong>
+                </div>
+                <div class="runtime-stat-card">
+                  <span>元素 / 字段数</span>
+                  <strong>{{ jsonDraftStats.itemCount }}</strong>
+                </div>
+                <div class="runtime-stat-card">
+                  <span>结果路径</span>
+                  <strong>{{ form.jsonResultPath.trim() || '直接读取根节点' }}</strong>
+                </div>
+                <div class="runtime-stat-card">
+                  <span>格式校验</span>
+                  <strong>{{ jsonDraftStats.statusText }}</strong>
+                </div>
+              </div>
+
+              <div class="runtime-form-grid">
+                <el-form-item label="结果路径" class="runtime-form-item runtime-form-item--full">
+                  <el-input v-model="form.jsonResultPath" placeholder="可选，例如 data.records" />
+                </el-form-item>
+
+                <el-form-item label="JSON 内容" prop="jsonText" class="runtime-form-item runtime-form-item--full">
+                  <el-input
+                    v-model="form.jsonText"
+                    type="textarea"
+                    :rows="12"
+                    placeholder='请输入 JSON 数组或对象，例如 [{"name":"华东","value":120}]'
+                  />
+                </el-form-item>
+              </div>
+            </div>
           </div>
           <div class="form-tip">静态 JSON 可直接作为页面编写的数据来源，也支持通过页面级 resultPath 或 jsonText 做实例覆盖。</div>
         </template>
@@ -370,19 +475,29 @@ import {
 type DatabaseType = 'MYSQL' | 'POSTGRESQL' | 'CLICKHOUSE' | 'SQLSERVER' | 'ORACLE'
 type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH'
 type TableDelimiter = 'CSV' | 'TSV'
+type ApiConfigSection = 'headers' | 'query'
 
 interface DatasourceEditorForm extends DatasourceForm {
   apiUrl: string
   apiMethod: ApiMethod
-  apiHeadersText: string
-  apiQueryText: string
-  apiBodyText: string
-  apiResultPath: string
   tableText: string
   tableDelimiter: TableDelimiter
   tableHasHeader: boolean
   jsonText: string
   jsonResultPath: string
+}
+
+interface RuntimeKeyValueRow {
+  id: string
+  key: string
+  value: string
+}
+
+interface ApiDatasourceFormState {
+  headers: RuntimeKeyValueRow[]
+  query: RuntimeKeyValueRow[]
+  bodyText: string
+  resultPath: string
 }
 
 const SOURCE_KIND_OPTIONS: Array<{ label: string; value: DatasourceSourceKind }> = [
@@ -423,15 +538,26 @@ const createEmptyForm = (): DatasourceEditorForm => ({
   configJson: '{}',
   apiUrl: '',
   apiMethod: 'GET',
-  apiHeadersText: '{}',
-  apiQueryText: '{}',
-  apiBodyText: '',
-  apiResultPath: '',
   tableText: '',
   tableDelimiter: 'CSV',
   tableHasHeader: true,
   jsonText: '[]',
   jsonResultPath: '',
+})
+
+let runtimeRowSeed = 0
+
+const createRuntimeRow = (patch?: Partial<Omit<RuntimeKeyValueRow, 'id'>>): RuntimeKeyValueRow => ({
+  id: `runtime-row-${runtimeRowSeed++}`,
+  key: patch?.key ?? '',
+  value: patch?.value ?? '',
+})
+
+const createEmptyApiRuntimeForm = (): ApiDatasourceFormState => ({
+  headers: [createRuntimeRow()],
+  query: [createRuntimeRow()],
+  bodyText: '',
+  resultPath: '',
 })
 
 const loading = ref(false)
@@ -456,6 +582,8 @@ const saving = ref(false)
 const testing = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive<DatasourceEditorForm>(createEmptyForm())
+const apiRuntimeForm = reactive<ApiDatasourceFormState>(createEmptyApiRuntimeForm())
+const apiRuntimeTab = ref<'headers' | 'query' | 'body'>('headers')
 
 const selectedDatasource = computed(() => datasources.value.find((item) => item.id === selectedId.value) ?? null)
 const filteredDatasources = computed(() => {
@@ -468,6 +596,36 @@ const filteredTables = computed(() => {
   const keyword = tableSearch.value.trim().toLowerCase()
   if (!keyword) return tables.value
   return tables.value.filter((item) => item.tableName.toLowerCase().includes(keyword))
+})
+const tableDraftStats = computed(() => {
+  const lines = form.tableText.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)
+  const delimiterChar = form.tableDelimiter === 'TSV' ? '\t' : ','
+  const firstLine = lines[0] ?? ''
+  const columnCount = firstLine ? firstLine.split(delimiterChar).length : 0
+  const rowCount = Math.max(lines.length - (form.tableHasHeader && lines.length ? 1 : 0), 0)
+  return {
+    rowCount,
+    columnCount,
+    headerLabel: form.tableHasHeader ? '首行为表头' : '首行即数据',
+  }
+})
+const jsonDraftStats = computed(() => {
+  const trimmed = form.jsonText.trim()
+  if (!trimmed) {
+    return { rootType: '未填写', itemCount: '0', statusText: '待输入' }
+  }
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (Array.isArray(parsed)) {
+      return { rootType: '数组', itemCount: String(parsed.length), statusText: '合法 JSON' }
+    }
+    if (parsed && typeof parsed === 'object') {
+      return { rootType: '对象', itemCount: String(Object.keys(parsed).length), statusText: '合法 JSON' }
+    }
+    return { rootType: typeof parsed, itemCount: '1', statusText: '合法 JSON' }
+  } catch {
+    return { rootType: '格式错误', itemCount: '-', statusText: '当前不是合法 JSON' }
+  }
 })
 
 const selectedDatasourceInfo = computed(() => {
@@ -577,6 +735,9 @@ const loadDatasources = async (preferredId?: number | null) => {
         ? selectedId.value
         : list[0]?.id ?? null
     selectedId.value = nextId
+  } catch {
+    datasources.value = []
+    selectedId.value = null
   } finally {
     loading.value = false
   }
@@ -591,6 +752,8 @@ const loadStaticPreview = async (datasourceId: number) => {
   try {
     const result = await getDatasourcePreviewData(datasourceId)
     Object.assign(preview, result)
+  } catch {
+    Object.assign(preview, emptyPreview())
   } finally {
     previewLoading.value = false
   }
@@ -607,6 +770,11 @@ const loadDatabaseTables = async (datasourceId: number) => {
         : result[0].tableName
       await selectTable(targetTable)
     }
+  } catch {
+    tables.value = []
+    selectedTable.value = ''
+    tableColumns.value = []
+    Object.assign(extractPreview, emptyExtractPreview())
   } finally {
     tablesLoading.value = false
   }
@@ -623,6 +791,9 @@ const selectTable = async (tableName: string) => {
     ])
     tableColumns.value = columns
     Object.assign(extractPreview, previewResult)
+  } catch {
+    tableColumns.value = []
+    Object.assign(extractPreview, emptyExtractPreview())
   } finally {
     columnsLoading.value = false
   }
@@ -632,6 +803,7 @@ const openCreate = () => {
   dialogMode.value = 'create'
   dialogEditId.value = null
   Object.assign(form, createEmptyForm())
+  resetApiRuntimeForm()
   dialogVisible.value = true
 }
 
@@ -639,6 +811,7 @@ const openEdit = (datasource: Datasource) => {
   dialogMode.value = 'edit'
   dialogEditId.value = datasource.id
   Object.assign(form, createEmptyForm())
+  resetApiRuntimeForm()
   form.name = datasource.name
   form.sourceKind = resolveSourceKind(datasource)
   form.datasourceType = datasource.datasourceType || 'MYSQL'
@@ -653,10 +826,7 @@ const openEdit = (datasource: Datasource) => {
   if (form.sourceKind === 'API') {
     form.apiUrl = readString(config.apiUrl ?? config.url)
     form.apiMethod = (readString(config.apiMethod ?? config.method) || 'GET').toUpperCase() as ApiMethod
-    form.apiHeadersText = JSON.stringify(readObject(config.apiHeaders ?? config.headers), null, 2)
-    form.apiQueryText = JSON.stringify(readObject(config.apiQuery ?? config.query), null, 2)
-    form.apiBodyText = stringifyUnknown(config.apiBody ?? config.body)
-    form.apiResultPath = readString(config.apiResultPath ?? config.resultPath)
+    syncApiRuntimeFormFromConfig(config)
   } else if (form.sourceKind === 'TABLE') {
     form.tableText = readString(config.tableText ?? config.text)
     form.tableDelimiter = (readString(config.tableDelimiter ?? config.delimiter) || 'CSV').toUpperCase() as TableDelimiter
@@ -728,17 +898,27 @@ const handleSubmit = async () => {
     dialogVisible.value = false
     await loadDatasources(saved.id)
     ElMessage.success(dialogMode.value === 'create' ? '数据源创建成功' : '数据源更新成功')
+  } catch (error) {
+    if (error instanceof Error && error.message) {
+      ElMessage.error(error.message)
+    }
   } finally {
     saving.value = false
   }
 }
 
 const handleDelete = async (id: number) => {
-  await deleteDatasource(id)
-  const remaining = datasources.value.filter((item) => item.id !== id)
-  const nextSelected = remaining[0]?.id ?? null
-  await loadDatasources(nextSelected)
-  ElMessage.success('数据源已删除')
+  try {
+    await deleteDatasource(id)
+    const remaining = datasources.value.filter((item) => item.id !== id)
+    const nextSelected = remaining[0]?.id ?? null
+    await loadDatasources(nextSelected)
+    ElMessage.success('数据源已删除')
+  } catch (error) {
+    if (error instanceof Error && error.message) {
+      ElMessage.error(error.message)
+    }
+  }
 }
 
 const buildDatasourcePayload = (): DatasourceForm => {
@@ -758,9 +938,9 @@ const buildDatasourcePayload = (): DatasourceForm => {
   }
 
   if (form.sourceKind === 'API') {
-    const headers = parseJsonObjectText(form.apiHeadersText, '请求头 JSON 必须是对象')
-    const query = parseJsonObjectText(form.apiQueryText, 'Query 参数 JSON 必须是对象')
-    const body = parseLooseJsonValue(form.apiBodyText)
+    const headers = buildRuntimeKeyValueObject(apiRuntimeForm.headers)
+    const query = buildRuntimeKeyValueObject(apiRuntimeForm.query)
+    const body = parseLooseJsonValue(apiRuntimeForm.bodyText)
     const config: Record<string, unknown> = {
       apiUrl: form.apiUrl.trim(),
       apiMethod: form.apiMethod,
@@ -768,7 +948,7 @@ const buildDatasourcePayload = (): DatasourceForm => {
     if (Object.keys(headers).length) config.apiHeaders = headers
     if (Object.keys(query).length) config.apiQuery = query
     if (body !== undefined) config.apiBody = body
-    if (form.apiResultPath.trim()) config.apiResultPath = form.apiResultPath.trim()
+    if (apiRuntimeForm.resultPath.trim()) config.apiResultPath = apiRuntimeForm.resultPath.trim()
     return {
       name: form.name.trim(),
       sourceKind: 'API',
@@ -854,20 +1034,6 @@ const parseConfigJson = (configJson?: string) => {
   }
 }
 
-const parseJsonObjectText = (jsonText: string, errorMessage: string) => {
-  const trimmed = jsonText.trim()
-  if (!trimmed) return {} as Record<string, unknown>
-  try {
-    const parsed = JSON.parse(trimmed)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error(errorMessage)
-    }
-    return parsed as Record<string, unknown>
-  } catch {
-    throw new Error(errorMessage)
-  }
-}
-
 const parseJsonValueText = (jsonText: string, errorMessage: string) => {
   try {
     return JSON.parse(jsonText)
@@ -891,6 +1057,13 @@ const readObject = (value: unknown) => {
   return value as Record<string, unknown>
 }
 
+const rowsFromObject = (value: unknown) => {
+  const entries = Object.entries(readObject(value))
+  return entries.length
+    ? entries.map(([key, rowValue]) => createRuntimeRow({ key, value: stringifyUnknown(rowValue) }))
+    : [createRuntimeRow()]
+}
+
 const readString = (value: unknown) => typeof value === 'string' ? value : ''
 const readBoolean = (value: unknown, fallback = false) => typeof value === 'boolean' ? value : fallback
 const countLines = (text: string) => text ? `${text.split(/\r?\n/).filter((item) => item.trim()).length} 行` : '0 行'
@@ -901,6 +1074,76 @@ const stringifyUnknown = (value: unknown) => {
     return JSON.stringify(value, null, 2)
   } catch {
     return String(value)
+  }
+}
+
+const resetApiRuntimeForm = () => {
+  Object.assign(apiRuntimeForm, createEmptyApiRuntimeForm())
+  apiRuntimeTab.value = 'headers'
+}
+
+const syncApiRuntimeFormFromConfig = (config: Record<string, unknown>) => {
+  resetApiRuntimeForm()
+  apiRuntimeForm.headers = rowsFromObject(config.apiHeaders ?? config.headers)
+  apiRuntimeForm.query = rowsFromObject(config.apiQuery ?? config.query)
+  apiRuntimeForm.bodyText = stringifyUnknown(config.apiBody ?? config.body)
+  apiRuntimeForm.resultPath = readString(config.apiResultPath ?? config.resultPath)
+}
+
+const buildRuntimeKeyValueObject = (rows: RuntimeKeyValueRow[]) => rows.reduce<Record<string, unknown>>((result, row) => {
+  const key = row.key.trim()
+  if (!key) return result
+  const parsedValue = parseLooseJsonValue(row.value)
+  result[key] = parsedValue === undefined ? '' : parsedValue
+  return result
+}, {})
+
+const addApiRuntimeRow = (section: ApiConfigSection) => {
+  apiRuntimeForm[section] = [...apiRuntimeForm[section], createRuntimeRow()]
+}
+
+const removeApiRuntimeRow = (section: ApiConfigSection, rowId: string) => {
+  const nextRows = apiRuntimeForm[section].filter((item) => item.id !== rowId)
+  apiRuntimeForm[section] = nextRows.length ? nextRows : [createRuntimeRow()]
+}
+
+const applyTableExample = (delimiter: TableDelimiter) => {
+  form.tableDelimiter = delimiter
+  form.tableHasHeader = true
+  form.tableText = delimiter === 'TSV'
+    ? ['region\tvalue\ttrend', '华东\t120\t12%', '华南\t98\t8%', '西南\t76\t5%'].join('\n')
+    : ['region,value,trend', '华东,120,12%', '华南,98,8%', '西南,76,5%'].join('\n')
+}
+
+const clearTableDraft = () => {
+  form.tableText = ''
+}
+
+const applyJsonExample = (kind: 'array' | 'object') => {
+  form.jsonText = kind === 'array'
+    ? JSON.stringify([
+      { region: '华东', value: 120, trend: 12 },
+      { region: '华南', value: 98, trend: 8 },
+      { region: '西南', value: 76, trend: 5 },
+    ], null, 2)
+    : JSON.stringify({
+      data: {
+        summary: { total: 294, updatedAt: '2026-04-17 12:00:00' },
+        records: [
+          { region: '华东', value: 120 },
+          { region: '华南', value: 98 },
+        ],
+      },
+    }, null, 2)
+}
+
+const formatJsonDraft = () => {
+  try {
+    form.jsonText = JSON.stringify(parseJsonValueText(form.jsonText, 'JSON 静态数据内容不是合法 JSON'), null, 2)
+  } catch (error) {
+    if (error instanceof Error && error.message) {
+      ElMessage.warning(error.message)
+    }
   }
 }
 
@@ -1270,6 +1513,104 @@ onMounted(async () => {
   grid-column: 1 / -1;
 }
 
+.runtime-editor-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #deebf7;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.runtime-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.runtime-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.runtime-editor-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #183153;
+}
+
+.runtime-editor-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #71829b;
+}
+
+.runtime-tabs :deep(.el-tabs__header) {
+  margin-bottom: 12px;
+}
+
+.kv-editor-list {
+  display: grid;
+  gap: 10px;
+}
+
+.kv-editor-row {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.action-row--compact {
+  margin-top: 10px;
+}
+
+.runtime-stat-grid,
+.runtime-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runtime-stat-card {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #deebf7;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.runtime-stat-card span {
+  font-size: 12px;
+  color: #71829b;
+}
+
+.runtime-stat-card strong {
+  font-size: 13px;
+  color: #183153;
+  word-break: break-word;
+}
+
+.runtime-form-item {
+  margin-bottom: 0;
+}
+
+.runtime-form-item--full {
+  grid-column: 1 / -1;
+}
+
 .source-kind-group {
   display: flex;
   flex-wrap: wrap;
@@ -1298,8 +1639,22 @@ onMounted(async () => {
   }
 
   .table-browser,
-  .form-grid {
+  .form-grid,
+  .runtime-stat-grid,
+  .runtime-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .kv-editor-row {
+    grid-template-columns: 1fr;
+  }
+
+  .runtime-editor-head {
+    flex-direction: column;
+  }
+
+  .action-row {
+    justify-content: flex-start;
   }
 }
 </style>

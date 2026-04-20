@@ -11,6 +11,8 @@ public interface BiDatasetMapper {
 
     BiDataset findById(Long id);
 
+    long countByDatasourceId(Long datasourceId);
+
     int insert(BiDataset dataset);
 
     int update(BiDataset dataset);

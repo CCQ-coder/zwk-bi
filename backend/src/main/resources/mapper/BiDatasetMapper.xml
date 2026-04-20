@@ -24,6 +24,12 @@
         WHERE id = #{id}
     </select>
 
+    <select id="countByDatasourceId" resultType="long" parameterType="long">
+        SELECT COUNT(1)
+        FROM bi_dataset
+        WHERE datasource_id = #{datasourceId}
+    </select>
+
     <insert id="insert" parameterType="com.aibi.bi.domain.BiDataset" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO bi_dataset (name, datasource_id, sql_text, folder_id)
         VALUES (#{name}, #{datasourceId}, #{sqlText}, #{folderId})
