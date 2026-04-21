@@ -50,18 +50,6 @@
                 <div class="helper-text">{{ currentChartMeta.description }}</div>
               </el-form-item>
             </el-form>
-            <div class="preset-grid">
-              <button
-                v-for="preset in componentPresets"
-                :key="preset.id"
-                type="button"
-                class="preset-card"
-                @click="applyPreset(preset.id)"
-              >
-                <strong>{{ preset.name }}</strong>
-                <span>{{ preset.description }}</span>
-              </button>
-            </div>
           </section>
 
           <section class="inspector-section">
@@ -364,6 +352,50 @@
                   <span class="ss-key">颜色</span>
                   <el-color-picker v-model="configForm.style.titleColor" size="small" />
                 </div>
+              </div>
+            </div>
+
+            <!-- iframe 网址配置 -->
+            <div v-if="isIframeType" class="ss-section">
+              <div class="ss-hd" @click="toggleSection('iframe')">
+                <span class="ss-chevron" :class="{ open: openSections.has('iframe') }">&#9654;</span>
+                <span class="ss-hd-label">网页嵌入</span>
+              </div>
+              <div v-show="openSections.has('iframe')" class="ss-body">
+                <template v-if="currentChartType === 'iframe_single'">
+                  <div class="ss-row ss-row--vertical">
+                    <span class="ss-key">网页地址</span>
+                    <el-input v-model="configForm.style.iframeUrl" size="small" placeholder="https://example.com" clearable />
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="ss-row ss-row--vertical">
+                    <span class="ss-key">页签列表</span>
+                    <div class="iframe-tabs-list">
+                      <div v-for="(tab, idx) in configForm.style.iframeTabs" :key="idx" class="iframe-tab-row">
+                        <el-input v-model="tab.label" size="small" placeholder="页签名称" style="width:80px" />
+                        <el-input v-model="tab.url" size="small" placeholder="https://example.com" style="flex:1" />
+                        <el-button link size="small" type="danger" @click="configForm.style.iframeTabs.splice(idx, 1)">删除</el-button>
+                      </div>
+                      <el-button size="small" @click="configForm.style.iframeTabs.push({ label: `页签${configForm.style.iframeTabs.length + 1}`, url: '' })">+ 添加页签</el-button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- 文本内容 -->
+            <div v-if="isTextBlockType" class="ss-section">
+              <div class="ss-hd" @click="toggleSection('textcontent')">
+                <span class="ss-chevron" :class="{ open: openSections.has('textcontent') }">&#9654;</span>
+                <span class="ss-hd-label">文本内容</span>
+              </div>
+              <div v-show="openSections.has('textcontent')" class="ss-body">
+                <div class="ss-row ss-row--vertical">
+                  <span class="ss-key">静态内容</span>
+                  <el-input v-model="configForm.style.textContent" type="textarea" :rows="4" size="small" placeholder="输入文本内容，也可绑定数据源动态展示" />
+                </div>
+                <div class="helper-text" style="margin-top:4px">绑定数据后，此内容作为无数据时的默认文案。</div>
               </div>
             </div>
 
@@ -1000,7 +1032,7 @@ const chartTypeGroups = [
 const TABLE_LIKE_CHART_TYPES = new Set(['table', 'table_summary', 'table_pivot', 'table_rank'])
 const METRIC_WIDGET_TYPES = new Set(['single_field', 'number_flipper', 'metric_indicator', 'business_trend'])
 const CONTENT_WIDGET_TYPES = new Set(['text_block', 'hyperlink', 'iframe_single', 'iframe_tabs', 'image_list', 'text_list', 'clock_display', 'word_cloud', 'qr_code'])
-const PURE_STATIC_NO_DATA_TYPES = new Set(['text_block', 'hyperlink', 'iframe_single', 'iframe_tabs', 'clock_display', 'qr_code'])
+const PURE_STATIC_NO_DATA_TYPES = new Set(['hyperlink', 'clock_display', 'qr_code'])
 
 const PAGE_SOURCE_OPTIONS: Array<{ label: string; value: DatasourceSourceKind }> = [
   { label: '数据库', value: 'DATABASE' },
@@ -1115,6 +1147,8 @@ const isMetricComponentType = computed(() => METRIC_WIDGET_TYPES.has(currentChar
 const isContentComponentType = computed(() => CONTENT_WIDGET_TYPES.has(currentChartType.value))
 const isWordCloudType = computed(() => currentChartType.value === 'word_cloud')
 const isListType = computed(() => currentChartType.value === 'text_list' || currentChartType.value === 'image_list')
+const isIframeType = computed(() => currentChartType.value === 'iframe_single' || currentChartType.value === 'iframe_tabs')
+const isTextBlockType = computed(() => currentChartType.value === 'text_block')
 const isPureStaticNoDataComponentType = computed(() => (
   isDecorationComponentType.value || isVectorIconComponentType.value || PURE_STATIC_NO_DATA_TYPES.has(currentChartType.value)
 ))
@@ -2433,6 +2467,11 @@ onBeforeUnmount(() => {
   min-height: 28px;
 }
 
+.ss-row--vertical {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .ss-key {
   font-size: 12px;
   color: rgba(214, 230, 247, 0.82);
@@ -2445,5 +2484,17 @@ onBeforeUnmount(() => {
 
 .ss-row :deep(.el-input) {
   flex: 1;
+}
+
+.iframe-tabs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.iframe-tab-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 </style>

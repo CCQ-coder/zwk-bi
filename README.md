@@ -6,6 +6,231 @@
 - 数据库: MySQL + ClickHouse
 - 数据同步: DataX + ETL
 
+---
+
+## 部署打包
+
+### 需要上传到服务器的文件
+
+| 目录 / 文件 | 说明 |
+|---|---|
+| `docker-compose.yml` | 数据库容器编排（MySQL + ClickHouse） |
+| `database/` | 数据库初始化脚本，容器首次启动时自动执行 |
+| `backend/target/backend-0.0.1-SNAPSHOT.jar` | 后端可执行 Jar（下方命令打包产出） |
+| `frontend/dist/` | 前端静态文件（下方命令打包产出） |
+| `data-integration/` | DataX 同步作业配置（按需上传） |
+
+---
+
+### 一、打包前端
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+产出目录：`frontend/dist/`，将整个 `dist` 目录部署到 Nginx 的 `html` 根目录。
+
+**Nginx 前端代理配置文件**（建议保存为 `/etc/nginx/conf.d/ai-bi.conf`）：
+
+```nginx
+# 可选：定义后端服务地址
+upstream ai_bi_backend {
+  server 127.0.0.1:8081;
+  keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name your-domain.com;
+
+  # 前端静态文件目录（请替换为你的实际部署路径）
+    root /var/www/ai-bi/dist;
+    index index.html;
+
+  # SPA history 模式兜底，避免前端路由 404
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+  # 反代后端 API
+    location /api/ {
+    proxy_pass http://ai_bi_backend;
+    proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+  # 后端上传文件访问
+    location /uploads/ {
+    proxy_pass http://ai_bi_backend;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+  # 常用静态资源缓存策略
+  location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2)$ {
+    expires 7d;
+    add_header Cache-Control "public, max-age=604800, immutable";
+  }
+}
+```
+
+Nginx 配置生效命令：
+
+```bash
+nginx -t
+systemctl reload nginx
+```
+
+如果你使用 HTTPS，可在同一文件增加 443 server 块：
+
+```nginx
+server {
+  listen 443 ssl http2;
+  server_name your-domain.com;
+
+  ssl_certificate /etc/nginx/ssl/your-domain.crt;
+  ssl_certificate_key /etc/nginx/ssl/your-domain.key;
+
+  root /var/www/ai-bi/dist;
+  index index.html;
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+
+  location /api/ {
+    proxy_pass http://ai_bi_backend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location /uploads/ {
+    proxy_pass http://ai_bi_backend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+---
+
+### 二、打包后端
+
+```bash
+cd backend
+mvn clean package -DskipTests
+```
+
+如果你在 Windows 终端里遇到 `mvn` 不存在（CommandNotFoundException），可用以下任一方式：
+
+```powershell
+# 方式 1：使用仓库自带脚本（会自动设置 JAVA_HOME 和 Maven 路径）
+powershell -ExecutionPolicy Bypass -File .\start-backend.ps1
+```
+
+```powershell
+# 方式 2：直接调用本机 mvn.cmd（示例为 IDEA 自带 Maven）
+$env:JAVA_HOME="C:\Users\the\.jdks\ms-17.0.18"
+& "E:\Program Files\JetBrains\IntelliJ IDEA 2025.3.4\plugins\maven\lib\maven3\bin\mvn.cmd" clean package -DskipTests
+```
+
+产出文件：`backend/target/backend-0.0.1-SNAPSHOT.jar`
+
+**启动命令**（服务器上执行）：
+
+```bash
+# 基础启动
+java -jar backend-0.0.1-SNAPSHOT.jar
+
+# 携带环境变量覆盖（推荐，避免敏感信息写入配置文件）
+java \
+  -DAI_BI_DB_URL="jdbc:mysql://127.0.0.1:3306/ai_bi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai" \
+  -DAI_BI_DB_USERNAME=root \
+  -DAI_BI_DB_PASSWORD=your_password \
+  -DAI_BI_JWT_SECRET=your_jwt_secret_key \
+  -DAI_BI_SERVER_PORT=8081 \
+  -jar backend-0.0.1-SNAPSHOT.jar
+
+# 后台运行（nohup）
+nohup java -jar backend-0.0.1-SNAPSHOT.jar \
+  --server.port=8081 \
+  > /var/log/ai-bi-backend.log 2>&1 &
+```
+
+---
+
+### 三、启动数据库（两种方式任选一种）
+
+#### 方式 A：使用服务器已有的 MySQL（推荐）
+
+无需 Docker，直接在服务器的 MySQL 中建库并执行初始化脚本：
+
+```sql
+-- 1. 登录 MySQL
+mysql -u root -p
+
+-- 2. 建库（如果还没有）
+CREATE DATABASE IF NOT EXISTS ai_bi DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 3. 执行初始化脚本（包含所有建表和基础数据）
+USE ai_bi;
+SOURCE /path/to/database/mysql/init.sql;
+```
+
+> `init.sql` 内已包含最新完整表结构（版本 V19），**新库直接执行这一个文件即可**，无需再逐个执行 migration 脚本。
+
+初始化完成后，启动后端时通过环境变量指向服务器 MySQL：
+
+```bash
+java \
+  -DAI_BI_DB_URL="jdbc:mysql://127.0.0.1:3306/ai_bi?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai" \
+  -DAI_BI_DB_USERNAME=root \
+  -DAI_BI_DB_PASSWORD=your_password \
+  -jar backend-0.0.1-SNAPSHOT.jar
+```
+
+ClickHouse 同理，可直接在服务器上安装 ClickHouse，然后执行：
+
+```bash
+clickhouse-client --queries-file database/clickhouse/init.sql
+```
+
+---
+
+#### 方式 B：使用 Docker（本地开发 / 无 MySQL 的服务器）
+
+```bash
+# 仅需上传 docker-compose.yml 和 database/ 目录
+docker compose up -d
+```
+
+首次启动时 Docker 会自动执行 `database/mysql/init.sql` 和 `database/clickhouse/init.sql` 完成建库建表。
+
+---
+
+### 四、完整上线检查清单
+
+1. `docker compose ps` 确认 MySQL 和 ClickHouse 容器均为 `Up`
+2. `curl http://127.0.0.1:8081/api/health` 返回 `OK`
+3. 浏览器访问前端地址，登录默认账号（`admin` / `admin123`）
+4. 后端日志中 Flyway 显示 `Successfully applied N migration(s)` 表示数据库已自动升级
+
+---
+
+
+
 ## 需求落地说明
 - 业务系统接入: ERP / MES / CRM / 业务 MySQL
 - 数据同步层: DataX + ETL

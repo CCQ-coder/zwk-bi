@@ -80,6 +80,11 @@ export interface ComponentStyleConfig {
   iconSize: number
   iconStrokeColor: string
   iconFillColor: string
+  // iframe 组件
+  iframeUrl: string
+  iframeTabs: Array<{ label: string; url: string }>
+  // 文本组件
+  textContent: string
   // 高级
   componentOpacity: number
   shadowShow: boolean
@@ -218,6 +223,11 @@ export const DEFAULT_COMPONENT_STYLE: ComponentStyleConfig = {
   iconSize: 48,
   iconStrokeColor: '#4db3ff',
   iconFillColor: 'rgba(77,179,255,0.15)',
+  // iframe 组件
+  iframeUrl: '',
+  iframeTabs: [],
+  // 文本组件
+  textContent: '',
   // 高级
   componentOpacity: 1,
   shadowShow: false,
@@ -973,7 +983,7 @@ export const VECTOR_ICON_CHART_TYPES = new Set([
 
 export const PURE_STATIC_CHART_TYPES = new Set([
   ...DECORATION_CHART_TYPES,
-  'text_block', 'iframe_single', 'iframe_tabs', 'hyperlink', 'clock_display', 'qr_code',
+  'hyperlink', 'clock_display', 'qr_code',
   ...VECTOR_ICON_CHART_TYPES,
 ])
 

@@ -73,7 +73,10 @@
                   class="lp-type-chip"
                   :class="{ 'lp-type-chip--active': assetType === item.type }"
                   :title="item.label"
+                  draggable="true"
                   @click="assetType = item.type"
+                  @dragstart="onTypeChipDragStart($event, item.type)"
+                  @dragend="onTypeChipDragEnd"
                 >
                   <span class="lp-type-icon" v-html="item.svgIcon" />
                   <span class="lp-type-label">{{ item.label }}</span>
@@ -181,13 +184,20 @@
             </div>
 
             <div
-              v-for="component in layeredComponents"
+              v-for="(component, layerIdx) in layeredComponents"
               :key="component.id"
               class="lp-layer-item"
-              :class="{ 'lp-layer-item--active': activeCompId === component.id }"
+              :class="{ 'lp-layer-item--active': activeCompId === component.id, 'lp-layer-item--drag-over': layerDragOverIdx === layerIdx }"
+              draggable="true"
+              @dragstart="onLayerDragStart($event, layerIdx)"
+              @dragover.prevent="onLayerDragOver($event, layerIdx)"
+              @dragleave="onLayerDragLeave"
+              @drop.prevent="onLayerDrop($event, layerIdx)"
+              @dragend="onLayerDragEnd"
               @click="selectLayerComponent(component)"
             >
               <div class="lp-layer-item-main">
+                <span class="lp-layer-drag-handle">⠿</span>
                 <span class="lp-layer-name">{{ getComponentDisplayName(component) }}</span>
                 <span class="lp-layer-meta">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }} · {{ getComponentStatusText(component) }} · Z{{ component.zIndex ?? 0 }}</span>
               </div>
@@ -494,7 +504,6 @@
               >
                 <div class="stage-card-header" @mousedown.stop.prevent="startDrag($event, component)">
                   <div class="stage-card-header-main">
-                    <span class="stage-card-name">{{ getComponentDisplayName(component) }}</span>
                     <span class="stage-card-meta">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }} · {{ getComponentStatusText(component) }}</span>
                   </div>
                   <el-button class="remove-btn" text size="small" @click.stop="confirmRemoveComponent(component)">
@@ -556,6 +565,7 @@
                     v-else-if="isStaticWidget(component)"
                     :chart-type="getComponentChartConfig(component).chartType"
                     :chart-config="getComponentChartConfig(component)"
+                    :style-config="getComponentConfig(component).style"
                     :data="componentDataMap.get(component.id) ?? null"
                     :show-title="getComponentConfig(component).style.showTitle"
                     dark
@@ -1161,7 +1171,10 @@ const selectedChartId = ref<number | null>(null)
 const selectedTemplateId = ref<number | null>(null)
 const draggingTemplateId = ref<number | null>(null)
 const draggingChartId = ref<number | null>(null)
+const draggingTypeChip = ref<string | null>(null)
 const stageDropActive = ref(false)
+const layerDragFromIdx = ref<number | null>(null)
+const layerDragOverIdx = ref<number | null>(null)
 
 const createDashVisible = ref(false)
 const dashSaving = ref(false)
@@ -2382,7 +2395,7 @@ const onChartDragEnd = () => {
 }
 
 const onStageDragOver = (event: DragEvent) => {
-  if (!draggingTemplateId.value && !draggingChartId.value) return
+  if (!draggingTemplateId.value && !draggingChartId.value && !draggingTypeChip.value) return
   stageDropActive.value = true
   if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
 }
@@ -2398,6 +2411,22 @@ const onStageDragLeave = (event: DragEvent) => {
 const onStageDrop = async (event: DragEvent) => {
   const raw = event.dataTransfer?.getData('text/plain') ?? ''
   stageDropActive.value = false
+
+  // Handle type chip drop (creates default component of that type)
+  if (raw.startsWith('typechip:') || draggingTypeChip.value) {
+    const chipType = draggingTypeChip.value ?? raw.replace('typechip:', '')
+    draggingTypeChip.value = null
+    draggingTemplateId.value = null
+    draggingChartId.value = null
+    // Find a built-in template matching the type, or the first matching template
+    const matchingTemplate = templateAssets.value.find((t) => t.chartType === chipType && t.builtIn)
+      ?? templateAssets.value.find((t) => t.chartType === chipType)
+    if (matchingTemplate) {
+      await addTemplateToScreen(matchingTemplate, { clientX: event.clientX, clientY: event.clientY })
+    }
+    return
+  }
+
   if (raw.startsWith('chart:') || draggingChartId.value) {
     const chartId = draggingChartId.value ?? Number(raw.replace('chart:', '') || 0)
     draggingChartId.value = null
@@ -2412,6 +2441,69 @@ const onStageDrop = async (event: DragEvent) => {
   const template = templates.value.find((item) => item.id === templateId)
   if (!template) return
   await addTemplateToScreen(template, { clientX: event.clientX, clientY: event.clientY })
+}
+
+// ─── 类型芯片拖拽 ─────────────────────────────────────────────────────
+const onTypeChipDragStart = (event: DragEvent, chipType: string) => {
+  draggingTypeChip.value = chipType
+  draggingTemplateId.value = null
+  draggingChartId.value = null
+  stageDropActive.value = true
+  event.dataTransfer?.setData('text/plain', `typechip:${chipType}`)
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy'
+}
+
+const onTypeChipDragEnd = () => {
+  draggingTypeChip.value = null
+  stageDropActive.value = false
+}
+
+// ─── 图层拖拽排序 ─────────────────────────────────────────────────────
+const onLayerDragStart = (event: DragEvent, idx: number) => {
+  layerDragFromIdx.value = idx
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', `layer:${idx}`)
+  }
+}
+
+const onLayerDragOver = (_event: DragEvent, idx: number) => {
+  if (layerDragFromIdx.value === null) return
+  layerDragOverIdx.value = idx
+}
+
+const onLayerDragLeave = () => {
+  layerDragOverIdx.value = null
+}
+
+const onLayerDrop = async (_event: DragEvent, toIdx: number) => {
+  layerDragOverIdx.value = null
+  const fromIdx = layerDragFromIdx.value
+  layerDragFromIdx.value = null
+  if (fromIdx === null || fromIdx === toIdx) return
+
+  // Reorder: layeredComponents is sorted highest-zIndex first.
+  // After reorder, reassign zIndex so that item at index 0 has the highest z.
+  const ordered = [...layeredComponents.value]
+  const [moved] = ordered.splice(fromIdx, 1)
+  ordered.splice(toIdx, 0, moved)
+
+  // Assign descending zIndex starting from the count
+  const baseZ = ordered.length + 1
+  const persistPromises: Promise<void>[] = []
+  for (let i = 0; i < ordered.length; i++) {
+    const newZ = baseZ - i
+    if (ordered[i].zIndex !== newZ) {
+      ordered[i].zIndex = newZ
+      persistPromises.push(persistLayout(ordered[i]))
+    }
+  }
+  await Promise.all(persistPromises)
+}
+
+const onLayerDragEnd = () => {
+  layerDragFromIdx.value = null
+  layerDragOverIdx.value = null
 }
 
 const summarizeTemplateConfig = (configJson: string) => {
@@ -4350,6 +4442,24 @@ onBeforeUnmount(() => {
 .lp-layer-item--active {
   background: rgba(77,179,255,0.12);
   border-color: rgba(77,179,255,0.58);
+}
+
+.lp-layer-item--drag-over {
+  border-color: rgba(77,179,255,0.8);
+  background: rgba(77,179,255,0.18);
+  box-shadow: 0 0 0 2px rgba(77,179,255,0.25);
+}
+
+.lp-layer-drag-handle {
+  cursor: grab;
+  color: rgba(255,255,255,0.3);
+  font-size: 14px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.lp-layer-item:hover .lp-layer-drag-handle {
+  color: rgba(255,255,255,0.6);
 }
 
 .lp-layer-item-main {

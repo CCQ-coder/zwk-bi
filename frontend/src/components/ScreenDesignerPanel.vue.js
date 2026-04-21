@@ -1,7 +1,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Grid, Operation, PictureFilled, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue';
-import html2canvas from 'html2canvas';
 import ComponentDataFallback from './ComponentDataFallback.vue';
 import ComponentStaticPreview from './ComponentStaticPreview.vue';
 import ComponentTemplatePreview from './ComponentTemplatePreview.vue';
@@ -157,7 +156,16 @@ const getAssetBadgeText = (type) => {
         return '免数据';
     return '数据';
 };
-const getTemplateAssetConfig = (template) => normalizeComponentAssetConfig(template.configJson);
+// 缓存模板/组件配置解析结果，避免 v-for 内多次 JSON.parse
+const _templateConfigCache = new WeakMap();
+const getTemplateAssetConfig = (template) => {
+    let cached = _templateConfigCache.get(template);
+    if (!cached) {
+        cached = normalizeComponentAssetConfig(template.configJson);
+        _templateConfigCache.set(template, cached);
+    }
+    return cached;
+};
 const isTemplateStaticAsset = (template) => isStaticWidgetChartType(getTemplateAssetConfig(template).chart.chartType || template.chartType);
 const STATIC_TEMPLATE_LIBRARY = [
     { type: 'decor_border_frame', name: '默认边框装饰', description: '适合用作区块包裹和背景版强调。', layout: { width: 520, height: 220 } },
@@ -251,12 +259,18 @@ const leftPanelWidth = ref(520);
 const startPanelResize = (e) => {
     const startX = e.clientX;
     const startWidth = leftPanelWidth.value;
-    const onMove = (ev) => {
-        leftPanelWidth.value = Math.max(420, Math.min(880, startWidth + ev.clientX - startX));
-    };
+    let rafId = 0;
+    let lastX = startX;
+    const applyFrame = () => { rafId = 0; leftPanelWidth.value = Math.max(420, Math.min(880, startWidth + lastX - startX)); };
+    const onMove = (ev) => { lastX = ev.clientX; if (!rafId)
+        rafId = requestAnimationFrame(applyFrame); };
     const onUp = () => {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            applyFrame();
+        }
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -317,7 +331,10 @@ const selectedChartId = ref(null);
 const selectedTemplateId = ref(null);
 const draggingTemplateId = ref(null);
 const draggingChartId = ref(null);
+const draggingTypeChip = ref(null);
 const stageDropActive = ref(false);
+const layerDragFromIdx = ref(null);
+const layerDragOverIdx = ref(null);
 const createDashVisible = ref(false);
 const dashSaving = ref(false);
 const dashForm = reactive({ name: '' });
@@ -422,7 +439,7 @@ const toggleOverlay = async () => {
     overlayConfig.y = 0;
     await saveOverlay();
 };
-// 幕布拖动
+// 幕布拖动 (rAF 节流)
 const startCurtainDrag = (e) => {
     overlaySelected.value = true;
     activeCompId.value = null;
@@ -430,20 +447,24 @@ const startCurtainDrag = (e) => {
     const startY = e.clientY;
     const ox = overlayConfig.x;
     const oy = overlayConfig.y;
-    const onMove = (ev) => {
-        const scale = canvasScale.value || 1;
-        overlayConfig.x = Math.max(0, Math.round(ox + (ev.clientX - startX) / scale));
-        overlayConfig.y = Math.max(0, Math.round(oy + (ev.clientY - startY) / scale));
-    };
+    let rafId = 0;
+    let lastEv = e;
+    const applyFrame = () => { rafId = 0; const scale = canvasScale.value || 1; overlayConfig.x = Math.max(0, Math.round(ox + (lastEv.clientX - startX) / scale)); overlayConfig.y = Math.max(0, Math.round(oy + (lastEv.clientY - startY) / scale)); };
+    const onMove = (ev) => { lastEv = ev; if (!rafId)
+        rafId = requestAnimationFrame(applyFrame); };
     const onUp = () => {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            applyFrame();
+        }
         saveOverlay();
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
 };
-// 幕布调整大小
+// 幕布调整大小 (rAF 节流)
 const startCurtainResize = (e, handle) => {
     overlaySelected.value = true;
     activeCompId.value = null;
@@ -453,10 +474,13 @@ const startCurtainResize = (e, handle) => {
     const ow = overlayConfig.w;
     const oy = overlayConfig.y;
     const oh = overlayConfig.h;
-    const onMove = (ev) => {
+    let rafId = 0;
+    let lastEv = e;
+    const applyFrame = () => {
+        rafId = 0;
         const scale = canvasScale.value || 1;
-        const dx = (ev.clientX - startX) / scale;
-        const dy = (ev.clientY - startY) / scale;
+        const dx = (lastEv.clientX - startX) / scale;
+        const dy = (lastEv.clientY - startY) / scale;
         if (handle.includes('e'))
             overlayConfig.w = Math.max(100, Math.round(ow + dx));
         if (handle.includes('s'))
@@ -472,9 +496,15 @@ const startCurtainResize = (e, handle) => {
             overlayConfig.y = ny;
         }
     };
+    const onMove = (ev) => { lastEv = ev; if (!rafId)
+        rafId = requestAnimationFrame(applyFrame); };
     const onUp = () => {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            applyFrame();
+        }
         saveOverlay();
     };
     document.addEventListener('mousemove', onMove);
@@ -527,7 +557,21 @@ const draftPublishedLink = computed(() => currentDashboard.value
 const roleOptions = ['ADMIN', 'ANALYST', 'VIEWER'];
 const activeComponent = computed(() => components.value.find((item) => item.id === activeCompId.value) ?? null);
 const activeChart = computed(() => activeComponent.value ? chartMap.value.get(activeComponent.value.chartId) ?? null : null);
-const getComponentConfig = (component) => normalizeComponentConfig(component.configJson, chartMap.value.get(component.chartId));
+const _componentConfigCache = new Map();
+const getComponentConfig = (component) => {
+    const cacheKey = `${component.id}:${component.configJson ?? ''}`;
+    let cached = _componentConfigCache.get(cacheKey);
+    if (!cached) {
+        cached = normalizeComponentConfig(component.configJson, chartMap.value.get(component.chartId));
+        _componentConfigCache.set(cacheKey, cached);
+        // 限制缓存条目数量，防止长时间编辑内存膨胀
+        if (_componentConfigCache.size > 200) {
+            const firstKey = _componentConfigCache.keys().next().value;
+            _componentConfigCache.delete(firstKey);
+        }
+    }
+    return cached;
+};
 const getComponentChartConfig = (component) => getComponentConfig(component).chart;
 const getComponentDisplayName = (component) => getComponentChartConfig(component).name?.trim()
     || chartMap.value.get(component.chartId)?.name
@@ -571,15 +615,16 @@ const canvasMinHeight = computed(() => {
     const occupied = components.value.reduce((max, item) => Math.max(max, item.posY + item.height + 24), 0);
     return Math.max(currentCanvasConfig.value.height, bgBottom, 560, occupied);
 });
+const RULER_STEP = 200; // 加大标尺间距减少 DOM 数量
 const hRulerMarks = computed(() => {
     const marks = [];
-    for (let i = 0; i <= canvasWorkWidth.value; i += 100)
+    for (let i = 0; i <= canvasWorkWidth.value; i += RULER_STEP)
         marks.push(i);
     return marks;
 });
 const vRulerMarks = computed(() => {
     const marks = [];
-    for (let i = 0; i <= canvasMinHeight.value; i += 100)
+    for (let i = 0; i <= canvasMinHeight.value; i += RULER_STEP)
         marks.push(i);
     return marks;
 });
@@ -1185,6 +1230,7 @@ const captureScreenCover = async () => {
             windowHeight: Math.max(stage.scrollHeight, overlayConfig.y + overlayConfig.h),
             onclone: prepareStageCloneForCapture,
         };
+        const { default: html2canvas } = await import('html2canvas');
         const canvas = await html2canvas(stage, captureOptions);
         const blob = await new Promise((resolve) => canvas.toBlob((result) => resolve(result), 'image/png'));
         if (!blob) {
@@ -1458,7 +1504,7 @@ const onChartDragEnd = () => {
     stageDropActive.value = false;
 };
 const onStageDragOver = (event) => {
-    if (!draggingTemplateId.value && !draggingChartId.value)
+    if (!draggingTemplateId.value && !draggingChartId.value && !draggingTypeChip.value)
         return;
     stageDropActive.value = true;
     if (event.dataTransfer)
@@ -1474,6 +1520,20 @@ const onStageDragLeave = (event) => {
 const onStageDrop = async (event) => {
     const raw = event.dataTransfer?.getData('text/plain') ?? '';
     stageDropActive.value = false;
+    // Handle type chip drop (creates default component of that type)
+    if (raw.startsWith('typechip:') || draggingTypeChip.value) {
+        const chipType = draggingTypeChip.value ?? raw.replace('typechip:', '');
+        draggingTypeChip.value = null;
+        draggingTemplateId.value = null;
+        draggingChartId.value = null;
+        // Find a built-in template matching the type, or the first matching template
+        const matchingTemplate = templateAssets.value.find((t) => t.chartType === chipType && t.builtIn)
+            ?? templateAssets.value.find((t) => t.chartType === chipType);
+        if (matchingTemplate) {
+            await addTemplateToScreen(matchingTemplate, { clientX: event.clientX, clientY: event.clientY });
+        }
+        return;
+    }
     if (raw.startsWith('chart:') || draggingChartId.value) {
         const chartId = draggingChartId.value ?? Number(raw.replace('chart:', '') || 0);
         draggingChartId.value = null;
@@ -1490,6 +1550,63 @@ const onStageDrop = async (event) => {
     if (!template)
         return;
     await addTemplateToScreen(template, { clientX: event.clientX, clientY: event.clientY });
+};
+// ─── 类型芯片拖拽 ─────────────────────────────────────────────────────
+const onTypeChipDragStart = (event, chipType) => {
+    draggingTypeChip.value = chipType;
+    draggingTemplateId.value = null;
+    draggingChartId.value = null;
+    stageDropActive.value = true;
+    event.dataTransfer?.setData('text/plain', `typechip:${chipType}`);
+    if (event.dataTransfer)
+        event.dataTransfer.effectAllowed = 'copy';
+};
+const onTypeChipDragEnd = () => {
+    draggingTypeChip.value = null;
+    stageDropActive.value = false;
+};
+// ─── 图层拖拽排序 ─────────────────────────────────────────────────────
+const onLayerDragStart = (event, idx) => {
+    layerDragFromIdx.value = idx;
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', `layer:${idx}`);
+    }
+};
+const onLayerDragOver = (_event, idx) => {
+    if (layerDragFromIdx.value === null)
+        return;
+    layerDragOverIdx.value = idx;
+};
+const onLayerDragLeave = () => {
+    layerDragOverIdx.value = null;
+};
+const onLayerDrop = async (_event, toIdx) => {
+    layerDragOverIdx.value = null;
+    const fromIdx = layerDragFromIdx.value;
+    layerDragFromIdx.value = null;
+    if (fromIdx === null || fromIdx === toIdx)
+        return;
+    // Reorder: layeredComponents is sorted highest-zIndex first.
+    // After reorder, reassign zIndex so that item at index 0 has the highest z.
+    const ordered = [...layeredComponents.value];
+    const [moved] = ordered.splice(fromIdx, 1);
+    ordered.splice(toIdx, 0, moved);
+    // Assign descending zIndex starting from the count
+    const baseZ = ordered.length + 1;
+    const persistPromises = [];
+    for (let i = 0; i < ordered.length; i++) {
+        const newZ = baseZ - i;
+        if (ordered[i].zIndex !== newZ) {
+            ordered[i].zIndex = newZ;
+            persistPromises.push(persistLayout(ordered[i]));
+        }
+    }
+    await Promise.all(persistPromises);
+};
+const onLayerDragEnd = () => {
+    layerDragFromIdx.value = null;
+    layerDragOverIdx.value = null;
 };
 const summarizeTemplateConfig = (configJson) => {
     const asset = normalizeComponentAssetConfig(configJson);
@@ -1515,6 +1632,10 @@ onBeforeUnmount(() => {
     cleanupInteractionFrame();
     window.removeEventListener('resize', handleWindowResize);
     disposeCharts();
+    if (sidebarHoverTimer !== null) {
+        clearTimeout(sidebarHoverTimer);
+        sidebarHoverTimer = null;
+    }
 });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_withDefaultsArg = (function (t) { return t; })({
@@ -1661,6 +1782,8 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['lp-hover-chart-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-hover-chart-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-layer-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-layer-drag-handle']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['el-button']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-resize-handle']} */ ;
@@ -1882,10 +2005,21 @@ if (__VLS_ctx.screenId) {
                                     return;
                                 __VLS_ctx.assetType = item.type;
                             } },
+                        ...{ onDragstart: (...[$event]) => {
+                                if (!(__VLS_ctx.screenId))
+                                    return;
+                                if (!(!__VLS_ctx.effectiveSidebarCollapsed))
+                                    return;
+                                if (!(__VLS_ctx.expandedCats.has(cat.label)))
+                                    return;
+                                __VLS_ctx.onTypeChipDragStart($event, item.type);
+                            } },
+                        ...{ onDragend: (__VLS_ctx.onTypeChipDragEnd) },
                         key: (item.type),
                         ...{ class: "lp-type-chip" },
                         ...{ class: ({ 'lp-type-chip--active': __VLS_ctx.assetType === item.type }) },
                         title: (item.label),
+                        draggable: "true",
                     });
                     __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
                         ...{ class: "lp-type-icon" },
@@ -2166,8 +2300,31 @@ if (__VLS_ctx.screenId) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "lp-layer-badge" },
         });
-        for (const [component] of __VLS_getVForSourceType((__VLS_ctx.layeredComponents))) {
+        for (const [component, layerIdx] of __VLS_getVForSourceType((__VLS_ctx.layeredComponents))) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ onDragstart: (...[$event]) => {
+                        if (!(__VLS_ctx.screenId))
+                            return;
+                        if (!(!__VLS_ctx.effectiveSidebarCollapsed))
+                            return;
+                        __VLS_ctx.onLayerDragStart($event, layerIdx);
+                    } },
+                ...{ onDragover: (...[$event]) => {
+                        if (!(__VLS_ctx.screenId))
+                            return;
+                        if (!(!__VLS_ctx.effectiveSidebarCollapsed))
+                            return;
+                        __VLS_ctx.onLayerDragOver($event, layerIdx);
+                    } },
+                ...{ onDragleave: (__VLS_ctx.onLayerDragLeave) },
+                ...{ onDrop: (...[$event]) => {
+                        if (!(__VLS_ctx.screenId))
+                            return;
+                        if (!(!__VLS_ctx.effectiveSidebarCollapsed))
+                            return;
+                        __VLS_ctx.onLayerDrop($event, layerIdx);
+                    } },
+                ...{ onDragend: (__VLS_ctx.onLayerDragEnd) },
                 ...{ onClick: (...[$event]) => {
                         if (!(__VLS_ctx.screenId))
                             return;
@@ -2177,10 +2334,14 @@ if (__VLS_ctx.screenId) {
                     } },
                 key: (component.id),
                 ...{ class: "lp-layer-item" },
-                ...{ class: ({ 'lp-layer-item--active': __VLS_ctx.activeCompId === component.id }) },
+                ...{ class: ({ 'lp-layer-item--active': __VLS_ctx.activeCompId === component.id, 'lp-layer-item--drag-over': __VLS_ctx.layerDragOverIdx === layerIdx }) },
+                draggable: "true",
             });
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ class: "lp-layer-item-main" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "lp-layer-drag-handle" },
             });
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
                 ...{ class: "lp-layer-name" },
@@ -3568,10 +3729,6 @@ else {
             ...{ class: "stage-card-header-main" },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-            ...{ class: "stage-card-name" },
-        });
-        (__VLS_ctx.getComponentDisplayName(component));
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "stage-card-meta" },
         });
         (__VLS_ctx.chartTypeLabel(__VLS_ctx.getComponentChartConfig(component).chartType));
@@ -3747,6 +3904,7 @@ else {
             const __VLS_406 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
                 chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
+                styleConfig: (__VLS_ctx.getComponentConfig(component).style),
                 data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
                 showTitle: (__VLS_ctx.getComponentConfig(component).style.showTitle),
                 dark: true,
@@ -3754,6 +3912,7 @@ else {
             const __VLS_407 = __VLS_406({
                 chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
+                styleConfig: (__VLS_ctx.getComponentConfig(component).style),
                 data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
                 showTitle: (__VLS_ctx.getComponentConfig(component).style.showTitle),
                 dark: true,
@@ -5003,6 +5162,7 @@ var __VLS_670;
 /** @type {__VLS_StyleScopedClasses['lp-layer-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-item-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-layer-drag-handle']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-name']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-actions']} */ ;
@@ -5096,7 +5256,6 @@ var __VLS_670;
 /** @type {__VLS_StyleScopedClasses['stage-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card-header-main']} */ ;
-/** @type {__VLS_StyleScopedClasses['stage-card-name']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['remove-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card-body']} */ ;
@@ -5214,6 +5373,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectedChartId: selectedChartId,
             selectedTemplateId: selectedTemplateId,
             stageDropActive: stageDropActive,
+            layerDragOverIdx: layerDragOverIdx,
             createDashVisible: createDashVisible,
             dashSaving: dashSaving,
             dashForm: dashForm,
@@ -5310,6 +5470,13 @@ const __VLS_self = (await import('vue')).defineComponent({
             onStageDragOver: onStageDragOver,
             onStageDragLeave: onStageDragLeave,
             onStageDrop: onStageDrop,
+            onTypeChipDragStart: onTypeChipDragStart,
+            onTypeChipDragEnd: onTypeChipDragEnd,
+            onLayerDragStart: onLayerDragStart,
+            onLayerDragOver: onLayerDragOver,
+            onLayerDragLeave: onLayerDragLeave,
+            onLayerDrop: onLayerDrop,
+            onLayerDragEnd: onLayerDragEnd,
             summarizeTemplateConfig: summarizeTemplateConfig,
         };
     },

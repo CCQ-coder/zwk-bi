@@ -101,29 +101,57 @@
 
     <template v-else-if="chartType === 'iframe_single' || chartType === 'iframe_tabs'">
       <div class="frame-shell">
-        <div v-if="chartType === 'iframe_tabs'" class="frame-shell__tabs">
-          <span class="frame-shell__tab frame-shell__tab--active">总览</span>
-          <span class="frame-shell__tab">区域</span>
-          <span class="frame-shell__tab">明细</span>
-        </div>
-        <div class="frame-shell__bar">
-          <span class="frame-shell__dot" />
-          <span class="frame-shell__dot" />
-          <span class="frame-shell__dot" />
-          <span class="frame-shell__address">embedded.business.local</span>
-        </div>
-        <div class="frame-shell__body">
-          <div class="frame-shell__card" />
-          <div class="frame-shell__card frame-shell__card--wide" />
-          <div class="frame-shell__card" />
-        </div>
+        <template v-if="chartType === 'iframe_tabs' && iframeTabList.length">
+          <div class="frame-shell__tabs">
+            <span
+              v-for="(tab, idx) in iframeTabList"
+              :key="idx"
+              class="frame-shell__tab"
+              :class="{ 'frame-shell__tab--active': activeIframeTab === idx }"
+              @click="activeIframeTab = idx"
+            >{{ tab.label }}</span>
+          </div>
+          <iframe
+            v-if="activeIframeTabUrl"
+            :src="activeIframeTabUrl"
+            class="frame-shell__iframe"
+            frameborder="0"
+            allowfullscreen
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            referrerpolicy="no-referrer"
+          />
+          <div v-else class="frame-shell__placeholder">请在属性面板中填写页签网址</div>
+        </template>
+        <template v-else-if="iframeSingleUrl">
+          <iframe
+            :src="iframeSingleUrl"
+            class="frame-shell__iframe"
+            frameborder="0"
+            allowfullscreen
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            referrerpolicy="no-referrer"
+          />
+        </template>
+        <template v-else>
+          <div class="frame-shell__bar">
+            <span class="frame-shell__dot" />
+            <span class="frame-shell__dot" />
+            <span class="frame-shell__dot" />
+            <span class="frame-shell__address">请在属性面板中填写网页地址</span>
+          </div>
+          <div class="frame-shell__body">
+            <div class="frame-shell__card" />
+            <div class="frame-shell__card frame-shell__card--wide" />
+            <div class="frame-shell__card" />
+          </div>
+        </template>
       </div>
     </template>
 
     <template v-else-if="chartType === 'text_block'">
       <div class="text-shell">
         <div v-if="shouldShowTitle" class="text-shell__title">{{ titleText }}</div>
-        <div class="text-shell__paragraph">本区域适合展示公告、提示信息、模块说明或重点摘要，支持作为独立文字组件进行视觉编排。</div>
+        <div class="text-shell__paragraph">{{ textBlockContent }}</div>
       </div>
     </template>
 
@@ -189,15 +217,18 @@ import {
   isDecorationChartType,
   isVectorIconChartType,
   type ComponentChartConfig,
+  type ComponentStyleConfig,
 } from '../utils/component-config'
 
 const props = withDefaults(defineProps<{
   chartType: string
   chartConfig: ComponentChartConfig
+  styleConfig?: Partial<ComponentStyleConfig>
   data?: ChartDataResult | null
   dark?: boolean
   showTitle?: boolean
 }>(), {
+  styleConfig: undefined,
   data: null,
   dark: false,
   showTitle: false,
@@ -224,6 +255,52 @@ const titleText = computed(() => props.chartConfig.name || chartTypeLabel(props.
 // Enforce hidden titles for static widgets in preview, per screen design requirement.
 const shouldShowTitle = computed(() => false)
 const rawRows = computed(() => props.data?.rawRows ?? [])
+
+// ─── iframe ───────────────────────────────────────────────────────────
+const activeIframeTab = ref(0)
+
+const sanitizeUrl = (url: string): string => {
+  const trimmed = (url ?? '').trim()
+  if (!trimmed) return ''
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.href
+  } catch { /* invalid URL */ }
+  return ''
+}
+
+const iframeSingleUrl = computed(() => sanitizeUrl(props.styleConfig?.iframeUrl ?? ''))
+
+const iframeTabList = computed(() => {
+  const tabs = props.styleConfig?.iframeTabs ?? []
+  return tabs.length ? tabs : []
+})
+
+const activeIframeTabUrl = computed(() => {
+  const tab = iframeTabList.value[activeIframeTab.value]
+  return tab ? sanitizeUrl(tab.url) : ''
+})
+
+// ─── text block ───────────────────────────────────────────────────────
+const textBlockContent = computed(() => {
+  // Priority: data source > static text content > default placeholder
+  if (rawRows.value.length) {
+    const firstRow = rawRows.value[0]
+    // If yField is set, show its value
+    if (props.chartConfig.yField && firstRow[props.chartConfig.yField] != null) {
+      return String(firstRow[props.chartConfig.yField])
+    }
+    // If xField is set, show its value
+    if (props.chartConfig.xField && firstRow[props.chartConfig.xField] != null) {
+      return String(firstRow[props.chartConfig.xField])
+    }
+    // Show first column value
+    const cols = props.data?.columns ?? Object.keys(firstRow)
+    if (cols.length) return String(firstRow[cols[0]] ?? '')
+  }
+  if (props.styleConfig?.textContent) return props.styleConfig.textContent
+  return '本区域适合展示公告、提示信息、模块说明或重点摘要，支持作为独立文字组件进行视觉编排。'
+})
 
 const primaryMetric = computed(() => {
   if (props.chartConfig.yField && rawRows.value.length) {
@@ -874,14 +951,18 @@ const themeName = computed(() => {
 .frame-shell {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 0;
+  padding: 0;
   box-sizing: border-box;
+  width: 100%;
+  height: 100%;
 }
 
 .frame-shell__tabs {
   display: flex;
   gap: 8px;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
 }
 
 .frame-shell__tab {
@@ -889,11 +970,35 @@ const themeName = computed(() => {
   border-radius: 999px;
   background: rgba(77, 179, 255, 0.08);
   font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.frame-shell__tab:hover {
+  background: rgba(77, 179, 255, 0.14);
 }
 
 .frame-shell__tab--active {
   background: rgba(77, 179, 255, 0.18);
   color: #4db3ff;
+}
+
+.frame-shell__iframe {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: none;
+  border-radius: 0 0 4px 4px;
+  background: #fff;
+}
+
+.frame-shell__placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: rgba(255,255,255,0.35);
 }
 
 .frame-shell__bar {
@@ -903,6 +1008,7 @@ const themeName = computed(() => {
   padding: 8px 10px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.06);
+  margin: 12px;
 }
 
 .frame-shell__dot {
@@ -917,6 +1023,7 @@ const themeName = computed(() => {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
+  padding: 0 12px 12px;
 }
 
 .frame-shell__card {

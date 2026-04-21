@@ -49,6 +49,37 @@ export const DEFAULT_COMPONENT_STYLE = {
     tableFontColor: '#c0d8f0',
     tableFontSize: 12,
     tableStriped: true,
+    // 指标组件
+    metricValueFontSize: 36,
+    metricValueColor: '#4db3ff',
+    metricPrefix: '',
+    metricSuffix: '',
+    metricTrendUpColor: '#2dbd85',
+    metricTrendDownColor: '#f56c6c',
+    // 词云
+    wordCloudMinSize: 12,
+    wordCloudMaxSize: 48,
+    wordCloudRotation: 0,
+    // 列表
+    listItemGap: 8,
+    listMaxItems: 10,
+    listScrollAnimation: false,
+    // 筛选器
+    filterBtnSize: 'default',
+    filterActiveColor: '#409eff',
+    filterLayout: 'horizontal',
+    // 装饰组件
+    decorAnimSpeed: 3,
+    decorGlowColor: '#4db3ff',
+    // 图标组件
+    iconSize: 48,
+    iconStrokeColor: '#4db3ff',
+    iconFillColor: 'rgba(77,179,255,0.15)',
+    // iframe 组件
+    iframeUrl: '',
+    iframeTabs: [],
+    // 文本组件
+    textContent: '',
     // 高级
     componentOpacity: 1,
     shadowShow: false,
@@ -791,7 +822,7 @@ export const VECTOR_ICON_CHART_TYPES = new Set([
 ]);
 export const PURE_STATIC_CHART_TYPES = new Set([
     ...DECORATION_CHART_TYPES,
-    'text_block', 'iframe_single', 'iframe_tabs', 'hyperlink', 'clock_display', 'qr_code',
+    'hyperlink', 'clock_display', 'qr_code',
     ...VECTOR_ICON_CHART_TYPES,
 ]);
 export const DEFAULT_COMPONENT_ASSET_LAYOUT = {

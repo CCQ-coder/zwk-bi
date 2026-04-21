@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { chartTypeLabel, isDecorationChartType, isVectorIconChartType, } from '../utils/component-config';
 const props = withDefaults(defineProps(), {
+    styleConfig: undefined,
     data: null,
     dark: false,
     showTitle: false,
@@ -24,6 +25,51 @@ const titleText = computed(() => props.chartConfig.name || chartTypeLabel(props.
 // Enforce hidden titles for static widgets in preview, per screen design requirement.
 const shouldShowTitle = computed(() => false);
 const rawRows = computed(() => props.data?.rawRows ?? []);
+// ─── iframe ───────────────────────────────────────────────────────────
+const activeIframeTab = ref(0);
+const sanitizeUrl = (url) => {
+    const trimmed = (url ?? '').trim();
+    if (!trimmed)
+        return '';
+    try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+            return parsed.href;
+    }
+    catch { /* invalid URL */ }
+    return '';
+};
+const iframeSingleUrl = computed(() => sanitizeUrl(props.styleConfig?.iframeUrl ?? ''));
+const iframeTabList = computed(() => {
+    const tabs = props.styleConfig?.iframeTabs ?? [];
+    return tabs.length ? tabs : [];
+});
+const activeIframeTabUrl = computed(() => {
+    const tab = iframeTabList.value[activeIframeTab.value];
+    return tab ? sanitizeUrl(tab.url) : '';
+});
+// ─── text block ───────────────────────────────────────────────────────
+const textBlockContent = computed(() => {
+    // Priority: data source > static text content > default placeholder
+    if (rawRows.value.length) {
+        const firstRow = rawRows.value[0];
+        // If yField is set, show its value
+        if (props.chartConfig.yField && firstRow[props.chartConfig.yField] != null) {
+            return String(firstRow[props.chartConfig.yField]);
+        }
+        // If xField is set, show its value
+        if (props.chartConfig.xField && firstRow[props.chartConfig.xField] != null) {
+            return String(firstRow[props.chartConfig.xField]);
+        }
+        // Show first column value
+        const cols = props.data?.columns ?? Object.keys(firstRow);
+        if (cols.length)
+            return String(firstRow[cols[0]] ?? '');
+    }
+    if (props.styleConfig?.textContent)
+        return props.styleConfig.textContent;
+    return '本区域适合展示公告、提示信息、模块说明或重点摘要，支持作为独立文字组件进行视觉编排。';
+});
 const primaryMetric = computed(() => {
     if (props.chartConfig.yField && rawRows.value.length) {
         const values = rawRows.value
@@ -117,6 +163,7 @@ const themeName = computed(() => {
 });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_withDefaultsArg = (function (t) { return t; })({
+    styleConfig: undefined,
     data: null,
     dark: false,
     showTitle: false,
@@ -163,6 +210,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['qr-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['link-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['frame-shell__tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['metric-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['metric-shell__trend']} */ ;
@@ -374,47 +422,90 @@ else if (__VLS_ctx.chartType === 'iframe_single' || __VLS_ctx.chartType === 'ifr
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "frame-shell" },
     });
-    if (__VLS_ctx.chartType === 'iframe_tabs') {
+    if (__VLS_ctx.chartType === 'iframe_tabs' && __VLS_ctx.iframeTabList.length) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "frame-shell__tabs" },
         });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-            ...{ class: "frame-shell__tab frame-shell__tab--active" },
-        });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-            ...{ class: "frame-shell__tab" },
-        });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-            ...{ class: "frame-shell__tab" },
+        for (const [tab, idx] of __VLS_getVForSourceType((__VLS_ctx.iframeTabList))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ onClick: (...[$event]) => {
+                        if (!!(__VLS_ctx.isDecorationChartType(__VLS_ctx.chartType)))
+                            return;
+                        if (!!(__VLS_ctx.isVectorIconChartType(__VLS_ctx.chartType)))
+                            return;
+                        if (!!(__VLS_ctx.chartType === 'clock_display'))
+                            return;
+                        if (!!(__VLS_ctx.chartType === 'qr_code'))
+                            return;
+                        if (!!(__VLS_ctx.chartType === 'hyperlink'))
+                            return;
+                        if (!(__VLS_ctx.chartType === 'iframe_single' || __VLS_ctx.chartType === 'iframe_tabs'))
+                            return;
+                        if (!(__VLS_ctx.chartType === 'iframe_tabs' && __VLS_ctx.iframeTabList.length))
+                            return;
+                        __VLS_ctx.activeIframeTab = idx;
+                    } },
+                key: (idx),
+                ...{ class: "frame-shell__tab" },
+                ...{ class: ({ 'frame-shell__tab--active': __VLS_ctx.activeIframeTab === idx }) },
+            });
+            (tab.label);
+        }
+        if (__VLS_ctx.activeIframeTabUrl) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.iframe)({
+                src: (__VLS_ctx.activeIframeTabUrl),
+                ...{ class: "frame-shell__iframe" },
+                frameborder: "0",
+                allowfullscreen: true,
+                sandbox: "allow-scripts allow-same-origin allow-popups allow-forms",
+                referrerpolicy: "no-referrer",
+            });
+        }
+        else {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "frame-shell__placeholder" },
+            });
+        }
+    }
+    else if (__VLS_ctx.iframeSingleUrl) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.iframe)({
+            src: (__VLS_ctx.iframeSingleUrl),
+            ...{ class: "frame-shell__iframe" },
+            frameborder: "0",
+            allowfullscreen: true,
+            sandbox: "allow-scripts allow-same-origin allow-popups allow-forms",
+            referrerpolicy: "no-referrer",
         });
     }
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "frame-shell__bar" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
-        ...{ class: "frame-shell__dot" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
-        ...{ class: "frame-shell__dot" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
-        ...{ class: "frame-shell__dot" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "frame-shell__address" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "frame-shell__body" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
-        ...{ class: "frame-shell__card" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
-        ...{ class: "frame-shell__card frame-shell__card--wide" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
-        ...{ class: "frame-shell__card" },
-    });
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "frame-shell__bar" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "frame-shell__dot" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "frame-shell__dot" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+            ...{ class: "frame-shell__dot" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "frame-shell__address" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "frame-shell__body" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
+            ...{ class: "frame-shell__card" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
+            ...{ class: "frame-shell__card frame-shell__card--wide" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
+            ...{ class: "frame-shell__card" },
+        });
+    }
 }
 else if (__VLS_ctx.chartType === 'text_block') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -429,6 +520,7 @@ else if (__VLS_ctx.chartType === 'text_block') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "text-shell__paragraph" },
     });
+    (__VLS_ctx.textBlockContent);
 }
 else if (__VLS_ctx.chartType === 'single_field' || __VLS_ctx.chartType === 'metric_indicator' || __VLS_ctx.chartType === 'number_flipper') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -616,9 +708,9 @@ else {
 /** @type {__VLS_StyleScopedClasses['frame-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell__tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell__tab']} */ ;
-/** @type {__VLS_StyleScopedClasses['frame-shell__tab--active']} */ ;
-/** @type {__VLS_StyleScopedClasses['frame-shell__tab']} */ ;
-/** @type {__VLS_StyleScopedClasses['frame-shell__tab']} */ ;
+/** @type {__VLS_StyleScopedClasses['frame-shell__iframe']} */ ;
+/** @type {__VLS_StyleScopedClasses['frame-shell__placeholder']} */ ;
+/** @type {__VLS_StyleScopedClasses['frame-shell__iframe']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell__bar']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell__dot']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell__dot']} */ ;
@@ -662,6 +754,11 @@ const __VLS_self = (await import('vue')).defineComponent({
             isVectorIconChartType: isVectorIconChartType,
             titleText: titleText,
             shouldShowTitle: shouldShowTitle,
+            activeIframeTab: activeIframeTab,
+            iframeSingleUrl: iframeSingleUrl,
+            iframeTabList: iframeTabList,
+            activeIframeTabUrl: activeIframeTabUrl,
+            textBlockContent: textBlockContent,
             primaryMetric: primaryMetric,
             listItems: listItems,
             cloudItems: cloudItems,
