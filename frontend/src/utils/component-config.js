@@ -807,6 +807,7 @@ export const CANVAS_RENDERABLE_CHART_TYPES = new Set([
     'table_summary', 'table_pivot',
     'heatmap',
 ]);
+export const TABLE_LIKE_CHART_TYPES = new Set(['table', 'table_summary', 'table_pivot', 'table_rank']);
 export const DECORATION_CHART_TYPES = new Set([
     'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
     'decor_border_stream', 'decor_border_pulse', 'decor_border_bracket', 'decor_border_circuit',
@@ -851,6 +852,47 @@ export const getMissingChartFields = (chartConfig) => {
         issues.push('度量字段');
     return issues;
 };
+const normalizeFieldList = (value) => {
+    if (!Array.isArray(value))
+        return [];
+    return Array.from(new Set(value
+        .filter((item) => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)));
+};
+const normalizeTableChartFields = (chart) => {
+    const tableDimensionFields = normalizeFieldList(chart.tableDimensionFields);
+    const tableMetricFields = normalizeFieldList(chart.tableMetricFields);
+    if (!TABLE_LIKE_CHART_TYPES.has(chart.chartType)) {
+        return {
+            ...chart,
+            tableDimensionFields,
+            tableMetricFields,
+        };
+    }
+    const normalizedDimensions = tableDimensionFields.length
+        ? tableDimensionFields
+        : normalizeFieldList([chart.xField, chart.groupField]);
+    const normalizedMetrics = tableMetricFields.length
+        ? tableMetricFields
+        : normalizeFieldList([chart.yField]);
+    return {
+        ...chart,
+        xField: normalizedDimensions[0] ?? '',
+        yField: normalizedMetrics[0] ?? '',
+        groupField: normalizedDimensions[1] ?? '',
+        tableDimensionFields: normalizedDimensions,
+        tableMetricFields: normalizedMetrics,
+    };
+};
+export const getConfiguredTableColumns = (chartConfig, availableColumns) => {
+    const availableSet = new Set(availableColumns);
+    const selected = Array.from(new Set([
+        ...normalizeFieldList(chartConfig.tableDimensionFields),
+        ...normalizeFieldList(chartConfig.tableMetricFields),
+    ])).filter((column) => availableSet.has(column));
+    return selected.length ? selected : availableColumns;
+};
 const scoreColumn = (column, keywords) => {
     const normalized = column.toLowerCase();
     return keywords.reduce((score, keyword) => score + (normalized.includes(keyword.toLowerCase()) ? 2 : 0), 0);
@@ -878,11 +920,16 @@ export const suggestChartFields = (columns, chartType) => {
     const groupField = meta.allowsGroup
         ? pickColumn(columns, ['group', 'series', 'type', 'category', '分类', '分组'], [xField, yField])
         : '';
-    return {
+    const nextConfig = {
         xField,
         yField,
         groupField,
     };
+    if (TABLE_LIKE_CHART_TYPES.has(chartType)) {
+        nextConfig.tableDimensionFields = normalizeFieldList([xField, groupField]);
+        nextConfig.tableMetricFields = normalizeFieldList([yField]);
+    }
+    return nextConfig;
 };
 export const buildPresetChartConfig = (preset, columns, currentChart) => {
     const suggested = suggestChartFields(columns, preset.chartType);
@@ -906,6 +953,8 @@ export const buildChartSnapshot = (chart) => ({
     xField: chart?.xField ?? '',
     yField: chart?.yField ?? '',
     groupField: chart?.groupField ?? '',
+    tableDimensionFields: [],
+    tableMetricFields: [],
 });
 const parseRawComponentConfig = (configJson) => {
     if (!configJson)
@@ -952,6 +1001,8 @@ export const parseComponentConfig = (configJson) => {
         chartPatch.yField = parsed.yField;
     if (typeof parsed.groupField === 'string')
         chartPatch.groupField = parsed.groupField;
+    chartPatch.tableDimensionFields = normalizeFieldList(parsed.tableDimensionFields);
+    chartPatch.tableMetricFields = normalizeFieldList(parsed.tableMetricFields);
     if (typeof parsed.theme === 'string')
         stylePatch.theme = parsed.theme;
     if (typeof parsed.bgColor === 'string')
@@ -985,7 +1036,7 @@ export const parseComponentConfig = (configJson) => {
 };
 export const normalizeComponentConfig = (configJson, baseChart) => {
     const parsed = parseComponentConfig(configJson);
-    const chart = { ...buildChartSnapshot(baseChart), ...(parsed.chart ?? {}) };
+    const chart = normalizeTableChartFields({ ...buildChartSnapshot(baseChart), ...(parsed.chart ?? {}) });
     const normalizedInteraction = {
         ...DEFAULT_COMPONENT_INTERACTION,
         ...(parsed.interaction ?? {}),

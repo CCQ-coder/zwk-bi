@@ -4,7 +4,7 @@ import ComponentStaticPreview from './ComponentStaticPreview.vue';
 import { getChartData, getChartList } from '../api/chart';
 import { getDashboardById, getDashboardComponents } from '../api/dashboard';
 import { getPublicChartList, getPublicComponentData, getPublicDashboardById, getPublicDashboardComponents, } from '../api/report';
-import { buildComponentOption, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
+import { buildComponentOption, getConfiguredTableColumns, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 import { normalizeCanvasConfig, parseReportConfig } from '../utils/report-config';
 const props = defineProps();
@@ -234,7 +234,7 @@ const isRenderableChart = (component) => {
     const type = getComponentChartConfig(component).chartType ?? '';
     return isCanvasRenderableChartType(type);
 };
-const getTableColumns = (componentId) => componentDataMap.value.get(componentId)?.columns ?? [];
+const getTableColumns = (component) => getConfiguredTableColumns(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.columns ?? []);
 const getTableRows = (componentId) => componentDataMap.value.get(componentId)?.rawRows ?? [];
 const renderChart = (component, data) => {
     const el = chartRefs.get(component.id);
@@ -889,7 +889,7 @@ else {
                     label: "#",
                 }, ...__VLS_functionalComponentArgsRest(__VLS_77));
             }
-            for (const [column] of __VLS_getVForSourceType((__VLS_ctx.getTableColumns(component.id)))) {
+            for (const [column] of __VLS_getVForSourceType((__VLS_ctx.getTableColumns(component)))) {
                 const __VLS_80 = {}.ElTableColumn;
                 /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
                 // @ts-ignore

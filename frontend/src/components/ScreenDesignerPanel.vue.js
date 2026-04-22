@@ -9,7 +9,7 @@ import { addDashboardComponent, createDashboard, deleteDashboard, getDashboardCo
 import { createChart, getChartData, getChartList } from '../api/chart';
 import { createTemplate, getTemplateList } from '../api/chart-template';
 import { getDatasetList } from '../api/dataset';
-import { buildComponentAssetConfig, buildChartSnapshot, buildComponentConfig, buildComponentOption, chartTypeLabel, getMissingChartFields, isCanvasRenderableChartType, isDecorationChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentAssetConfig, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
+import { buildComponentAssetConfig, buildChartSnapshot, buildComponentConfig, buildComponentOption, chartTypeLabel, getConfiguredTableColumns, getMissingChartFields, isCanvasRenderableChartType, isDecorationChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentAssetConfig, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 import { buildPublishedLink, buildReportConfig, normalizeCanvasConfig, normalizeCoverConfig, normalizePublishConfig, parseReportConfig, SCREEN_CANVAS_PRESETS, } from '../utils/report-config';
 import { uploadImage } from '../api/upload';
@@ -356,6 +356,8 @@ const localStaticTemplates = computed(() => BUILTIN_TEMPLATE_LIBRARY.map((item, 
             xField: '',
             yField: '',
             groupField: '',
+            tableDimensionFields: [],
+            tableMetricFields: [],
         },
     }, item.layout),
     builtIn: true,
@@ -1236,7 +1238,7 @@ const showNoField = (component) => {
         return false;
     return getMissingChartFields(config).length > 0;
 };
-const getTableColumns = (componentId) => componentDataMap.value.get(componentId)?.columns ?? [];
+const getTableColumns = (component) => getConfiguredTableColumns(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.columns ?? []);
 const getTableRows = (componentId) => componentDataMap.value.get(componentId)?.rawRows ?? [];
 const setStageCardRef = (el, componentId) => {
     const previous = stageCardRefs.get(componentId);
@@ -1628,6 +1630,7 @@ const persistLayout = async (component, layout = cloneComponentLayout(component)
 let interaction = null;
 const interactionPreview = shallowRef(null);
 const resizeHandles = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'];
+const SNAP_TOLERANCE = 6;
 const findComponent = (id) => components.value.find((item) => item.id === id);
 const resizeInteractionChart = (componentId) => {
     chartInstances.get(componentId)?.resize();
@@ -1637,24 +1640,49 @@ const getResizeTransformOrigin = (handle) => {
     const vertical = handle.includes('n') ? 'bottom' : handle.includes('s') ? 'top' : 'center';
     return `${horizontal} ${vertical}`;
 };
+const normalizeGuideLines = (lines, max) => Array.from(new Set(lines
+    .map((line) => Math.round(line))
+    .filter((line) => line >= 0 && line <= max)));
+const collectSnapTargets = (componentId) => {
+    const vertical = [overlayConfig.x, overlayConfig.x + overlayConfig.w / 2, overlayConfig.x + overlayConfig.w];
+    const horizontal = [overlayConfig.y, overlayConfig.y + overlayConfig.h / 2, overlayConfig.y + overlayConfig.h];
+    components.value.forEach((item) => {
+        if (item.id === componentId)
+            return;
+        vertical.push(item.posX, item.posX + item.width / 2, item.posX + item.width);
+        horizontal.push(item.posY, item.posY + item.height / 2, item.posY + item.height);
+    });
+    return {
+        vertical: normalizeGuideLines(vertical, canvasWorkWidth.value),
+        horizontal: normalizeGuideLines(horizontal, canvasMinHeight.value),
+    };
+};
+const findNearestSnapMatch = (sourceLines, targetLines) => {
+    let bestMatch = null;
+    sourceLines.forEach((sourceLine) => {
+        targetLines.forEach((targetLine) => {
+            const delta = targetLine - sourceLine;
+            if (Math.abs(delta) > SNAP_TOLERANCE)
+                return;
+            if (!bestMatch || Math.abs(delta) < Math.abs(bestMatch.delta)) {
+                bestMatch = { delta, line: targetLine };
+            }
+        });
+    });
+    return bestMatch;
+};
+const buildInteractionGuideLines = (nextX, nextY, nextWidth, nextHeight, guideVertical, guideHorizontal) => ({
+    vertical: normalizeGuideLines(guideVertical?.length ? guideVertical : [nextX, nextX + nextWidth / 2, nextX + nextWidth], canvasWorkWidth.value),
+    horizontal: normalizeGuideLines(guideHorizontal?.length ? guideHorizontal : [nextY, nextY + nextHeight / 2, nextY + nextHeight], canvasMinHeight.value),
+});
 const interactionGuideLines = computed(() => {
     const preview = interactionPreview.value;
     if (!preview) {
         return { vertical: [], horizontal: [] };
     }
-    const vertical = [
-        Math.round(preview.nextX),
-        Math.round(preview.nextX + preview.nextWidth / 2),
-        Math.round(preview.nextX + preview.nextWidth),
-    ];
-    const horizontal = [
-        Math.round(preview.nextY),
-        Math.round(preview.nextY + preview.nextHeight / 2),
-        Math.round(preview.nextY + preview.nextHeight),
-    ];
     return {
-        vertical: Array.from(new Set(vertical)).filter((line) => line >= 0 && line <= canvasWorkWidth.value),
-        horizontal: Array.from(new Set(horizontal)).filter((line) => line >= 0 && line <= canvasMinHeight.value),
+        vertical: preview.guideVertical,
+        horizontal: preview.guideHorizontal,
     };
 });
 const applyInteractionFrame = () => {
@@ -1668,16 +1696,37 @@ const applyInteractionFrame = () => {
     const dx = (pendingPointer.x - interaction.startMouseX) / scale;
     const dy = (pendingPointer.y - interaction.startMouseY) / scale;
     if (interaction.mode === 'move') {
-        const nextX = Math.min(Math.max(0, getCanvasWidth() - interaction.startWidth), Math.max(0, interaction.startX + dx));
-        const nextY = Math.max(0, interaction.startY + dy);
+        const maxX = Math.max(0, getCanvasWidth() - interaction.startWidth);
+        let nextX = Math.min(maxX, Math.max(0, interaction.startX + dx));
+        let nextY = Math.max(0, interaction.startY + dy);
+        const snapTargets = collectSnapTargets(component.id);
+        const verticalMatch = findNearestSnapMatch([nextX, nextX + interaction.startWidth / 2, nextX + interaction.startWidth], snapTargets.vertical);
+        const horizontalMatch = findNearestSnapMatch([nextY, nextY + interaction.startHeight / 2, nextY + interaction.startHeight], snapTargets.horizontal);
+        if (verticalMatch) {
+            const snappedX = nextX + verticalMatch.delta;
+            if (snappedX >= 0 && snappedX <= maxX) {
+                nextX = snappedX;
+            }
+        }
+        if (horizontalMatch) {
+            const snappedY = nextY + horizontalMatch.delta;
+            if (snappedY >= 0) {
+                nextY = snappedY;
+            }
+        }
+        const roundedX = Math.round(nextX);
+        const roundedY = Math.round(nextY);
+        const guideLines = buildInteractionGuideLines(roundedX, roundedY, interaction.startWidth, interaction.startHeight, verticalMatch ? [verticalMatch.line] : undefined, horizontalMatch ? [horizontalMatch.line] : undefined);
         interactionPreview.value = {
             compId: component.id,
-            nextX: Math.round(nextX),
-            nextY: Math.round(nextY),
+            nextX: roundedX,
+            nextY: roundedY,
             nextWidth: interaction.startWidth,
             nextHeight: interaction.startHeight,
-            transform: `translate(${Math.round(nextX - interaction.startX)}px, ${Math.round(nextY - interaction.startY)}px)`,
+            transform: `translate(${Math.round(roundedX - interaction.startX)}px, ${Math.round(roundedY - interaction.startY)}px)`,
             transformOrigin: 'left top',
+            guideVertical: guideLines.vertical,
+            guideHorizontal: guideLines.horizontal,
         };
     }
     else {
@@ -1687,30 +1736,76 @@ const applyInteractionFrame = () => {
         let nextWidth = interaction.startWidth;
         let nextHeight = interaction.startHeight;
         const canvasWidth = getCanvasWidth();
+        const snapTargets = collectSnapTargets(component.id);
+        let snapVerticalLine;
+        let snapHorizontalLine;
         if (handle.includes('e')) {
             nextWidth = Math.min(Math.max(MIN_CARD_WIDTH, interaction.startWidth + dx), Math.max(MIN_CARD_WIDTH, canvasWidth - interaction.startX));
+            const match = findNearestSnapMatch([nextX + nextWidth], snapTargets.vertical);
+            if (match) {
+                const snappedWidth = match.line - nextX;
+                if (snappedWidth >= MIN_CARD_WIDTH && nextX + snappedWidth <= canvasWidth) {
+                    nextWidth = snappedWidth;
+                    snapVerticalLine = [match.line];
+                }
+            }
         }
         if (handle.includes('s')) {
             nextHeight = Math.max(MIN_CARD_HEIGHT, interaction.startHeight + dy);
+            const match = findNearestSnapMatch([nextY + nextHeight], snapTargets.horizontal);
+            if (match) {
+                const snappedHeight = match.line - nextY;
+                if (snappedHeight >= MIN_CARD_HEIGHT) {
+                    nextHeight = snappedHeight;
+                    snapHorizontalLine = [match.line];
+                }
+            }
         }
         if (handle.includes('w')) {
             const maxLeft = interaction.startX + interaction.startWidth - MIN_CARD_WIDTH;
             nextX = Math.min(Math.max(0, interaction.startX + dx), maxLeft);
             nextWidth = interaction.startWidth - (nextX - interaction.startX);
+            const match = findNearestSnapMatch([nextX], snapTargets.vertical);
+            if (match) {
+                const snappedX = Math.min(Math.max(0, match.line), maxLeft);
+                const snappedWidth = interaction.startWidth - (snappedX - interaction.startX);
+                if (snappedWidth >= MIN_CARD_WIDTH) {
+                    nextX = snappedX;
+                    nextWidth = snappedWidth;
+                    snapVerticalLine = [snappedX];
+                }
+            }
         }
         if (handle.includes('n')) {
             const maxTop = interaction.startY + interaction.startHeight - MIN_CARD_HEIGHT;
             nextY = Math.min(Math.max(0, interaction.startY + dy), maxTop);
             nextHeight = interaction.startHeight - (nextY - interaction.startY);
+            const match = findNearestSnapMatch([nextY], snapTargets.horizontal);
+            if (match) {
+                const snappedY = Math.min(Math.max(0, match.line), maxTop);
+                const snappedHeight = interaction.startHeight - (snappedY - interaction.startY);
+                if (snappedHeight >= MIN_CARD_HEIGHT) {
+                    nextY = snappedY;
+                    nextHeight = snappedHeight;
+                    snapHorizontalLine = [snappedY];
+                }
+            }
         }
+        const roundedX = Math.round(nextX);
+        const roundedY = Math.round(nextY);
+        const roundedWidth = Math.round(nextWidth);
+        const roundedHeight = Math.round(nextHeight);
+        const guideLines = buildInteractionGuideLines(roundedX, roundedY, roundedWidth, roundedHeight, snapVerticalLine, snapHorizontalLine);
         interactionPreview.value = {
             compId: component.id,
-            nextX: Math.round(nextX),
-            nextY: Math.round(nextY),
-            nextWidth: Math.round(nextWidth),
-            nextHeight: Math.round(nextHeight),
-            transform: `translate(${Math.round(nextX - interaction.startX)}px, ${Math.round(nextY - interaction.startY)}px) scale(${nextWidth / interaction.startWidth}, ${nextHeight / interaction.startHeight})`,
+            nextX: roundedX,
+            nextY: roundedY,
+            nextWidth: roundedWidth,
+            nextHeight: roundedHeight,
+            transform: `translate(${Math.round(roundedX - interaction.startX)}px, ${Math.round(roundedY - interaction.startY)}px) scale(${roundedWidth / interaction.startWidth}, ${roundedHeight / interaction.startHeight})`,
             transformOrigin: getResizeTransformOrigin(handle),
+            guideVertical: guideLines.vertical,
+            guideHorizontal: guideLines.horizontal,
         };
     }
 };
@@ -4768,7 +4863,7 @@ else {
                     label: "#",
                 }, ...__VLS_functionalComponentArgsRest(__VLS_363));
             }
-            for (const [column] of __VLS_getVForSourceType((__VLS_ctx.getTableColumns(component.id)))) {
+            for (const [column] of __VLS_getVForSourceType((__VLS_ctx.getTableColumns(component)))) {
                 const __VLS_366 = {}.ElTableColumn;
                 /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
                 // @ts-ignore

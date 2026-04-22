@@ -12,6 +12,8 @@ export interface ComponentChartConfig {
   xField: string
   yField: string
   groupField: string
+  tableDimensionFields: string[]
+  tableMetricFields: string[]
 }
 
 export interface ComponentStyleConfig {
@@ -965,6 +967,8 @@ export const CANVAS_RENDERABLE_CHART_TYPES = new Set([
   'heatmap',
 ])
 
+export const TABLE_LIKE_CHART_TYPES = new Set(['table', 'table_summary', 'table_pivot', 'table_rank'])
+
 export const DECORATION_CHART_TYPES = new Set([
   'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
   'decor_border_stream', 'decor_border_pulse', 'decor_border_bracket', 'decor_border_circuit',
@@ -1017,6 +1021,54 @@ export const getMissingChartFields = (chartConfig: ComponentChartConfig) => {
   return issues
 }
 
+const normalizeFieldList = (value: unknown) => {
+  if (!Array.isArray(value)) return [] as string[]
+  return Array.from(new Set(
+    value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  ))
+}
+
+const normalizeTableChartFields = (chart: ComponentChartConfig): ComponentChartConfig => {
+  const tableDimensionFields = normalizeFieldList(chart.tableDimensionFields)
+  const tableMetricFields = normalizeFieldList(chart.tableMetricFields)
+
+  if (!TABLE_LIKE_CHART_TYPES.has(chart.chartType)) {
+    return {
+      ...chart,
+      tableDimensionFields,
+      tableMetricFields,
+    }
+  }
+
+  const normalizedDimensions = tableDimensionFields.length
+    ? tableDimensionFields
+    : normalizeFieldList([chart.xField, chart.groupField])
+  const normalizedMetrics = tableMetricFields.length
+    ? tableMetricFields
+    : normalizeFieldList([chart.yField])
+
+  return {
+    ...chart,
+    xField: normalizedDimensions[0] ?? '',
+    yField: normalizedMetrics[0] ?? '',
+    groupField: normalizedDimensions[1] ?? '',
+    tableDimensionFields: normalizedDimensions,
+    tableMetricFields: normalizedMetrics,
+  }
+}
+
+export const getConfiguredTableColumns = (chartConfig: ComponentChartConfig, availableColumns: string[]) => {
+  const availableSet = new Set(availableColumns)
+  const selected = Array.from(new Set([
+    ...normalizeFieldList(chartConfig.tableDimensionFields),
+    ...normalizeFieldList(chartConfig.tableMetricFields),
+  ])).filter((column) => availableSet.has(column))
+  return selected.length ? selected : availableColumns
+}
+
 const scoreColumn = (column: string, keywords: string[]) => {
   const normalized = column.toLowerCase()
   return keywords.reduce((score, keyword) => score + (normalized.includes(keyword.toLowerCase()) ? 2 : 0), 0)
@@ -1044,11 +1096,16 @@ export const suggestChartFields = (columns: string[], chartType: string): Partia
   const groupField = meta.allowsGroup
     ? pickColumn(columns, ['group', 'series', 'type', 'category', '分类', '分组'], [xField, yField])
     : ''
-  return {
+  const nextConfig: Partial<ComponentChartConfig> = {
     xField,
     yField,
     groupField,
   }
+  if (TABLE_LIKE_CHART_TYPES.has(chartType)) {
+    nextConfig.tableDimensionFields = normalizeFieldList([xField, groupField])
+    nextConfig.tableMetricFields = normalizeFieldList([yField])
+  }
+  return nextConfig
 }
 
 export const buildPresetChartConfig = (
@@ -1078,6 +1135,8 @@ export const buildChartSnapshot = (chart?: Chart | null): ComponentChartConfig =
   xField: chart?.xField ?? '',
   yField: chart?.yField ?? '',
   groupField: chart?.groupField ?? '',
+  tableDimensionFields: [],
+  tableMetricFields: [],
 })
 
 const parseRawComponentConfig = (configJson?: string | null): Record<string, any> => {
@@ -1112,6 +1171,8 @@ export const parseComponentConfig = (configJson?: string | null): Partial<Compon
   if (typeof parsed.xField === 'string') chartPatch.xField = parsed.xField
   if (typeof parsed.yField === 'string') chartPatch.yField = parsed.yField
   if (typeof parsed.groupField === 'string') chartPatch.groupField = parsed.groupField
+  chartPatch.tableDimensionFields = normalizeFieldList(parsed.tableDimensionFields)
+  chartPatch.tableMetricFields = normalizeFieldList(parsed.tableMetricFields)
   if (typeof parsed.theme === 'string') stylePatch.theme = parsed.theme
   if (typeof parsed.bgColor === 'string') stylePatch.bgColor = parsed.bgColor
   if (typeof parsed.showLegend === 'boolean') stylePatch.showLegend = parsed.showLegend
@@ -1133,7 +1194,7 @@ export const parseComponentConfig = (configJson?: string | null): Partial<Compon
 
 export const normalizeComponentConfig = (configJson?: string | null, baseChart?: Chart | null): ComponentInstanceConfig => {
   const parsed = parseComponentConfig(configJson)
-  const chart = { ...buildChartSnapshot(baseChart), ...(parsed.chart ?? {}) }
+  const chart = normalizeTableChartFields({ ...buildChartSnapshot(baseChart), ...(parsed.chart ?? {}) })
   const normalizedInteraction = {
     ...DEFAULT_COMPONENT_INTERACTION,
     ...(parsed.interaction ?? {}),

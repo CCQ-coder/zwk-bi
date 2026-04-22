@@ -152,7 +152,7 @@
                 label="#"
               />
               <el-table-column
-                v-for="column in getTableColumns(component.id)"
+                v-for="column in getTableColumns(component)"
                 :key="column"
                 :prop="column"
                 :label="column"
@@ -218,6 +218,7 @@ import {
 import {
   buildComponentOption,
   chartTypeLabel,
+  getConfiguredTableColumns,
   getMissingChartFields,
   isCanvasRenderableChartType,
   isStaticWidgetChartType,
@@ -469,7 +470,10 @@ const isRenderableChart = (component: DashboardComponent) => {
   return isCanvasRenderableChartType(type)
 }
 
-const getTableColumns = (componentId: number) => componentDataMap.value.get(componentId)?.columns ?? []
+const getTableColumns = (component: DashboardComponent) => getConfiguredTableColumns(
+  getComponentConfig(component).chart,
+  componentDataMap.value.get(component.id)?.columns ?? []
+)
 const getTableRows = (componentId: number) => componentDataMap.value.get(componentId)?.rawRows ?? []
 
 const renderChart = (component: DashboardComponent, data: ChartDataResult) => {
