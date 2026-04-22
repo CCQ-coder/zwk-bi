@@ -1,5 +1,5 @@
 <template>
-  <div class="screen-root" :class="{ 'screen-root--editor': screenId }">
+  <div class="screen-root" :class="{ 'screen-root--editor': screenId, 'screen-root--quiet': screenId }">
     <!-- 编辑器模式：可折叠左侧综合面板 -->
     <aside
       v-if="screenId"
@@ -100,68 +100,62 @@
             </div>
 
             <div class="lp-asset-scroll">
-              <el-popover
+              <div
                 v-for="template in filteredTemplates"
                 :key="template.id"
-                placement="right-start"
-                :width="340"
-                trigger="hover"
-                :show-after="120"
-                popper-class="lp-preview-popper"
+                class="lp-asset-card lp-asset-card--compact"
+                :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
+                draggable="true"
+                @click="selectedTemplateId = template.id"
+                @mouseenter="hoveredTemplateId = template.id"
+                @mouseleave="hoveredTemplateId = null"
+                @dblclick="quickAddTemplate(template)"
+                @dragstart="onTemplateDragStart($event, template)"
+                @dragend="onTemplateDragEnd"
               >
-                <template #reference>
-                  <div
-                    class="lp-asset-card lp-asset-card--compact"
-                    :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
-                    draggable="true"
-                    @click="selectedTemplateId = template.id"
-                    @dblclick="quickAddTemplate(template)"
-                    @dragstart="onTemplateDragStart($event, template)"
-                    @dragend="onTemplateDragEnd"
-                  >
-                    <div class="lp-ac-row">
-                      <span class="lp-ac-name">{{ template.name }}</span>
-                      <div class="lp-ac-tags">
-                        <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
-                        <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
-                      </div>
-                    </div>
-                    <div class="lp-ac-subline">
-                      <span class="lp-ac-size">{{ getTemplateLayoutText(template) }}</span>
-                      <span class="lp-ac-lite-badge">{{ getAssetBadgeText(template.chartType) }}</span>
-                    </div>
+                <div class="lp-ac-row">
+                  <span class="lp-ac-name">{{ template.name }}</span>
+                  <div class="lp-ac-tags">
+                    <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
+                    <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
                   </div>
-                </template>
-
-                <div class="lp-hover-preview">
-                  <div class="lp-hover-head">
-                    <div>
-                      <div class="lp-hover-title">{{ template.name }}</div>
-                      <div class="lp-hover-subtitle">{{ chartTypeLabel(template.chartType) }} · {{ getTemplateLayoutText(template) }}</div>
-                    </div>
-                    <span class="lp-hover-pill">{{ getAssetBadgeText(template.chartType) }}</span>
-                  </div>
-
-                  <div class="lp-hover-stage">
-                    <ComponentStaticPreview
-                      v-if="isTemplateStaticAsset(template)"
-                      :chart-type="getTemplateAssetConfig(template).chart.chartType"
-                      :chart-config="getTemplateAssetConfig(template).chart"
-                      :show-title="false"
-                      dark
-                    />
-                    <ComponentTemplatePreview
-                      v-else
-                      :chart-config="getTemplateAssetConfig(template).chart"
-                      :style-config="getTemplateAssetConfig(template).style"
-                    />
-                  </div>
-
-                  <div class="lp-hover-meta">{{ template.description || summarizeTemplateConfig(template.configJson) || '拖入画布后继续配置样式和交互。' }}</div>
                 </div>
-              </el-popover>
+                <div class="lp-ac-subline">
+                  <span class="lp-ac-size">{{ getTemplateLayoutText(template) }}</span>
+                  <span class="lp-ac-lite-badge">{{ getAssetBadgeText(template.chartType) }}</span>
+                </div>
+              </div>
 
               <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
+            </div>
+
+            <div v-if="previewTemplate" class="lp-preview-panel">
+              <div class="lp-hover-preview">
+                <div class="lp-hover-head">
+                  <div>
+                    <div class="lp-hover-title">{{ previewTemplate.name }}</div>
+                    <div class="lp-hover-subtitle">{{ chartTypeLabel(previewTemplate.chartType) }} · {{ getTemplateLayoutText(previewTemplate) }}</div>
+                  </div>
+                  <span class="lp-hover-pill">{{ getAssetBadgeText(previewTemplate.chartType) }}</span>
+                </div>
+
+                <div class="lp-hover-stage">
+                  <ComponentStaticPreview
+                    v-if="isTemplateStaticAsset(previewTemplate)"
+                    :chart-type="getTemplateAssetConfig(previewTemplate).chart.chartType"
+                    :chart-config="getTemplateAssetConfig(previewTemplate).chart"
+                    :show-title="false"
+                    dark
+                  />
+                  <ComponentTemplatePreview
+                    v-else
+                    :chart-config="getTemplateAssetConfig(previewTemplate).chart"
+                    :style-config="getTemplateAssetConfig(previewTemplate).style"
+                  />
+                </div>
+
+                <div class="lp-hover-meta">{{ previewTemplate.description || summarizeTemplateConfig(previewTemplate.configJson) || '拖入画布后继续配置样式和交互。' }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -383,6 +377,9 @@
             <el-button size="small" :icon="Promotion" @click="openPublishDialog">{{ isPublished ? '发布管理' : '发布' }}</el-button>
             <el-button size="small" :icon="Share" @click="openShareDialog">分享</el-button>
             <el-button size="small" type="primary" :icon="CirclePlus" :disabled="!selectedLibraryAsset" @click="handleAddSelectedAsset">放入</el-button>
+            <el-button size="small" :icon="inspectorCollapsed ? ArrowLeft : ArrowRight" @click="toggleInspector">
+              {{ inspectorCollapsed ? '展开属性' : '收起属性' }}
+            </el-button>
             <el-divider direction="vertical" />
             <el-button size="small" :icon="ArrowLeft" @click="$emit('back')">退出</el-button>
           </div>
@@ -422,7 +419,7 @@
                 @change="onBgHeightChange"
               />
             </div>
-            <span class="canvas-tb-tip">{{ components.length }} 组件 · 双击左侧加入 · 拖标题移动 · 点击背景版编辑样式</span>
+            <span v-if="!screenId" class="canvas-tb-tip">{{ components.length }} 组件 · 双击左侧加入 · 拖标题移动 · 点击背景版编辑样式</span>
             <!-- 缩放控制 -->
             <div class="canvas-tb-zoom">
               <el-tooltip content="缩小"><el-button link size="small" @click="zoomOut" :disabled="canvasScale <= SCALE_MIN">−</el-button></el-tooltip>
@@ -458,7 +455,7 @@
               <div class="ruler-v-strip">
                 <span v-for="m in vRulerMarks" :key="m" class="ruler-v-mark" :style="{ top: m + 'px' }">{{ m }}</span>
               </div>
-              <div class="screen-stage-scroll">
+              <div ref="stageScrollRef" class="screen-stage-scroll">
 
             <div
               ref="canvasRef"
@@ -492,6 +489,7 @@
               <div
                 v-for="component in components"
                 :key="component.id"
+                :ref="(el) => setStageCardRef(el as HTMLElement | null, component.id)"
                 class="stage-card"
                 :class="{
                   active: activeCompId === component.id,
@@ -524,6 +522,12 @@
                       <el-icon style="margin-right:4px"><Filter /></el-icon>
                       筛选
                     </el-button>
+                  </div>
+                  <div v-else-if="shouldDeferComponentPreview(component)" class="chart-placeholder">
+                    滚动后加载
+                  </div>
+                  <div v-else-if="isComponentPreviewLoading(component)" class="chart-placeholder">
+                    加载中
                   </div>
                   <div v-else-if="isTableChart(component)" class="table-wrapper">
                     <el-table
@@ -571,7 +575,7 @@
                     dark
                   />
                   <div v-else-if="showNoField(component)" class="chart-placeholder warning">
-                    当前组件缺少必要字段，请先在右侧组件属性中完成配置。
+                    待配置
                   </div>
                   <ComponentDataFallback
                     v-else-if="!isRenderableChart(component)"
@@ -608,7 +612,7 @@
       </template>
     </main>
 
-    <aside class="screen-inspector">
+    <aside v-if="!inspectorCollapsed" class="screen-inspector">
       <!-- 背景版属性面板 (当背景版被选中时显示) -->
       <div v-if="overlaySelected" class="bg-inspector">
         <div class="bg-insp-head">
@@ -788,7 +792,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, triggerRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Grid, Operation, PictureFilled, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import ComponentDataFallback from './ComponentDataFallback.vue'
@@ -903,7 +907,8 @@ const makeVectorGlyphIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3
 
 const createTypeItem = (type: string, svgIcon: string, label = chartTypeLabel(type)) => ({ type, label, svgIcon })
 
-const CHART_COMPONENT_ITEMS: ChartTypeItem[] = [
+// 柱图族
+const BAR_CHART_ITEMS: ChartTypeItem[] = [
   createTypeItem('bar', makeBarIcon()),
   createTypeItem('bar_stack', makeBarStackIcon()),
   createTypeItem('bar_percent', makeBarStackIcon()),
@@ -919,23 +924,63 @@ const CHART_COMPONENT_ITEMS: ChartTypeItem[] = [
   createTypeItem('bar_combo', makeBarComboIcon()),
   createTypeItem('bar_combo_group', makeBarComboIcon()),
   createTypeItem('bar_combo_stack', makeBarComboIcon()),
+]
+
+// 线/面图族
+const LINE_CHART_ITEMS: ChartTypeItem[] = [
   createTypeItem('line', makeLineIcon()),
   createTypeItem('area', makeAreaIcon()),
   createTypeItem('line_stack', makeLineStackIcon()),
+]
+
+// 占比/分布
+const PIE_CHART_ITEMS: ChartTypeItem[] = [
   createTypeItem('pie', makePieIcon()),
   createTypeItem('doughnut', makeDoughnutIcon()),
   createTypeItem('rose', makeRoseIcon()),
-  createTypeItem('radar', makeRadarIcon()),
   createTypeItem('funnel', makeFunnelIcon()),
   createTypeItem('treemap', makeTreemapIcon()),
-  createTypeItem('heatmap', makeHeatmapIcon()),
+]
+
+// 关系/分布矩阵
+const RELATION_CHART_ITEMS: ChartTypeItem[] = [
+  createTypeItem('radar', makeRadarIcon()),
   createTypeItem('scatter', makeScatterIcon()),
+  createTypeItem('heatmap', makeHeatmapIcon()),
+]
+
+// 地理空间
+const GEO_CHART_ITEMS: ChartTypeItem[] = [
   createTypeItem('map', makeMapIcon()),
+]
+
+// 指标/仪表
+const METRIC_CHART_ITEMS: ChartTypeItem[] = [
   createTypeItem('gauge', makeGaugeIcon()),
+]
+
+// 表格族
+const TABLE_CHART_ITEMS: ChartTypeItem[] = [
   createTypeItem('table', makeTableIcon()),
   createTypeItem('table_summary', makeTableIcon()),
   createTypeItem('table_pivot', makeTableIcon()),
+]
+
+// 控件类组件（筛选/联动）
+const CONTROL_COMPONENT_ITEMS: ChartTypeItem[] = [
   createTypeItem('filter_button', makeFilterButtonIcon()),
+]
+
+// 兼容旧引用：聚合所有图表组件
+const CHART_COMPONENT_ITEMS: ChartTypeItem[] = [
+  ...BAR_CHART_ITEMS,
+  ...LINE_CHART_ITEMS,
+  ...PIE_CHART_ITEMS,
+  ...RELATION_CHART_ITEMS,
+  ...GEO_CHART_ITEMS,
+  ...METRIC_CHART_ITEMS,
+  ...TABLE_CHART_ITEMS,
+  ...CONTROL_COMPONENT_ITEMS,
 ]
 
 const DECORATION_COMPONENT_ITEMS: ChartTypeItem[] = [
@@ -959,16 +1004,20 @@ const TEXT_COMPONENT_ITEMS: ChartTypeItem[] = [
   createTypeItem('single_field', makeMetricWidgetIcon()),
   createTypeItem('number_flipper', makeMetricWidgetIcon()),
   createTypeItem('table_rank', makeListWidgetIcon()),
+  createTypeItem('text_list', makeListWidgetIcon()),
+  createTypeItem('clock_display', makeClockWidgetIcon()),
+  createTypeItem('word_cloud', makeWordCloudIcon()),
+  createTypeItem('business_trend', makeTrendWidgetIcon()),
+  createTypeItem('metric_indicator', makeMetricWidgetIcon()),
+]
+
+// 媒体/嵌入组件：iframe、图片、二维码、超链接
+const MEDIA_COMPONENT_ITEMS: ChartTypeItem[] = [
   createTypeItem('iframe_single', makeFrameWidgetIcon()),
   createTypeItem('iframe_tabs', makeFrameWidgetIcon()),
   createTypeItem('hyperlink', makeLinkWidgetIcon()),
   createTypeItem('image_list', makeListWidgetIcon()),
-  createTypeItem('text_list', makeListWidgetIcon()),
-  createTypeItem('clock_display', makeClockWidgetIcon()),
-  createTypeItem('word_cloud', makeWordCloudIcon()),
   createTypeItem('qr_code', makeQrWidgetIcon()),
-  createTypeItem('business_trend', makeTrendWidgetIcon()),
-  createTypeItem('metric_indicator', makeMetricWidgetIcon()),
 ]
 
 const VECTOR_ICON_COMPONENT_ITEMS: ChartTypeItem[] = [
@@ -981,9 +1030,17 @@ const VECTOR_ICON_COMPONENT_ITEMS: ChartTypeItem[] = [
 ]
 
 const CHART_CATEGORIES: ChartCategory[] = [
-  { label: '图表组件', types: CHART_COMPONENT_ITEMS },
-  { label: '装饰组件', types: DECORATION_COMPONENT_ITEMS },
+  { label: '柱图', types: BAR_CHART_ITEMS },
+  { label: '线/面图', types: LINE_CHART_ITEMS },
+  { label: '占比/分布', types: PIE_CHART_ITEMS },
+  { label: '关系/分布矩阵', types: RELATION_CHART_ITEMS },
+  { label: '地理空间', types: GEO_CHART_ITEMS },
+  { label: '指标/仪表', types: METRIC_CHART_ITEMS },
+  { label: '表格组件', types: TABLE_CHART_ITEMS },
+  { label: '控件组件', types: CONTROL_COMPONENT_ITEMS },
   { label: '文字组件', types: TEXT_COMPONENT_ITEMS },
+  { label: '媒体组件', types: MEDIA_COMPONENT_ITEMS },
+  { label: '装饰组件', types: DECORATION_COMPONENT_ITEMS },
   { label: '矢量图标组件', types: VECTOR_ICON_COMPONENT_ITEMS },
 ]
 
@@ -1068,7 +1125,10 @@ const DEFAULT_CHART_TEMPLATE_LIBRARY: StaticAssetSeed[] = CHART_COMPONENT_ITEMS.
 const BUILTIN_TEMPLATE_LIBRARY: StaticAssetSeed[] = [...DEFAULT_CHART_TEMPLATE_LIBRARY, ...STATIC_TEMPLATE_LIBRARY]
 
 // ─── 左侧面板展开/折叠 & 拖拽缩放 ────────────────────────────────────────────
-const expandedCats = ref(new Set<string>(CHART_CATEGORIES.map((c) => c.label)))
+const DEFAULT_EXPANDED_CATEGORIES = new Set<string>(['柱图', '线/面图', '占比/分布', '表格组件'])
+const expandedCats = ref(new Set<string>(
+  CHART_CATEGORIES.map((c) => c.label).filter((label) => DEFAULT_EXPANDED_CATEGORIES.has(label))
+))
 const toggleCategory = (label: string) => {
   const next = new Set(expandedCats.value)
   if (next.has(label)) { next.delete(label) } else { next.add(label) }
@@ -1077,19 +1137,26 @@ const toggleCategory = (label: string) => {
 
 const sidebarCollapsed = ref(false)
 const compactEditorMode = ref(false)
+const inspectorCollapsed = ref(true)
+const autoFitCanvas = ref(true)
 let sidebarHoverTimer: number | null = null
+const COMPACT_EDITOR_BREAKPOINT = 1440
 
 const effectiveSidebarCollapsed = computed(() => sidebarCollapsed.value || compactEditorMode.value)
 
 const toggleSidebar = () => {
   if (compactEditorMode.value) return
   sidebarCollapsed.value = !sidebarCollapsed.value
+  scheduleCanvasFit()
 }
 
 const hoverExpandSidebar = () => {
   if (compactEditorMode.value || !sidebarCollapsed.value) return
   if (sidebarHoverTimer !== null) { clearTimeout(sidebarHoverTimer); sidebarHoverTimer = null }
-  sidebarHoverTimer = window.setTimeout(() => { sidebarCollapsed.value = false }, 200)
+  sidebarHoverTimer = window.setTimeout(() => {
+    sidebarCollapsed.value = false
+    scheduleCanvasFit()
+  }, 200)
 }
 
 const hoverCollapseSidebar = () => {
@@ -1097,18 +1164,19 @@ const hoverCollapseSidebar = () => {
   // Don't auto-collapse after hover-expand; user must click toggle or move away
 }
 
-const leftPanelWidth = ref(520)
+const leftPanelWidth = ref(460)
 const startPanelResize = (e: MouseEvent) => {
   const startX = e.clientX
   const startWidth = leftPanelWidth.value
   let rafId = 0
   let lastX = startX
-  const applyFrame = () => { rafId = 0; leftPanelWidth.value = Math.max(420, Math.min(880, startWidth + lastX - startX)) }
+  const applyFrame = () => { rafId = 0; leftPanelWidth.value = Math.max(380, Math.min(760, startWidth + lastX - startX)) }
   const onMove = (ev: MouseEvent) => { lastX = ev.clientX; if (!rafId) rafId = requestAnimationFrame(applyFrame) }
   const onUp = () => {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
     if (rafId) { cancelAnimationFrame(rafId); applyFrame() }
+    scheduleCanvasFit()
   }
   document.addEventListener('mousemove', onMove)
   document.addEventListener('mouseup', onUp)
@@ -1151,8 +1219,9 @@ const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LI
 })))
 const templateAssets = computed(() => [...localStaticTemplates.value, ...templates.value])
 const dashboardCounts = ref(new Map<number, number>())
-const componentDataMap = ref(new Map<number, ChartDataResult>())
+const componentDataMap = shallowRef(new Map<number, ChartDataResult>())
 const canvasRef = ref<HTMLElement | null>(null)
+const stageScrollRef = ref<HTMLElement | null>(null)
 const activeCompId = ref<number | null>(null)
 const dashboardSearch = ref('')
 const shareVisible = ref(false)
@@ -1169,6 +1238,7 @@ const assetSearch = ref('')
 const assetType = ref('')
 const selectedChartId = ref<number | null>(null)
 const selectedTemplateId = ref<number | null>(null)
+const hoveredTemplateId = ref<number | null>(null)
 const draggingTemplateId = ref<number | null>(null)
 const draggingChartId = ref<number | null>(null)
 const draggingTypeChip = ref<string | null>(null)
@@ -1190,9 +1260,14 @@ const publishForm = reactive({
 })
 
 const chartRefs = new Map<number, HTMLElement>()
+const stageCardRefs = new Map<number, HTMLElement>()
 const chartInstances = new Map<number, ECharts>()
+const COMPONENT_DATA_BATCH_SIZE = 4
 let interactionFrame: number | null = null
 let pendingPointer: { x: number; y: number } | null = null
+let componentDataLoadToken = 0
+let componentVisibilityObserver: IntersectionObserver | null = null
+const visibleComponentIds = shallowRef(new Set<number>())
 
 // ─── 背景版 (Background Board) ───────────────────────────────────────────────
 const overlaySelected = ref(false)
@@ -1377,6 +1452,13 @@ const filteredTemplates = computed(() => {
 
 const selectedChartAsset = computed(() => charts.value.find((item) => item.id === selectedChartId.value) ?? null)
 const selectedTemplate = computed(() => templateAssets.value.find((item) => item.id === selectedTemplateId.value) ?? null)
+const previewTemplate = computed(() =>
+  filteredTemplates.value.find((item) => item.id === hoveredTemplateId.value)
+  ?? filteredTemplates.value.find((item) => item.id === selectedTemplateId.value)
+  ?? filteredTemplates.value[0]
+  ?? selectedTemplate.value
+  ?? null
+)
 const selectedLibraryAsset = computed(() => libraryTab.value === 'templates' ? selectedTemplate.value : selectedChartAsset.value)
 const filteredDashboards = computed(() => {
   const keyword = dashboardSearch.value.trim().toLowerCase()
@@ -1399,7 +1481,7 @@ const activeComponent = computed(() => components.value.find((item) => item.id =
 const activeChart = computed(() => activeComponent.value ? chartMap.value.get(activeComponent.value.chartId) ?? null : null)
 const _componentConfigCache = new Map<string, ReturnType<typeof normalizeComponentConfig>>()
 const getComponentConfig = (component: DashboardComponent) => {
-  const cacheKey = `${component.id}:${component.configJson ?? ''}`
+  const cacheKey = `${component.id}:${component.chartId}:${component.configJson ?? ''}`
   let cached = _componentConfigCache.get(cacheKey)
   if (!cached) {
     cached = normalizeComponentConfig(component.configJson, chartMap.value.get(component.chartId))
@@ -1440,19 +1522,49 @@ const canvasWorkWidth = computed(() => Math.max(overlayConfig.w + 400, 2400))
 
 // ─── 缩放控制 ───────────────────────────────────────────────────────────
 const canvasScale = ref(1)
-const SCALE_MIN = 0.25
+const SCALE_MIN = 0.1
 const SCALE_MAX = 2
 const SCALE_STEP = 0.1
 
-const zoomIn = () => { canvasScale.value = Math.min(SCALE_MAX, +(canvasScale.value + SCALE_STEP).toFixed(2)) }
-const zoomOut = () => { canvasScale.value = Math.max(SCALE_MIN, +(canvasScale.value - SCALE_STEP).toFixed(2)) }
-const zoomReset = () => { canvasScale.value = 1 }
-const zoomFit = () => {
-  const scrollEl = document.querySelector('.screen-stage-scroll') as HTMLElement | null
+const getStageScrollElement = () => stageScrollRef.value
+
+const applyFittedCanvasScale = () => {
+  const scrollEl = getStageScrollElement()
   if (!scrollEl) return
   const fitW = (scrollEl.clientWidth - 40) / canvasWorkWidth.value
   const fitH = (scrollEl.clientHeight - 40) / canvasMinHeight.value
   canvasScale.value = Math.max(SCALE_MIN, Math.min(SCALE_MAX, +Math.min(fitW, fitH).toFixed(2)))
+}
+
+const scheduleCanvasFit = () => {
+  if (!autoFitCanvas.value) return
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      applyFittedCanvasScale()
+    })
+  })
+}
+
+const zoomIn = () => {
+  autoFitCanvas.value = false
+  canvasScale.value = Math.min(SCALE_MAX, +(canvasScale.value + SCALE_STEP).toFixed(2))
+}
+const zoomOut = () => {
+  autoFitCanvas.value = false
+  canvasScale.value = Math.max(SCALE_MIN, +(canvasScale.value - SCALE_STEP).toFixed(2))
+}
+const zoomReset = () => {
+  autoFitCanvas.value = false
+  canvasScale.value = 1
+}
+const zoomFit = () => {
+  autoFitCanvas.value = true
+  applyFittedCanvasScale()
+}
+
+const toggleInspector = () => {
+  inspectorCollapsed.value = !inspectorCollapsed.value
+  scheduleCanvasFit()
 }
 
 const canvasMinHeight = computed(() => {
@@ -1523,6 +1635,183 @@ const buildCounts = async () => {
   dashboardCounts.value = new Map(entries)
 }
 
+const yieldToMainThread = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0))
+
+const setComponentData = (componentId: number, data: ChartDataResult) => {
+  componentDataMap.value.set(componentId, data)
+  triggerRef(componentDataMap)
+}
+
+const deleteComponentData = (componentId: number) => {
+  if (!componentDataMap.value.has(componentId)) return
+  componentDataMap.value.delete(componentId)
+  triggerRef(componentDataMap)
+}
+
+const clearComponentData = () => {
+  if (!componentDataMap.value.size) return
+  componentDataMap.value.clear()
+  triggerRef(componentDataMap)
+}
+
+const clearVisibleComponentIds = () => {
+  if (!visibleComponentIds.value.size) return
+  visibleComponentIds.value = new Set()
+}
+
+const buildComponentDataRequestSignature = (
+  chartId: number,
+  resolved: ReturnType<typeof normalizeComponentConfig>,
+) => JSON.stringify({
+  chartId,
+  chartType: resolved.chart.chartType,
+  sourceMode: resolved.chart.sourceMode,
+  datasetId: resolved.chart.datasetId,
+  datasourceId: resolved.chart.datasourceId,
+  pageSourceKind: resolved.chart.pageSourceKind,
+  sqlText: resolved.chart.sqlText,
+  runtimeConfigText: resolved.chart.runtimeConfigText,
+  xField: resolved.chart.xField,
+  yField: resolved.chart.yField,
+  groupField: resolved.chart.groupField,
+  filters: mergeComponentRequestFilters(resolved.interaction.dataFilters),
+})
+
+const disposeChartInstance = (componentId: number) => {
+  chartInstances.get(componentId)?.dispose()
+  chartInstances.delete(componentId)
+  chartRefs.delete(componentId)
+}
+
+const disposeComponentVisibilityObserver = () => {
+  componentVisibilityObserver?.disconnect()
+  componentVisibilityObserver = null
+  stageCardRefs.clear()
+  clearVisibleComponentIds()
+}
+
+const markComponentVisible = (componentId: number, visible: boolean) => {
+  const next = new Set(visibleComponentIds.value)
+  const changed = visible ? !next.has(componentId) : next.delete(componentId)
+  if (!changed) return
+  if (visible) next.add(componentId)
+  visibleComponentIds.value = next
+}
+
+const isComponentVisible = (componentId: number) => visibleComponentIds.value.has(componentId)
+
+const rerenderComponentFromCache = async (component: DashboardComponent) => {
+  await nextTick()
+  if (showNoField(component) || !isRenderableChart(component)) {
+    disposeChartInstance(component.id)
+    return
+  }
+  const cachedData = componentDataMap.value.get(component.id)
+  if (!cachedData) return
+  renderChart(component, cachedData)
+  chartInstances.get(component.id)?.resize()
+}
+
+const syncComponentPreview = async (
+  component: DashboardComponent,
+  payload: { chartId: number; configJson: string },
+) => {
+  const previousSignature = buildComponentDataRequestSignature(component.chartId, getComponentConfig(component))
+  component.chartId = payload.chartId
+  component.configJson = payload.configJson
+  const nextResolved = normalizeComponentConfig(payload.configJson, chartMap.value.get(payload.chartId))
+  const nextSignature = buildComponentDataRequestSignature(payload.chartId, nextResolved)
+
+  if (previousSignature === nextSignature && componentDataMap.value.has(component.id)) {
+    await rerenderComponentFromCache(component)
+    return
+  }
+
+  await loadComponentData(component)
+}
+
+const componentRequiresPreviewData = (component: DashboardComponent) => {
+  const chart = getComponentChartConfig(component)
+  const chartType = chart.chartType ?? ''
+  if (chartType === 'filter_button' || showNoField(component)) return false
+  if (isStaticWidgetChartType(chartType)) {
+    return Boolean(
+      chart.datasetId
+      || chart.datasourceId
+      || chart.sqlText?.trim()
+      || chart.runtimeConfigText?.trim()
+      || chart.xField
+      || chart.yField
+      || chart.groupField
+    )
+  }
+  return true
+}
+
+const shouldDeferComponentPreview = (component: DashboardComponent) => (
+  componentRequiresPreviewData(component)
+  && !isComponentVisible(component.id)
+  && !componentDataMap.value.has(component.id)
+)
+
+const isComponentPreviewLoading = (component: DashboardComponent) => (
+  componentRequiresPreviewData(component)
+  && isComponentVisible(component.id)
+  && !componentDataMap.value.has(component.id)
+)
+
+const handleComponentVisibilityChange = (componentId: number, visible: boolean) => {
+  markComponentVisible(componentId, visible)
+  const component = findComponent(componentId)
+  if (!component) return
+  if (visible) {
+    if (componentRequiresPreviewData(component) && !componentDataMap.value.has(componentId)) {
+      void loadComponentData(component)
+      return
+    }
+    const cachedData = componentDataMap.value.get(componentId)
+    if (cachedData && isRenderableChart(component)) {
+      renderChart(component, cachedData)
+      chartInstances.get(componentId)?.resize()
+    }
+    return
+  }
+  disposeChartInstance(componentId)
+}
+
+const setupComponentVisibilityObserver = () => {
+  disposeComponentVisibilityObserver()
+  if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return false
+  if (!stageScrollRef.value) return false
+  componentVisibilityObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const componentId = Number((entry.target as HTMLElement).dataset.componentId || 0)
+      if (!componentId) continue
+      handleComponentVisibilityChange(componentId, entry.isIntersecting || entry.intersectionRatio > 0)
+    }
+  }, {
+    root: stageScrollRef.value,
+    rootMargin: '240px 160px',
+    threshold: 0.01,
+  })
+  stageCardRefs.forEach((element, componentId) => {
+    element.dataset.componentId = String(componentId)
+    componentVisibilityObserver?.observe(element)
+  })
+  return true
+}
+
+const loadComponentDataInBatches = async (items: DashboardComponent[], loadToken: number) => {
+  for (let start = 0; start < items.length; start += COMPONENT_DATA_BATCH_SIZE) {
+    const batch = items.slice(start, start + COMPONENT_DATA_BATCH_SIZE)
+    await Promise.all(batch.map((component) => loadComponentData(component, loadToken)))
+    if (componentDataLoadToken !== loadToken) return
+    if (start + COMPONENT_DATA_BATCH_SIZE < items.length) {
+      await yieldToMainThread()
+    }
+  }
+}
+
 const loadBaseData = async () => {
   loading.value = true
   try {
@@ -1568,40 +1857,61 @@ const selectDashboard = async (dashboard: Dashboard) => {
   overlaySelected.value = false
   await loadComponents()
   loadOverlayFromConfig()
+  await nextTick()
+  scheduleCanvasFit()
 }
 
 const loadComponents = async () => {
   if (!currentDashboard.value) return
+  const loadToken = ++componentDataLoadToken
   compLoading.value = true
+  disposeComponentVisibilityObserver()
   disposeCharts()
-  componentDataMap.value = new Map()
+  clearComponentData()
+  _componentConfigCache.clear()
   try {
     const result = await getDashboardComponents(currentDashboard.value.id)
+    if (componentDataLoadToken !== loadToken) return
     result.forEach(normalizeLayout)
     components.value = result
     dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, result.length)
     await nextTick()
-    await Promise.all(result.map((component) => loadComponentData(component)))
+    const observerReady = setupComponentVisibilityObserver()
+    if (!observerReady) {
+      await loadComponentDataInBatches(result, loadToken)
+    }
   } finally {
-    compLoading.value = false
+    if (componentDataLoadToken === loadToken) {
+      compLoading.value = false
+    }
   }
 }
 
-const loadComponentData = async (component: DashboardComponent) => {
-  const chart = getComponentChartConfig(component)
-  if (!chart || showNoField(component)) return
+const loadComponentData = async (component: DashboardComponent, loadToken = componentDataLoadToken) => {
+  const resolved = getComponentConfig(component)
+  const chart = resolved.chart
+  if (!chart || getMissingChartFields(chart).length > 0) {
+    deleteComponentData(component.id)
+    disposeChartInstance(component.id)
+    return
+  }
+  const requestSignature = buildComponentDataRequestSignature(component.chartId, resolved)
   try {
-    const resolved = getComponentConfig(component)
     const data = await getChartData(component.chartId, {
       configJson: component.configJson,
       filters: mergeComponentRequestFilters(resolved.interaction.dataFilters),
     })
+    if (loadToken !== componentDataLoadToken) return
+    if (requestSignature !== buildComponentDataRequestSignature(component.chartId, getComponentConfig(component))) return
     const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], chart)
-    const nextMap = new Map(componentDataMap.value)
-    nextMap.set(component.id, materialized)
-    componentDataMap.value = nextMap
-    if (isRenderableChart(component)) renderChart(component, materialized)
+    setComponentData(component.id, materialized)
+    if (isRenderableChart(component)) {
+      renderChart(component, materialized)
+    } else {
+      disposeChartInstance(component.id)
+    }
   } catch {
+    if (loadToken !== componentDataLoadToken) return
     ElMessage.warning(`组件 ${chart.name} 数据加载失败`)
   }
 }
@@ -1648,6 +1958,21 @@ const showNoField = (component: DashboardComponent) => {
 
 const getTableColumns = (componentId: number) => componentDataMap.value.get(componentId)?.columns ?? []
 const getTableRows = (componentId: number) => componentDataMap.value.get(componentId)?.rawRows ?? []
+
+const setStageCardRef = (el: HTMLElement | null, componentId: number) => {
+  const previous = stageCardRefs.get(componentId)
+  if (previous && componentVisibilityObserver) {
+    componentVisibilityObserver.unobserve(previous)
+  }
+  if (!el) {
+    stageCardRefs.delete(componentId)
+    markComponentVisible(componentId, false)
+    return
+  }
+  el.dataset.componentId = String(componentId)
+  stageCardRefs.set(componentId, el)
+  componentVisibilityObserver?.observe(el)
+}
 
 const getMaxZ = () => components.value.reduce((max, item) => Math.max(max, item.zIndex ?? 0), 0)
 
@@ -1701,19 +2026,17 @@ const handleRemoveActiveComponent = async () => {
 const previewActiveComponent = async (payload: { chartId: number; configJson: string }) => {
   const component = activeComponent.value
   if (!component) return
-  component.chartId = payload.chartId
-  component.configJson = payload.configJson
-  await nextTick()
-  await loadComponentData(component)
+  await syncComponentPreview(component, payload)
 }
 
 const saveActiveComponent = async (payload: { chartId: number; configJson: string }) => {
   const component = activeComponent.value
   if (!component || !currentDashboard.value) return
-  await updateDashboardComponent(currentDashboard.value.id, component.id, payload)
-  component.chartId = payload.chartId
-  component.configJson = payload.configJson
-  await loadComponents()
+  const updated = await updateDashboardComponent(currentDashboard.value.id, component.id, payload)
+  await syncComponentPreview(component, {
+    chartId: updated.chartId ?? payload.chartId,
+    configJson: updated.configJson ?? payload.configJson,
+  })
   ElMessage.success('组件实例配置已保存')
 }
 
@@ -1748,8 +2071,19 @@ interface InteractionState {
 
 let interaction: InteractionState | null = null
 const resizeHandles: ResizeHandle[] = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw']
+const INTERACTION_CHART_RESIZE_INTERVAL = 48
+let lastInteractionChartResizeAt = 0
 
 const findComponent = (id: number) => components.value.find((item) => item.id === id)
+
+const resizeInteractionChart = (componentId: number, force = false) => {
+  const instance = chartInstances.get(componentId)
+  if (!instance) return
+  const now = performance.now()
+  if (!force && now - lastInteractionChartResizeAt < INTERACTION_CHART_RESIZE_INTERVAL) return
+  lastInteractionChartResizeAt = now
+  instance.resize()
+}
 
 const applyInteractionFrame = () => {
   interactionFrame = null
@@ -1794,7 +2128,7 @@ const applyInteractionFrame = () => {
     component.posY = Math.round(nextY)
     component.width = Math.round(nextWidth)
     component.height = Math.round(nextHeight)
-    chartInstances.get(component.id)?.resize()
+    resizeInteractionChart(component.id)
   }
 }
 
@@ -1814,6 +2148,7 @@ const cleanupInteractionFrame = () => {
 
 const startDrag = (event: MouseEvent, component: DashboardComponent) => {
   focusComponent(component)
+  lastInteractionChartResizeAt = 0
   interaction = {
     mode: 'move',
     compId: component.id,
@@ -1832,6 +2167,7 @@ const startDrag = (event: MouseEvent, component: DashboardComponent) => {
 
 const startResize = (event: MouseEvent, component: DashboardComponent, handle: ResizeHandle = 'se') => {
   focusComponent(component)
+  lastInteractionChartResizeAt = 0
   interaction = {
     mode: 'resize',
     compId: component.id,
@@ -1866,7 +2202,7 @@ const onPointerUp = async () => {
   document.removeEventListener('mouseup', onPointerUp)
   cleanupInteractionFrame()
   if (component) {
-    chartInstances.get(component.id)?.resize()
+    resizeInteractionChart(component.id, true)
     await persistLayout(component)
   }
 }
@@ -2336,12 +2672,8 @@ const addTemplateToScreen = async (template: ChartTemplate, point?: { clientX: n
 const removeComponent = async (componentId: number) => {
   if (!currentDashboard.value) return
   await removeDashboardComponent(currentDashboard.value.id, componentId)
-  chartInstances.get(componentId)?.dispose()
-  chartInstances.delete(componentId)
-  chartRefs.delete(componentId)
-  const nextData = new Map(componentDataMap.value)
-  nextData.delete(componentId)
-  componentDataMap.value = nextData
+  disposeChartInstance(componentId)
+  deleteComponentData(componentId)
   components.value = components.value.filter((item) => item.id !== componentId)
   if (activeCompId.value === componentId) activeCompId.value = null
   dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length)
@@ -2518,16 +2850,20 @@ const summarizeTemplateConfig = (configJson: string) => {
 }
 
 const handleWindowResize = () => {
-  compactEditorMode.value = window.innerWidth <= 1100
+  compactEditorMode.value = window.innerWidth <= COMPACT_EDITOR_BREAKPOINT
   chartInstances.forEach((instance) => instance.resize())
+  scheduleCanvasFit()
 }
 
 onMounted(async () => {
   window.addEventListener('resize', handleWindowResize)
+  handleWindowResize()
   await loadBaseData()
 })
 
 onBeforeUnmount(() => {
+  componentDataLoadToken += 1
+  disposeComponentVisibilityObserver()
   document.removeEventListener('mousemove', onPointerMove)
   document.removeEventListener('mouseup', onPointerUp)
   cleanupInteractionFrame()
@@ -3516,7 +3852,7 @@ onBeforeUnmount(() => {
 /* ─── 编辑器模式布局 ─────────────────────────────────────────────────────────── */
 .screen-root--editor {
   display: grid;
-  grid-template-columns: v-bind("effectiveSidebarCollapsed ? '60px' : leftPanelWidth + 'px'") 1fr 300px;
+  grid-template-columns: v-bind("effectiveSidebarCollapsed ? '60px' : leftPanelWidth + 'px'") minmax(0, 1fr) v-bind("inspectorCollapsed ? '0px' : 'minmax(320px, 22vw)'");
   grid-template-rows: 1fr;
   gap: 0;
   height: 100%;
@@ -3533,6 +3869,9 @@ onBeforeUnmount(() => {
 .screen-root--editor .screen-toolbar {
   position: relative;
   z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   background: linear-gradient(180deg, rgba(12, 20, 32, 0.96) 0%, rgba(7, 14, 24, 0.98) 100%);
   border: none;
   border-bottom: 1px solid rgba(110,188,255,0.08);
@@ -3548,6 +3887,7 @@ onBeforeUnmount(() => {
 }
 
 .screen-root--editor .screen-inspector {
+  min-width: 0;
   z-index: 3;
   background: linear-gradient(180deg, #0d1826 0%, #09121d 100%);
   border-left: 1px solid rgba(110,188,255,0.08);
@@ -3562,6 +3902,17 @@ onBeforeUnmount(() => {
 
 .screen-root--editor .screen-comp-count {
   color: rgba(183,206,235,0.44);
+}
+
+.screen-root--editor .screen-title-row {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.screen-root--editor .screen-actions {
+  flex: 1 1 480px;
+  justify-content: flex-end;
+  row-gap: 8px;
 }
 
 .screen-root--editor .screen-actions :deep(.el-button) {
@@ -3582,6 +3933,38 @@ onBeforeUnmount(() => {
 
 .screen-root--editor .screen-actions :deep(.el-divider--vertical) {
   border-color: rgba(255,255,255,0.15);
+}
+
+.screen-root--quiet .canvas-tb-tip,
+.screen-root--quiet .screen-comp-count,
+.screen-root--quiet .lp-pane-subtitle,
+.screen-root--quiet .lp-library-note,
+.screen-root--quiet .lp-layer-order-tip,
+.screen-root--quiet .lp-layer-meta,
+.screen-root--quiet .lp-ac-subline,
+.screen-root--quiet .lp-hover-subtitle,
+.screen-root--quiet .lp-hover-meta,
+.screen-root--quiet .stage-card-meta,
+.screen-root--quiet .canvas-ruler-row,
+.screen-root--quiet .ruler-v-strip {
+  display: none;
+}
+
+.screen-root--quiet .stage-card-header {
+  margin-bottom: 2px;
+  min-height: 18px;
+}
+
+.screen-root--quiet .screen-inspector :deep(.inspector-subtitle),
+.screen-root--quiet .screen-inspector :deep(.summary-meta),
+.screen-root--quiet .screen-inspector :deep(.profile-desc),
+.screen-root--quiet .screen-inspector :deep(.mode-card-desc),
+.screen-root--quiet .screen-inspector :deep(.health-text),
+.screen-root--quiet .screen-inspector :deep(.preview-meta),
+.screen-root--quiet .screen-inspector :deep(.suggestion-body),
+.screen-root--quiet .screen-inspector :deep(.helper-text),
+.screen-root--quiet .screen-inspector :deep(.hint-text) {
+  display: none;
 }
 
 /* ─── 左侧综合面板 ───────────────────────────────────────────────────────────── */
@@ -3606,16 +3989,59 @@ onBeforeUnmount(() => {
   min-width: 60px;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1440px) {
   .screen-root--editor {
     grid-template-columns: 60px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
   }
 
+  .screen-root--editor .screen-toolbar {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .screen-root--editor .screen-title {
+    font-size: 18px;
+  }
+
+  .screen-root--editor .screen-title-row,
+  .screen-root--editor .screen-actions,
+  .canvas-topbar {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .screen-root--editor .screen-actions,
+  .canvas-topbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+
+  .screen-root--editor .screen-actions {
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    padding-bottom: 2px;
+  }
+
+  .canvas-topbar {
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  .canvas-tb-tip {
+    flex: 1 0 auto;
+    white-space: nowrap;
+  }
+
   .screen-root--editor .screen-inspector {
     grid-column: 1 / -1;
     grid-row: 2;
-    max-height: 280px;
+    max-height: min(180px, 28vh);
     overflow: auto;
     border-top: 1px solid rgba(255,255,255,0.08);
     background: #0d1622;
@@ -3997,6 +4423,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  gap: 10px;
   padding: 0 8px 10px;
 }
 
@@ -4064,12 +4491,22 @@ onBeforeUnmount(() => {
 }
 
 .lp-asset-scroll {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 5px;
   padding: 2px 2px 8px;
+}
+
+.lp-preview-panel {
+  flex-shrink: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(110,188,255,0.12);
+  background: linear-gradient(180deg, rgba(10,19,31,0.98) 0%, rgba(8,15,24,0.98) 100%);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.24);
+  padding: 12px;
 }
 
 .lp-asset-card {

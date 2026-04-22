@@ -3,6 +3,9 @@ import vue from '@vitejs/plugin-vue'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
+const FRONTEND_DEV_PORT = 5173
+const BACKEND_PROXY_TARGET = 'http://localhost:8081'
+
 export default defineConfig({
   plugins: [
     vue(),
@@ -43,15 +46,17 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
+    port: FRONTEND_DEV_PORT,
+    strictPort: true,
     proxy: {
       // /api 开头的请求全部转发到后端，解决前后端跨域问题
       '/api': {
-        target: 'http://localhost:8081',
+        target: BACKEND_PROXY_TARGET,
         changeOrigin: true
       },
       // 静态上传文件（背景图等）也转发到后端
       '/uploads': {
-        target: 'http://localhost:8081',
+        target: BACKEND_PROXY_TARGET,
         changeOrigin: true
       }
     }

@@ -224,7 +224,7 @@ docker compose up -d
 
 1. `docker compose ps` 确认 MySQL 和 ClickHouse 容器均为 `Up`
 2. `curl http://127.0.0.1:8081/api/health` 返回 `OK`
-3. 浏览器访问前端地址，登录默认账号（`admin` / `admin123`）
+3. 浏览器访问前端地址，登录默认账号（`admin` / `123456`）
 4. 后端日志中 Flyway 显示 `Successfully applied N migration(s)` 表示数据库已自动升级
 
 ---
@@ -288,6 +288,8 @@ cd frontend
 npm install
 npm run dev
 ```
+
+前端开发端口已在 `frontend/vite.config.ts` 中显式配置为 `5173`，后端代理目标为 `http://localhost:8081`。
 
 4. 健康检查
 - 后端: `http://localhost:8081/api/health`

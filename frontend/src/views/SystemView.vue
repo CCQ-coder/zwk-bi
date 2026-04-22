@@ -36,11 +36,141 @@
           </div>
 
           <div class="settings-grid">
-            <el-card shadow="never">
+            <!-- 平台品牌 -->
+            <el-card shadow="never" class="settings-card">
               <template #header>
                 <div class="card-header">
-                  <span>系统入口</span>
-                  <el-tag type="success" size="small">已接入动态菜单</el-tag>
+                  <div>
+                    <div class="card-title">平台品牌</div>
+                    <div class="card-subtitle">登录页与顶部品牌信息，所有用户可见</div>
+                  </div>
+                  <el-tag size="small" type="success">已生效</el-tag>
+                </div>
+              </template>
+              <el-form label-position="top" size="small" class="settings-form">
+                <el-form-item label="平台名称">
+                  <el-input v-model="platformDraft.branding.name" maxlength="40" show-word-limit />
+                </el-form-item>
+                <el-form-item label="平台标语">
+                  <el-input v-model="platformDraft.branding.slogan" maxlength="60" show-word-limit />
+                </el-form-item>
+                <el-form-item label="版权信息">
+                  <el-input v-model="platformDraft.branding.copyright" />
+                </el-form-item>
+                <el-form-item label="版本号">
+                  <el-input v-model="platformDraft.branding.version" />
+                </el-form-item>
+              </el-form>
+            </el-card>
+
+            <!-- 外观 -->
+            <el-card shadow="never" class="settings-card">
+              <template #header>
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">外观与主题</div>
+                    <div class="card-subtitle">主题模式与全局主色，将应用于普通页面（大屏自带深色主题）</div>
+                  </div>
+                </div>
+              </template>
+              <el-form label-position="top" size="small" class="settings-form">
+                <el-form-item label="主题模式">
+                  <el-radio-group v-model="platformDraft.themeMode">
+                    <el-radio-button value="light">浅色</el-radio-button>
+                    <el-radio-button value="dark">深色</el-radio-button>
+                    <el-radio-button value="auto">跟随系统</el-radio-button>
+                  </el-radio-group>
+                </el-form-item>
+                <el-form-item label="主色">
+                  <div class="color-row">
+                    <el-color-picker v-model="platformDraft.primaryColor" />
+                    <div class="color-presets">
+                      <span
+                        v-for="color in PRIMARY_PRESETS"
+                        :key="color"
+                        class="color-dot"
+                        :class="{ active: platformDraft.primaryColor === color }"
+                        :style="{ background: color }"
+                        @click="platformDraft.primaryColor = color"
+                      />
+                    </div>
+                  </div>
+                </el-form-item>
+              </el-form>
+            </el-card>
+
+            <!-- 安全策略 -->
+            <el-card shadow="never" class="settings-card">
+              <template #header>
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">安全策略</div>
+                    <div class="card-subtitle">密码强度、登录失败锁定与会话超时</div>
+                  </div>
+                  <el-tag size="small" type="warning">仅本地策略，后端落地待补充</el-tag>
+                </div>
+              </template>
+              <el-form label-position="top" size="small" class="settings-form settings-form--grid">
+                <el-form-item label="密码最短长度">
+                  <el-input-number v-model="platformDraft.security.passwordMinLength" :min="4" :max="32" controls-position="right" style="width: 100%" />
+                </el-form-item>
+                <el-form-item label="密码强制混合字符">
+                  <el-switch v-model="platformDraft.security.passwordRequireMixed" active-text="开启" inactive-text="关闭" />
+                </el-form-item>
+                <el-form-item label="登录失败锁定阈值">
+                  <el-input-number v-model="platformDraft.security.loginMaxFailures" :min="1" :max="20" controls-position="right" style="width: 100%" />
+                </el-form-item>
+                <el-form-item label="锁定时长（分钟）">
+                  <el-input-number v-model="platformDraft.security.loginLockMinutes" :min="1" :max="1440" controls-position="right" style="width: 100%" />
+                </el-form-item>
+                <el-form-item label="会话超时（分钟）">
+                  <el-input-number v-model="platformDraft.security.sessionTimeoutMinutes" :min="10" :max="2880" controls-position="right" style="width: 100%" />
+                </el-form-item>
+              </el-form>
+            </el-card>
+
+            <!-- 数据默认值 -->
+            <el-card shadow="never" class="settings-card">
+              <template #header>
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">数据默认值</div>
+                    <div class="card-subtitle">数据集预览、查询缓存与超时控制</div>
+                  </div>
+                </div>
+              </template>
+              <el-form label-position="top" size="small" class="settings-form settings-form--grid">
+                <el-form-item label="数据预览行数上限">
+                  <el-input-number v-model="platformDraft.dataDefaults.previewLimit" :min="10" :max="10000" :step="10" controls-position="right" style="width: 100%" />
+                </el-form-item>
+                <el-form-item label="查询超时（秒）">
+                  <el-input-number v-model="platformDraft.dataDefaults.queryTimeoutSeconds" :min="5" :max="600" controls-position="right" style="width: 100%" />
+                </el-form-item>
+                <el-form-item label="启用查询缓存">
+                  <el-switch v-model="platformDraft.dataDefaults.enableQueryCache" active-text="开启" inactive-text="关闭" />
+                </el-form-item>
+                <el-form-item label="缓存有效期（分钟）">
+                  <el-input-number
+                    v-model="platformDraft.dataDefaults.cacheMinutes"
+                    :min="1"
+                    :max="1440"
+                    :disabled="!platformDraft.dataDefaults.enableQueryCache"
+                    controls-position="right"
+                    style="width: 100%"
+                  />
+                </el-form-item>
+              </el-form>
+            </el-card>
+
+            <!-- 系统入口 -->
+            <el-card shadow="never" class="settings-card">
+              <template #header>
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">系统入口</div>
+                    <div class="card-subtitle">当前账号可见的系统模块</div>
+                  </div>
+                  <el-tag type="success" size="small">动态菜单</el-tag>
                 </div>
               </template>
               <div class="menu-chip-list">
@@ -49,18 +179,22 @@
                 </el-tag>
               </div>
               <el-alert
-                title="系统页已拆分出角色管理和菜单权限管理入口，管理员可直接在本页完成角色授权与菜单维护。"
+                title="角色管理与菜单权限管理已拆分为独立 Tab，可在本页直接配置授权与菜单结构。"
                 type="info"
                 :closable="false"
                 style="margin-top: 16px"
               />
             </el-card>
 
-            <el-card shadow="never">
+            <!-- 运行环境 -->
+            <el-card shadow="never" class="settings-card">
               <template #header>
                 <div class="card-header">
-                  <span>权限检查项</span>
-                  <el-button size="small" @click="refreshSessionMenus">刷新当前菜单</el-button>
+                  <div>
+                    <div class="card-title">运行环境</div>
+                    <div class="card-subtitle">当前服务的健康状态与基础信息</div>
+                  </div>
+                  <el-button size="small" @click="refreshSessionMenus">刷新菜单</el-button>
                 </div>
               </template>
               <el-descriptions border :column="1" size="small">
@@ -71,11 +205,19 @@
                     {{ health.status || '未知' }}
                   </el-tag>
                 </el-descriptions-item>
-                <el-descriptions-item label="当前系统根菜单">{{ rootMenuCount }}</el-descriptions-item>
+                <el-descriptions-item label="系统根菜单数">{{ rootMenuCount }}</el-descriptions-item>
+                <el-descriptions-item label="浏览器">{{ browserInfo }}</el-descriptions-item>
+                <el-descriptions-item label="分辨率">{{ screenInfo }}</el-descriptions-item>
               </el-descriptions>
             </el-card>
           </div>
+
+          <div class="settings-actions">
+            <el-button @click="resetSettingsDraft">恢复默认</el-button>
+            <el-button type="primary" :loading="settingsSaving" @click="saveSettingsDraft">保存设置</el-button>
+          </div>
         </el-tab-pane>
+
 
         <el-tab-pane v-if="hasSystemTab('users')" label="用户管理" name="users">
           <div class="tab-toolbar">
@@ -405,6 +547,13 @@ import { getRoleList, getRoleMenuIds, updateRoleMenuIds, type RoleSummary } from
 import { createUser, deleteUser, getUserList, updateUser } from '../api/user'
 import type { User } from '../api/user'
 import { saveAuthMenus, type AuthMenuItem } from '../utils/auth-session'
+import {
+  DEFAULT_PLATFORM_SETTINGS,
+  getPlatformSettings,
+  resetPlatformSettings,
+  savePlatformSettings,
+  type PlatformSettings
+} from '../utils/platform-settings'
 
 type SystemTab = 'settings' | 'users' | 'roles' | 'menus' | 'audit' | 'loginLogs' | 'monitor'
 
@@ -596,6 +745,43 @@ const loginLogSearch = ref('')
 const loginActionFilter = ref<'ALL' | 'LOGIN_SUCCESS' | 'LOGIN_FAIL'>('ALL')
 
 const health = ref<{ status: string; service: string }>({ status: '', service: '' })
+
+// ─── 平台基础设置（品牌/主题/安全/数据默认） ─────────────────────────────────
+const PRIMARY_PRESETS = ['#4a7dff', '#1ec7c0', '#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#8b5cf6']
+const platformDraft = reactive<PlatformSettings>(JSON.parse(JSON.stringify(getPlatformSettings())))
+const settingsSaving = ref(false)
+
+const browserInfo = computed(() => {
+  if (typeof navigator === 'undefined') return '未知'
+  const ua = navigator.userAgent
+  const match = ua.match(/(Edg|Chrome|Firefox|Safari)\/([\d.]+)/)
+  return match ? `${match[1]} ${match[2].split('.')[0]}` : ua.slice(0, 40)
+})
+const screenInfo = computed(() => {
+  if (typeof window === 'undefined') return '未知'
+  return `${window.screen?.width ?? '?'} × ${window.screen?.height ?? '?'} @ ${window.devicePixelRatio || 1}x`
+})
+
+const saveSettingsDraft = async () => {
+  settingsSaving.value = true
+  try {
+    savePlatformSettings(JSON.parse(JSON.stringify(platformDraft)))
+    ElMessage.success('设置已保存，登录页与平台标识将同步更新')
+  } finally {
+    settingsSaving.value = false
+  }
+}
+const resetSettingsDraft = () => {
+  const fresh = resetPlatformSettings()
+  Object.assign(platformDraft.branding, fresh.branding)
+  Object.assign(platformDraft.security, fresh.security)
+  Object.assign(platformDraft.dataDefaults, fresh.dataDefaults)
+  platformDraft.themeMode = fresh.themeMode
+  platformDraft.primaryColor = fresh.primaryColor
+  ElMessage.info('已恢复为默认设置')
+}
+// 默认值占位，避免 TS 报未使用
+void DEFAULT_PLATFORM_SETTINGS
 
 const roleLabel = (role: string) => ({ ADMIN: '管理员', ANALYST: '分析师', VIEWER: '查看者' }[role] ?? role)
 const roleTagType = (role: string): '' | 'danger' | 'warning' | 'info' =>
@@ -1055,6 +1241,33 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* ── 基础设置增强 ── */
+.settings-card { border-radius: 12px; }
+.settings-card .card-title { font-size: 14px; font-weight: 600; color: #1f2d3d; }
+.settings-card .card-subtitle { font-size: 12px; color: #909399; margin-top: 4px; }
+.settings-form .el-form-item { margin-bottom: 14px; }
+.settings-form--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0 14px;
+}
+.color-row { display: flex; align-items: center; gap: 16px; }
+.color-presets { display: flex; gap: 8px; }
+.color-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  cursor: pointer; border: 2px solid transparent;
+  transition: transform .15s, border-color .15s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.color-dot:hover { transform: scale(1.15); }
+.color-dot.active { border-color: #1f2d3d; }
+.settings-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .role-layout {
