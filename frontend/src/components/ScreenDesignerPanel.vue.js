@@ -366,6 +366,7 @@ const localStaticTemplates = computed(() => BUILTIN_TEMPLATE_LIBRARY.map((item, 
 const templateAssets = computed(() => [...localStaticTemplates.value, ...templates.value]);
 const dashboardCounts = ref(new Map());
 const componentDataMap = shallowRef(new Map());
+const leftPanelRef = ref(null);
 const canvasRef = ref(null);
 const stageScrollRef = ref(null);
 const activeCompId = ref(null);
@@ -384,13 +385,13 @@ const assetType = ref('');
 const selectedChartId = ref(null);
 const selectedTemplateId = ref(null);
 const hoveredTemplateId = ref(null);
-const previewTemplateId = ref(null);
 const draggingTemplateId = ref(null);
 const draggingChartId = ref(null);
 const draggingTypeChip = ref(null);
 const stageDropActive = ref(false);
 const layerDragFromIdx = ref(null);
 const layerDragOverIdx = ref(null);
+const templatePreviewStyle = ref({ top: '0px', left: '0px' });
 const undoStack = ref([]);
 const undoApplying = ref(false);
 const canUndo = computed(() => undoStack.value.length > 0 && !undoApplying.value);
@@ -600,34 +601,54 @@ const filteredTemplates = computed(() => {
         return matchKeyword && matchType;
     });
 });
-const hoverTemplatePreview = (templateId) => {
+const TEMPLATE_PREVIEW_WIDTH = 220;
+const TEMPLATE_PREVIEW_HEIGHT = 248;
+const TEMPLATE_PREVIEW_OFFSET = 14;
+let templatePreviewHideTimer = null;
+const cancelHideTemplatePreview = () => {
+    if (templatePreviewHideTimer !== null) {
+        clearTimeout(templatePreviewHideTimer);
+        templatePreviewHideTimer = null;
+    }
+};
+const updateTemplatePreviewPosition = (anchorEl) => {
+    const panel = leftPanelRef.value;
+    if (!panel)
+        return;
+    const panelRect = panel.getBoundingClientRect();
+    const anchorRect = anchorEl.getBoundingClientRect();
+    const headBottom = panel.querySelector('.lp-head')?.getBoundingClientRect().bottom ?? panelRect.top;
+    const minTop = Math.max(12, headBottom - panelRect.top + 8);
+    const maxLeft = Math.max(12, panelRect.width - TEMPLATE_PREVIEW_WIDTH - 12);
+    const maxTop = Math.max(minTop, panelRect.height - TEMPLATE_PREVIEW_HEIGHT - 12);
+    const nextLeft = Math.min(Math.max(anchorRect.right - panelRect.left + TEMPLATE_PREVIEW_OFFSET, 12), maxLeft);
+    const nextTop = Math.min(Math.max(anchorRect.top - panelRect.top - 6, minTop), maxTop);
+    templatePreviewStyle.value = {
+        left: `${Math.round(nextLeft)}px`,
+        top: `${Math.round(nextTop)}px`,
+    };
+};
+const showTemplatePreview = (event, templateId) => {
+    cancelHideTemplatePreview();
     hoveredTemplateId.value = templateId;
-    previewTemplateId.value = templateId;
+    if (event.currentTarget instanceof HTMLElement) {
+        updateTemplatePreviewPosition(event.currentTarget);
+    }
 };
-const selectTemplatePreview = (templateId) => {
-    selectedTemplateId.value = templateId;
-    previewTemplateId.value = templateId;
+const scheduleHideTemplatePreview = () => {
+    cancelHideTemplatePreview();
+    templatePreviewHideTimer = window.setTimeout(() => {
+        hoveredTemplateId.value = null;
+        templatePreviewHideTimer = null;
+    }, 90);
 };
-const clearTemplatePreviewState = () => {
+const hideTemplatePreview = () => {
+    cancelHideTemplatePreview();
     hoveredTemplateId.value = null;
-    if (!selectedTemplateId.value)
-        previewTemplateId.value = null;
 };
 const selectedChartAsset = computed(() => charts.value.find((item) => item.id === selectedChartId.value) ?? null);
 const selectedTemplate = computed(() => templateAssets.value.find((item) => item.id === selectedTemplateId.value) ?? null);
-const previewTemplate = computed(() => filteredTemplates.value.find((item) => item.id === hoveredTemplateId.value)
-    ?? filteredTemplates.value.find((item) => item.id === selectedTemplateId.value)
-    ?? filteredTemplates.value.find((item) => item.id === previewTemplateId.value)
-    ?? null);
-const previewTemplateState = computed(() => {
-    if (hoveredTemplateId.value && previewTemplate.value?.id === hoveredTemplateId.value)
-        return '悬停预览';
-    if (selectedTemplateId.value && previewTemplate.value?.id === selectedTemplateId.value)
-        return '当前选中';
-    if (previewTemplateId.value && previewTemplate.value?.id === previewTemplateId.value)
-        return '最近浏览';
-    return '预览区';
-});
+const hoveredTemplate = computed(() => filteredTemplates.value.find((item) => item.id === hoveredTemplateId.value) ?? null);
 const selectedLibraryAsset = computed(() => libraryTab.value === 'templates' ? selectedTemplate.value : selectedChartAsset.value);
 const filteredDashboards = computed(() => {
     const keyword = dashboardSearch.value.trim().toLowerCase();
@@ -1870,7 +1891,6 @@ const saveActiveComponentAsAsset = async () => {
         });
         templates.value = [created, ...templates.value];
         selectedTemplateId.value = created.id;
-        previewTemplateId.value = created.id;
         libraryTab.value = 'templates';
         templateSaveVisible.value = false;
         ElMessage.success('组件已保存到组件库');
@@ -1899,7 +1919,7 @@ const quickAddChart = async (chart) => {
     await addChartToScreen(chart);
 };
 const quickAddTemplate = async (template) => {
-    selectTemplatePreview(template.id);
+    selectedTemplateId.value = template.id;
     await addTemplateToScreen(template);
 };
 const resolveDropPlacement = (width, height, point) => {
@@ -2009,7 +2029,8 @@ const confirmRemoveComponent = async (component) => {
     }
 };
 const onTemplateDragStart = (event, template) => {
-    selectTemplatePreview(template.id);
+    selectedTemplateId.value = template.id;
+    hideTemplatePreview();
     draggingTemplateId.value = template.id;
     draggingChartId.value = null;
     stageDropActive.value = true;
@@ -2170,6 +2191,10 @@ onBeforeUnmount(() => {
     if (sidebarHoverTimer !== null) {
         clearTimeout(sidebarHoverTimer);
         sidebarHoverTimer = null;
+    }
+    if (templatePreviewHideTimer !== null) {
+        clearTimeout(templatePreviewHideTimer);
+        templatePreviewHideTimer = null;
     }
 });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
@@ -2427,10 +2452,12 @@ if (__VLS_ctx.screenId) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
         ...{ onMouseenter: (__VLS_ctx.hoverExpandSidebar) },
         ...{ onMouseleave: (__VLS_ctx.hoverCollapseSidebar) },
+        ref: "leftPanelRef",
         ...{ class: "screen-left-panel" },
         ...{ class: ({ 'screen-left-panel--collapsed': __VLS_ctx.effectiveSidebarCollapsed }) },
         ...{ style: (__VLS_ctx.effectiveSidebarCollapsed ? {} : { width: __VLS_ctx.leftPanelWidth + 'px' }) },
     });
+    /** @type {typeof __VLS_ctx.leftPanelRef} */ ;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "lp-head" },
     });
@@ -2714,10 +2741,10 @@ if (__VLS_ctx.screenId) {
             ...{ class: "lp-library-note" },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ onMouseleave: (__VLS_ctx.clearTemplatePreviewState) },
             ...{ class: "lp-library-body" },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ onScroll: (__VLS_ctx.hideTemplatePreview) },
             ...{ class: "lp-asset-scroll" },
         });
         for (const [template] of __VLS_getVForSourceType((__VLS_ctx.filteredTemplates))) {
@@ -2727,22 +2754,16 @@ if (__VLS_ctx.screenId) {
                             return;
                         if (!(!__VLS_ctx.effectiveSidebarCollapsed))
                             return;
-                        __VLS_ctx.selectTemplatePreview(template.id);
+                        __VLS_ctx.selectedTemplateId = template.id;
                     } },
                 ...{ onMouseenter: (...[$event]) => {
                         if (!(__VLS_ctx.screenId))
                             return;
                         if (!(!__VLS_ctx.effectiveSidebarCollapsed))
                             return;
-                        __VLS_ctx.hoverTemplatePreview(template.id);
+                        __VLS_ctx.showTemplatePreview($event, template.id);
                     } },
-                ...{ onMouseleave: (...[$event]) => {
-                        if (!(__VLS_ctx.screenId))
-                            return;
-                        if (!(!__VLS_ctx.effectiveSidebarCollapsed))
-                            return;
-                        __VLS_ctx.hoveredTemplateId = null;
-                    } },
+                ...{ onMouseleave: (__VLS_ctx.scheduleHideTemplatePreview) },
                 ...{ onDblclick: (...[$event]) => {
                         if (!(__VLS_ctx.screenId))
                             return;
@@ -2830,116 +2851,6 @@ if (__VLS_ctx.screenId) {
                 description: "暂无匹配组件",
                 imageSize: (42),
             }, ...__VLS_functionalComponentArgsRest(__VLS_53));
-        }
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "lp-preview-panel" },
-            ...{ class: ({ 'lp-preview-panel--empty': !__VLS_ctx.previewTemplate }) },
-        });
-        if (__VLS_ctx.previewTemplate) {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-hover-preview" },
-            });
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-preview-status-row" },
-            });
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-                ...{ class: "lp-preview-state" },
-            });
-            (__VLS_ctx.previewTemplateState);
-            const __VLS_56 = {}.ElButton;
-            /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-            // @ts-ignore
-            const __VLS_57 = __VLS_asFunctionalComponent(__VLS_56, new __VLS_56({
-                ...{ 'onClick': {} },
-                link: true,
-                type: "primary",
-                size: "small",
-            }));
-            const __VLS_58 = __VLS_57({
-                ...{ 'onClick': {} },
-                link: true,
-                type: "primary",
-                size: "small",
-            }, ...__VLS_functionalComponentArgsRest(__VLS_57));
-            let __VLS_60;
-            let __VLS_61;
-            let __VLS_62;
-            const __VLS_63 = {
-                onClick: (...[$event]) => {
-                    if (!(__VLS_ctx.screenId))
-                        return;
-                    if (!(!__VLS_ctx.effectiveSidebarCollapsed))
-                        return;
-                    if (!(__VLS_ctx.previewTemplate))
-                        return;
-                    __VLS_ctx.quickAddTemplate(__VLS_ctx.previewTemplate);
-                }
-            };
-            __VLS_59.slots.default;
-            var __VLS_59;
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-hover-head" },
-            });
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-hover-title" },
-            });
-            (__VLS_ctx.previewTemplate.name);
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-hover-subtitle" },
-            });
-            (__VLS_ctx.chartTypeLabel(__VLS_ctx.previewTemplate.chartType));
-            (__VLS_ctx.getTemplateLayoutText(__VLS_ctx.previewTemplate));
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-                ...{ class: "lp-hover-pill" },
-            });
-            (__VLS_ctx.getAssetBadgeText(__VLS_ctx.previewTemplate.chartType));
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-hover-stage" },
-            });
-            if (__VLS_ctx.isTemplateStaticAsset(__VLS_ctx.previewTemplate)) {
-                /** @type {[typeof ComponentStaticPreview, ]} */ ;
-                // @ts-ignore
-                const __VLS_64 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
-                    chartType: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.previewTemplate).chart.chartType),
-                    chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.previewTemplate).chart),
-                    showTitle: (false),
-                    dark: true,
-                }));
-                const __VLS_65 = __VLS_64({
-                    chartType: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.previewTemplate).chart.chartType),
-                    chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.previewTemplate).chart),
-                    showTitle: (false),
-                    dark: true,
-                }, ...__VLS_functionalComponentArgsRest(__VLS_64));
-            }
-            else {
-                /** @type {[typeof ComponentTemplatePreview, ]} */ ;
-                // @ts-ignore
-                const __VLS_67 = __VLS_asFunctionalComponent(ComponentTemplatePreview, new ComponentTemplatePreview({
-                    chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.previewTemplate).chart),
-                    styleConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.previewTemplate).style),
-                }));
-                const __VLS_68 = __VLS_67({
-                    chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.previewTemplate).chart),
-                    styleConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.previewTemplate).style),
-                }, ...__VLS_functionalComponentArgsRest(__VLS_67));
-            }
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-hover-meta" },
-            });
-            (__VLS_ctx.previewTemplate.description || __VLS_ctx.summarizeTemplateConfig(__VLS_ctx.previewTemplate.configJson) || '拖入画布后继续配置样式和交互。');
-        }
-        else {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-preview-placeholder" },
-            });
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-preview-placeholder-title" },
-            });
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "lp-preview-placeholder-copy" },
-            });
         }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "lp-pane lp-pane--layers" },
@@ -3034,23 +2945,23 @@ if (__VLS_ctx.screenId) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ class: "lp-layer-actions" },
             });
-            const __VLS_70 = {}.ElButton;
+            const __VLS_56 = {}.ElButton;
             /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
             // @ts-ignore
-            const __VLS_71 = __VLS_asFunctionalComponent(__VLS_70, new __VLS_70({
+            const __VLS_57 = __VLS_asFunctionalComponent(__VLS_56, new __VLS_56({
                 ...{ 'onClick': {} },
                 link: true,
                 size: "small",
             }));
-            const __VLS_72 = __VLS_71({
+            const __VLS_58 = __VLS_57({
                 ...{ 'onClick': {} },
                 link: true,
                 size: "small",
-            }, ...__VLS_functionalComponentArgsRest(__VLS_71));
-            let __VLS_74;
-            let __VLS_75;
-            let __VLS_76;
-            const __VLS_77 = {
+            }, ...__VLS_functionalComponentArgsRest(__VLS_57));
+            let __VLS_60;
+            let __VLS_61;
+            let __VLS_62;
+            const __VLS_63 = {
                 onClick: (...[$event]) => {
                     if (!(__VLS_ctx.screenId))
                         return;
@@ -3059,22 +2970,120 @@ if (__VLS_ctx.screenId) {
                     __VLS_ctx.bringSpecificComponentToFront(component);
                 }
             };
-            __VLS_73.slots.default;
-            var __VLS_73;
+            __VLS_59.slots.default;
+            var __VLS_59;
         }
         if (!__VLS_ctx.components.length) {
-            const __VLS_78 = {}.ElEmpty;
+            const __VLS_64 = {}.ElEmpty;
             /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
             // @ts-ignore
-            const __VLS_79 = __VLS_asFunctionalComponent(__VLS_78, new __VLS_78({
+            const __VLS_65 = __VLS_asFunctionalComponent(__VLS_64, new __VLS_64({
                 description: "当前大屏还没有组件",
                 imageSize: (48),
             }));
-            const __VLS_80 = __VLS_79({
+            const __VLS_66 = __VLS_65({
                 description: "当前大屏还没有组件",
                 imageSize: (48),
+            }, ...__VLS_functionalComponentArgsRest(__VLS_65));
+        }
+    }
+    if (!__VLS_ctx.effectiveSidebarCollapsed && __VLS_ctx.hoveredTemplate) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ onMouseenter: (__VLS_ctx.cancelHideTemplatePreview) },
+            ...{ onMouseleave: (__VLS_ctx.hideTemplatePreview) },
+            ...{ class: "lp-preview-float" },
+            ...{ style: (__VLS_ctx.templatePreviewStyle) },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "lp-hover-preview" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "lp-preview-status-row" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "lp-preview-state" },
+        });
+        const __VLS_68 = {}.ElButton;
+        /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+        // @ts-ignore
+        const __VLS_69 = __VLS_asFunctionalComponent(__VLS_68, new __VLS_68({
+            ...{ 'onClick': {} },
+            link: true,
+            type: "primary",
+            size: "small",
+        }));
+        const __VLS_70 = __VLS_69({
+            ...{ 'onClick': {} },
+            link: true,
+            type: "primary",
+            size: "small",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_69));
+        let __VLS_72;
+        let __VLS_73;
+        let __VLS_74;
+        const __VLS_75 = {
+            onClick: (...[$event]) => {
+                if (!(__VLS_ctx.screenId))
+                    return;
+                if (!(!__VLS_ctx.effectiveSidebarCollapsed && __VLS_ctx.hoveredTemplate))
+                    return;
+                __VLS_ctx.quickAddTemplate(__VLS_ctx.hoveredTemplate);
+            }
+        };
+        __VLS_71.slots.default;
+        var __VLS_71;
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "lp-hover-head" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "lp-hover-title" },
+        });
+        (__VLS_ctx.hoveredTemplate.name);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "lp-hover-subtitle" },
+        });
+        (__VLS_ctx.chartTypeLabel(__VLS_ctx.hoveredTemplate.chartType));
+        (__VLS_ctx.getTemplateLayoutText(__VLS_ctx.hoveredTemplate));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "lp-hover-pill" },
+        });
+        (__VLS_ctx.getAssetBadgeText(__VLS_ctx.hoveredTemplate.chartType));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "lp-hover-stage" },
+        });
+        if (__VLS_ctx.isTemplateStaticAsset(__VLS_ctx.hoveredTemplate)) {
+            /** @type {[typeof ComponentStaticPreview, ]} */ ;
+            // @ts-ignore
+            const __VLS_76 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
+                chartType: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart.chartType),
+                chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart),
+                showTitle: (false),
+                dark: true,
+            }));
+            const __VLS_77 = __VLS_76({
+                chartType: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart.chartType),
+                chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart),
+                showTitle: (false),
+                dark: true,
+            }, ...__VLS_functionalComponentArgsRest(__VLS_76));
+        }
+        else {
+            /** @type {[typeof ComponentTemplatePreview, ]} */ ;
+            // @ts-ignore
+            const __VLS_79 = __VLS_asFunctionalComponent(ComponentTemplatePreview, new ComponentTemplatePreview({
+                chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart),
+                styleConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).style),
+            }));
+            const __VLS_80 = __VLS_79({
+                chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart),
+                styleConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).style),
             }, ...__VLS_functionalComponentArgsRest(__VLS_79));
         }
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "lp-hover-meta" },
+        });
+        (__VLS_ctx.hoveredTemplate.description || __VLS_ctx.summarizeTemplateConfig(__VLS_ctx.hoveredTemplate.configJson) || '拖入画布后继续配置样式和交互。');
     }
     if (!__VLS_ctx.effectiveSidebarCollapsed) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
@@ -5554,19 +5563,6 @@ var __VLS_602;
 /** @type {__VLS_StyleScopedClasses['lp-ac-subline']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-ac-size']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-ac-lite-badge']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-preview-panel']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-hover-preview']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-preview-status-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-preview-state']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-hover-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-hover-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-hover-subtitle']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-hover-pill']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-hover-stage']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-hover-meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-preview-placeholder']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-preview-placeholder-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['lp-preview-placeholder-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-pane']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-pane--layers']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-pane-head']} */ ;
@@ -5585,6 +5581,16 @@ var __VLS_602;
 /** @type {__VLS_StyleScopedClasses['lp-layer-name']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-preview-float']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-hover-preview']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-preview-status-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-preview-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-hover-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-hover-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-hover-subtitle']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-hover-pill']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-hover-stage']} */ ;
+/** @type {__VLS_StyleScopedClasses['lp-hover-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-resize-handle']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-sidebar']} */ ;
 /** @type {__VLS_StyleScopedClasses['side-panel']} */ ;
@@ -5766,6 +5772,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             components: components,
             templateAssets: templateAssets,
             componentDataMap: componentDataMap,
+            leftPanelRef: leftPanelRef,
             canvasRef: canvasRef,
             stageScrollRef: stageScrollRef,
             activeCompId: activeCompId,
@@ -5782,9 +5789,9 @@ const __VLS_self = (await import('vue')).defineComponent({
             assetType: assetType,
             selectedChartId: selectedChartId,
             selectedTemplateId: selectedTemplateId,
-            hoveredTemplateId: hoveredTemplateId,
             stageDropActive: stageDropActive,
             layerDragOverIdx: layerDragOverIdx,
+            templatePreviewStyle: templatePreviewStyle,
             undoApplying: undoApplying,
             canUndo: canUndo,
             createDashVisible: createDashVisible,
@@ -5803,11 +5810,11 @@ const __VLS_self = (await import('vue')).defineComponent({
             chartTypeOptions: chartTypeOptions,
             filteredCharts: filteredCharts,
             filteredTemplates: filteredTemplates,
-            hoverTemplatePreview: hoverTemplatePreview,
-            selectTemplatePreview: selectTemplatePreview,
-            clearTemplatePreviewState: clearTemplatePreviewState,
-            previewTemplate: previewTemplate,
-            previewTemplateState: previewTemplateState,
+            cancelHideTemplatePreview: cancelHideTemplatePreview,
+            showTemplatePreview: showTemplatePreview,
+            scheduleHideTemplatePreview: scheduleHideTemplatePreview,
+            hideTemplatePreview: hideTemplatePreview,
+            hoveredTemplate: hoveredTemplate,
             selectedLibraryAsset: selectedLibraryAsset,
             filteredDashboards: filteredDashboards,
             currentCoverConfig: currentCoverConfig,

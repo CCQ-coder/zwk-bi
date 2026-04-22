@@ -3,6 +3,7 @@
     <!-- 编辑器模式：可折叠左侧综合面板 -->
     <aside
       v-if="screenId"
+      ref="leftPanelRef"
       class="screen-left-panel"
       :class="{ 'screen-left-panel--collapsed': effectiveSidebarCollapsed }"
       :style="effectiveSidebarCollapsed ? {} : { width: leftPanelWidth + 'px' }"
@@ -99,17 +100,17 @@
               </div>
             </div>
 
-            <div class="lp-library-body" @mouseleave="clearTemplatePreviewState">
-              <div class="lp-asset-scroll">
+            <div class="lp-library-body">
+              <div class="lp-asset-scroll" @scroll="hideTemplatePreview">
                 <div
                   v-for="template in filteredTemplates"
                   :key="template.id"
                   class="lp-asset-card lp-asset-card--compact"
                   :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
                   draggable="true"
-                  @click="selectTemplatePreview(template.id)"
-                  @mouseenter="hoverTemplatePreview(template.id)"
-                  @mouseleave="hoveredTemplateId = null"
+                  @click="selectedTemplateId = template.id"
+                  @mouseenter="showTemplatePreview($event, template.id)"
+                  @mouseleave="scheduleHideTemplatePreview"
                   @dblclick="quickAddTemplate(template)"
                   @dragstart="onTemplateDragStart($event, template)"
                   @dragend="onTemplateDragEnd"
@@ -128,43 +129,6 @@
                 </div>
 
                 <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
-              </div>
-
-              <div class="lp-preview-panel" :class="{ 'lp-preview-panel--empty': !previewTemplate }">
-                <div v-if="previewTemplate" class="lp-hover-preview">
-                  <div class="lp-preview-status-row">
-                    <span class="lp-preview-state">{{ previewTemplateState }}</span>
-                    <el-button link type="primary" size="small" @click.stop="quickAddTemplate(previewTemplate)">加入画布</el-button>
-                  </div>
-                  <div class="lp-hover-head">
-                    <div>
-                      <div class="lp-hover-title">{{ previewTemplate.name }}</div>
-                      <div class="lp-hover-subtitle">{{ chartTypeLabel(previewTemplate.chartType) }} · {{ getTemplateLayoutText(previewTemplate) }}</div>
-                    </div>
-                    <span class="lp-hover-pill">{{ getAssetBadgeText(previewTemplate.chartType) }}</span>
-                  </div>
-
-                  <div class="lp-hover-stage">
-                    <ComponentStaticPreview
-                      v-if="isTemplateStaticAsset(previewTemplate)"
-                      :chart-type="getTemplateAssetConfig(previewTemplate).chart.chartType"
-                      :chart-config="getTemplateAssetConfig(previewTemplate).chart"
-                      :show-title="false"
-                      dark
-                    />
-                    <ComponentTemplatePreview
-                      v-else
-                      :chart-config="getTemplateAssetConfig(previewTemplate).chart"
-                      :style-config="getTemplateAssetConfig(previewTemplate).style"
-                    />
-                  </div>
-
-                  <div class="lp-hover-meta">{{ previewTemplate.description || summarizeTemplateConfig(previewTemplate.configJson) || '拖入画布后继续配置样式和交互。' }}</div>
-                </div>
-                <div v-else class="lp-preview-placeholder">
-                  <div class="lp-preview-placeholder-title">悬停预览</div>
-                  <div class="lp-preview-placeholder-copy">把鼠标移到组件上，或点击组件后在这里查看稳定预览。</div>
-                </div>
               </div>
             </div>
           </div>
@@ -212,6 +176,45 @@
 
             <el-empty v-if="!components.length" description="当前大屏还没有组件" :image-size="48" />
           </div>
+        </div>
+      </div>
+
+      <div
+        v-if="!effectiveSidebarCollapsed && hoveredTemplate"
+        class="lp-preview-float"
+        :style="templatePreviewStyle"
+        @mouseenter="cancelHideTemplatePreview"
+        @mouseleave="hideTemplatePreview"
+      >
+        <div class="lp-hover-preview">
+          <div class="lp-preview-status-row">
+            <span class="lp-preview-state">悬停预览</span>
+            <el-button link type="primary" size="small" @click.stop="quickAddTemplate(hoveredTemplate)">加入画布</el-button>
+          </div>
+          <div class="lp-hover-head">
+            <div>
+              <div class="lp-hover-title">{{ hoveredTemplate.name }}</div>
+              <div class="lp-hover-subtitle">{{ chartTypeLabel(hoveredTemplate.chartType) }} · {{ getTemplateLayoutText(hoveredTemplate) }}</div>
+            </div>
+            <span class="lp-hover-pill">{{ getAssetBadgeText(hoveredTemplate.chartType) }}</span>
+          </div>
+
+          <div class="lp-hover-stage">
+            <ComponentStaticPreview
+              v-if="isTemplateStaticAsset(hoveredTemplate)"
+              :chart-type="getTemplateAssetConfig(hoveredTemplate).chart.chartType"
+              :chart-config="getTemplateAssetConfig(hoveredTemplate).chart"
+              :show-title="false"
+              dark
+            />
+            <ComponentTemplatePreview
+              v-else
+              :chart-config="getTemplateAssetConfig(hoveredTemplate).chart"
+              :style-config="getTemplateAssetConfig(hoveredTemplate).style"
+            />
+          </div>
+
+          <div class="lp-hover-meta">{{ hoveredTemplate.description || summarizeTemplateConfig(hoveredTemplate.configJson) || '拖入画布后继续配置样式和交互。' }}</div>
         </div>
       </div>
 
@@ -1165,6 +1168,7 @@ const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LI
 const templateAssets = computed(() => [...localStaticTemplates.value, ...templates.value])
 const dashboardCounts = ref(new Map<number, number>())
 const componentDataMap = shallowRef(new Map<number, ChartDataResult>())
+const leftPanelRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLElement | null>(null)
 const stageScrollRef = ref<HTMLElement | null>(null)
 const activeCompId = ref<number | null>(null)
@@ -1184,13 +1188,13 @@ const assetType = ref('')
 const selectedChartId = ref<number | null>(null)
 const selectedTemplateId = ref<number | null>(null)
 const hoveredTemplateId = ref<number | null>(null)
-const previewTemplateId = ref<number | null>(null)
 const draggingTemplateId = ref<number | null>(null)
 const draggingChartId = ref<number | null>(null)
 const draggingTypeChip = ref<string | null>(null)
 const stageDropActive = ref(false)
 const layerDragFromIdx = ref<number | null>(null)
 const layerDragOverIdx = ref<number | null>(null)
+const templatePreviewStyle = ref<Record<string, string>>({ top: '0px', left: '0px' })
 
 interface ComponentLayoutSnapshot {
   posX: number
@@ -1437,35 +1441,59 @@ const filteredTemplates = computed(() => {
   })
 })
 
-const hoverTemplatePreview = (templateId: number) => {
+const TEMPLATE_PREVIEW_WIDTH = 220
+const TEMPLATE_PREVIEW_HEIGHT = 248
+const TEMPLATE_PREVIEW_OFFSET = 14
+let templatePreviewHideTimer: number | null = null
+
+const cancelHideTemplatePreview = () => {
+  if (templatePreviewHideTimer !== null) {
+    clearTimeout(templatePreviewHideTimer)
+    templatePreviewHideTimer = null
+  }
+}
+
+const updateTemplatePreviewPosition = (anchorEl: HTMLElement) => {
+  const panel = leftPanelRef.value
+  if (!panel) return
+  const panelRect = panel.getBoundingClientRect()
+  const anchorRect = anchorEl.getBoundingClientRect()
+  const headBottom = panel.querySelector('.lp-head')?.getBoundingClientRect().bottom ?? panelRect.top
+  const minTop = Math.max(12, headBottom - panelRect.top + 8)
+  const maxLeft = Math.max(12, panelRect.width - TEMPLATE_PREVIEW_WIDTH - 12)
+  const maxTop = Math.max(minTop, panelRect.height - TEMPLATE_PREVIEW_HEIGHT - 12)
+  const nextLeft = Math.min(Math.max(anchorRect.right - panelRect.left + TEMPLATE_PREVIEW_OFFSET, 12), maxLeft)
+  const nextTop = Math.min(Math.max(anchorRect.top - panelRect.top - 6, minTop), maxTop)
+  templatePreviewStyle.value = {
+    left: `${Math.round(nextLeft)}px`,
+    top: `${Math.round(nextTop)}px`,
+  }
+}
+
+const showTemplatePreview = (event: MouseEvent, templateId: number) => {
+  cancelHideTemplatePreview()
   hoveredTemplateId.value = templateId
-  previewTemplateId.value = templateId
+  if (event.currentTarget instanceof HTMLElement) {
+    updateTemplatePreviewPosition(event.currentTarget)
+  }
 }
 
-const selectTemplatePreview = (templateId: number) => {
-  selectedTemplateId.value = templateId
-  previewTemplateId.value = templateId
+const scheduleHideTemplatePreview = () => {
+  cancelHideTemplatePreview()
+  templatePreviewHideTimer = window.setTimeout(() => {
+    hoveredTemplateId.value = null
+    templatePreviewHideTimer = null
+  }, 90)
 }
 
-const clearTemplatePreviewState = () => {
+const hideTemplatePreview = () => {
+  cancelHideTemplatePreview()
   hoveredTemplateId.value = null
-  if (!selectedTemplateId.value) previewTemplateId.value = null
 }
 
 const selectedChartAsset = computed(() => charts.value.find((item) => item.id === selectedChartId.value) ?? null)
 const selectedTemplate = computed(() => templateAssets.value.find((item) => item.id === selectedTemplateId.value) ?? null)
-const previewTemplate = computed(() =>
-  filteredTemplates.value.find((item) => item.id === hoveredTemplateId.value)
-  ?? filteredTemplates.value.find((item) => item.id === selectedTemplateId.value)
-  ?? filteredTemplates.value.find((item) => item.id === previewTemplateId.value)
-  ?? null
-)
-const previewTemplateState = computed(() => {
-  if (hoveredTemplateId.value && previewTemplate.value?.id === hoveredTemplateId.value) return '悬停预览'
-  if (selectedTemplateId.value && previewTemplate.value?.id === selectedTemplateId.value) return '当前选中'
-  if (previewTemplateId.value && previewTemplate.value?.id === previewTemplateId.value) return '最近浏览'
-  return '预览区'
-})
+const hoveredTemplate = computed(() => filteredTemplates.value.find((item) => item.id === hoveredTemplateId.value) ?? null)
 const selectedLibraryAsset = computed(() => libraryTab.value === 'templates' ? selectedTemplate.value : selectedChartAsset.value)
 const filteredDashboards = computed(() => {
   const keyword = dashboardSearch.value.trim().toLowerCase()
@@ -2776,7 +2804,6 @@ const saveActiveComponentAsAsset = async () => {
     })
     templates.value = [created, ...templates.value]
     selectedTemplateId.value = created.id
-    previewTemplateId.value = created.id
     libraryTab.value = 'templates'
     templateSaveVisible.value = false
     ElMessage.success('组件已保存到组件库')
@@ -2807,7 +2834,7 @@ const quickAddChart = async (chart: Chart) => {
 }
 
 const quickAddTemplate = async (template: ChartTemplate) => {
-  selectTemplatePreview(template.id)
+  selectedTemplateId.value = template.id
   await addTemplateToScreen(template)
 }
 
@@ -2935,7 +2962,8 @@ const confirmRemoveComponent = async (component: DashboardComponent) => {
 }
 
 const onTemplateDragStart = (event: DragEvent, template: ChartTemplate) => {
-  selectTemplatePreview(template.id)
+  selectedTemplateId.value = template.id
+  hideTemplatePreview()
   draggingTemplateId.value = template.id
   draggingChartId.value = null
   stageDropActive.value = true
@@ -3106,6 +3134,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleWindowResize)
   disposeCharts()
   if (sidebarHoverTimer !== null) { clearTimeout(sidebarHoverTimer); sidebarHoverTimer = null }
+  if (templatePreviewHideTimer !== null) { clearTimeout(templatePreviewHideTimer); templatePreviewHideTimer = null }
 })
 </script>
 
@@ -4752,7 +4781,6 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
 .lp-asset-scroll {
@@ -4765,45 +4793,20 @@ onBeforeUnmount(() => {
   padding: 2px 2px 8px;
 }
 
-.lp-preview-panel {
-  flex: 0 0 auto;
-  min-width: 0;
-  min-height: 228px;
+.lp-preview-float {
+  position: absolute;
+  width: 220px;
+  min-width: 220px;
+  max-width: calc(100% - 24px);
+  z-index: 8;
   display: flex;
   flex-direction: column;
   gap: 10px;
   border-radius: 16px;
   border: 1px solid rgba(110,188,255,0.12);
   background: linear-gradient(180deg, rgba(10,19,31,0.98) 0%, rgba(8,15,24,0.98) 100%);
-  box-shadow: 0 20px 48px rgba(0,0,0,0.24);
-  padding: 10px 12px;
-}
-
-.lp-preview-panel--empty {
-  justify-content: center;
-}
-
-.lp-preview-placeholder {
-  min-height: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 8px;
-  padding: 6px 2px;
-}
-
-.lp-preview-placeholder-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(226,240,255,0.9);
-}
-
-.lp-preview-placeholder-copy {
-  font-size: 11px;
-  line-height: 1.7;
-  color: rgba(188,211,236,0.58);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.28);
+  padding: 12px;
 }
 
 .lp-preview-status-row {
