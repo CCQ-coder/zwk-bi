@@ -369,7 +369,9 @@ const componentDataMap = shallowRef(new Map());
 const leftPanelRef = ref(null);
 const canvasRef = ref(null);
 const stageScrollRef = ref(null);
+const stageScrollOffset = reactive({ left: 0, top: 0 });
 const activeCompId = ref(null);
+const selectedComponentIds = ref([]);
 const dashboardSearch = ref('');
 const shareVisible = ref(false);
 const publishVisible = ref(false);
@@ -391,6 +393,18 @@ const draggingTypeChip = ref(null);
 const stageDropActive = ref(false);
 const layerDragFromIdx = ref(null);
 const layerDragOverIdx = ref(null);
+const marqueeSelection = reactive({
+    visible: false,
+    startX: 0,
+    startY: 0,
+    currentX: 0,
+    currentY: 0,
+});
+const componentContextMenu = reactive({
+    visible: false,
+    x: 0,
+    y: 0,
+});
 const templatePreviewStyle = ref({ top: '0px', left: '0px' });
 const undoStack = ref([]);
 const undoApplying = ref(false);
@@ -668,6 +682,8 @@ const draftPublishedLink = computed(() => currentDashboard.value
     : '');
 const roleOptions = ['ADMIN', 'ANALYST', 'VIEWER'];
 const activeComponent = computed(() => components.value.find((item) => item.id === activeCompId.value) ?? null);
+const selectedComponentIdSet = computed(() => new Set(selectedComponentIds.value));
+const selectedStageComponents = computed(() => components.value.filter((item) => selectedComponentIdSet.value.has(item.id)));
 const activeChart = computed(() => activeComponent.value ? chartMap.value.get(activeComponent.value.chartId) ?? null : null);
 const _componentConfigCache = new Map();
 const getComponentConfig = (component) => {
@@ -701,6 +717,18 @@ const layeredComponents = computed(() => [...components.value].sort((left, right
         return zIndexDelta;
     return right.id - left.id;
 }));
+const marqueeStyle = computed(() => {
+    const left = Math.min(marqueeSelection.startX, marqueeSelection.currentX);
+    const top = Math.min(marqueeSelection.startY, marqueeSelection.currentY);
+    const width = Math.abs(marqueeSelection.currentX - marqueeSelection.startX);
+    const height = Math.abs(marqueeSelection.currentY - marqueeSelection.startY);
+    return {
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+    };
+});
 const currentCanvasConfig = computed(() => normalizeCanvasConfig(parseReportConfig(currentDashboard.value?.configJson).canvas, 'screen'));
 const matchedCanvasPreset = computed(() => SCREEN_CANVAS_PRESETS.find((item) => item.width === currentCanvasConfig.value.width && item.height === currentCanvasConfig.value.height)?.id ?? 'custom');
 // 背景版 presets + size controls
@@ -770,6 +798,16 @@ const vRulerMarks = computed(() => {
         marks.push(i);
     return marks;
 });
+const getHRulerMarkStyle = (mark) => ({
+    left: `${Math.round(mark + 20 - stageScrollOffset.left)}px`,
+});
+const getVRulerMarkStyle = (mark) => ({
+    top: `${Math.round(mark + 20 - stageScrollOffset.top)}px`,
+});
+const handleStageScroll = () => {
+    stageScrollOffset.left = stageScrollRef.value?.scrollLeft ?? 0;
+    stageScrollOffset.top = stageScrollRef.value?.scrollTop ?? 0;
+};
 const getCanvasWidth = () => Math.max(canvasRef.value?.clientWidth ?? currentCanvasConfig.value.width, MIN_CARD_WIDTH + 32);
 const setChartRef = (el, componentId) => {
     if (el)
@@ -860,6 +898,12 @@ const overlaySnapshotsEqual = (left, right) => (left.show === right.show
     && left.gradientEnd === right.gradientEnd
     && left.gradientAngle === right.gradientAngle
     && left.bgImage === right.bgImage);
+const getEditorCardPadding = (component) => {
+    if (isDecorationComponent(component))
+        return 0;
+    const padding = Number(getComponentConfig(component).style.padding ?? 0);
+    return Math.max(0, Math.min(padding, 6));
+};
 const getCardStyle = (component) => {
     const style = getComponentConfig(component).style;
     const shadow = style.shadowShow
@@ -876,7 +920,7 @@ const getCardStyle = (component) => {
         border: style.borderShow ? `${style.borderWidth}px solid ${style.borderColor}` : undefined,
         opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
         boxShadow: shadow,
-        padding: style.padding != null && style.padding > 0 ? `${style.padding}px` : undefined,
+        padding: getEditorCardPadding(component) > 0 ? `${getEditorCardPadding(component)}px` : undefined,
         transform: preview?.transform,
         transformOrigin: preview?.transformOrigin,
     };
@@ -1084,8 +1128,10 @@ const disposeCharts = () => {
 };
 const selectDashboard = async (dashboard) => {
     currentDashboard.value = dashboard;
+    selectedComponentIds.value = [];
     activeCompId.value = null;
     overlaySelected.value = false;
+    hideComponentContextMenu();
     clearUndoHistory();
     await loadComponents();
     loadOverlayFromConfig();
@@ -1107,6 +1153,8 @@ const loadComponents = async () => {
             return;
         result.forEach(normalizeLayout);
         components.value = result;
+        selectedComponentIds.value = [];
+        hideComponentContextMenu();
         dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, result.length);
         await nextTick();
         const observerReady = setupComponentVisibilityObserver();
@@ -1205,20 +1253,150 @@ const setStageCardRef = (el, componentId) => {
     componentVisibilityObserver?.observe(el);
 };
 const getMaxZ = () => components.value.reduce((max, item) => Math.max(max, item.zIndex ?? 0), 0);
-const focusComponent = (component) => {
+const isComponentSelected = (componentId) => selectedComponentIdSet.value.has(componentId);
+const normalizeSelectedComponentIds = (componentIds) => {
+    const availableIds = new Set(components.value.map((item) => item.id));
+    return Array.from(new Set(componentIds)).filter((id) => availableIds.has(id));
+};
+const setSelectedComponents = (componentIds, primaryId = componentIds.at(-1) ?? null) => {
+    const nextIds = normalizeSelectedComponentIds(componentIds);
+    selectedComponentIds.value = nextIds;
     overlaySelected.value = false;
-    activeCompId.value = component.id;
+    activeCompId.value = primaryId !== null && nextIds.includes(primaryId)
+        ? primaryId
+        : nextIds.at(-1) ?? null;
+};
+const clearComponentSelection = () => {
+    selectedComponentIds.value = [];
+    activeCompId.value = null;
+    overlaySelected.value = false;
+};
+const hideComponentContextMenu = () => {
+    componentContextMenu.visible = false;
+};
+const resetMarqueeSelection = () => {
+    marqueeSelection.visible = false;
+    marqueeSelection.startX = 0;
+    marqueeSelection.startY = 0;
+    marqueeSelection.currentX = 0;
+    marqueeSelection.currentY = 0;
+};
+const getCanvasPointerPosition = (event) => {
+    const rect = canvasRef.value?.getBoundingClientRect();
+    const scale = canvasScale.value || 1;
+    if (!rect)
+        return { x: 0, y: 0 };
+    return {
+        x: Math.max(0, Math.min(canvasWorkWidth.value, Math.round((event.clientX - rect.left) / scale))),
+        y: Math.max(0, Math.min(canvasMinHeight.value, Math.round((event.clientY - rect.top) / scale))),
+    };
+};
+const collectComponentsInMarquee = () => {
+    const left = Math.min(marqueeSelection.startX, marqueeSelection.currentX);
+    const right = Math.max(marqueeSelection.startX, marqueeSelection.currentX);
+    const top = Math.min(marqueeSelection.startY, marqueeSelection.currentY);
+    const bottom = Math.max(marqueeSelection.startY, marqueeSelection.currentY);
+    return components.value
+        .filter((component) => component.posX < right
+        && component.posX + component.width > left
+        && component.posY < bottom
+        && component.posY + component.height > top)
+        .map((component) => component.id);
+};
+const startStageMarquee = (event, options = {}) => {
+    if (event.button !== 0)
+        return;
+    hideComponentContextMenu();
+    const start = getCanvasPointerPosition(event);
+    marqueeSelection.startX = start.x;
+    marqueeSelection.startY = start.y;
+    marqueeSelection.currentX = start.x;
+    marqueeSelection.currentY = start.y;
+    marqueeSelection.visible = false;
+    let didDrag = false;
+    const onMove = (nextEvent) => {
+        const next = getCanvasPointerPosition(nextEvent);
+        marqueeSelection.currentX = next.x;
+        marqueeSelection.currentY = next.y;
+        if (!didDrag && (Math.abs(next.x - start.x) > 4 || Math.abs(next.y - start.y) > 4)) {
+            didDrag = true;
+            marqueeSelection.visible = true;
+        }
+        if (!didDrag)
+            return;
+        setSelectedComponents(collectComponentsInMarquee());
+    };
+    const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        if (!didDrag) {
+            if (options.selectOverlayOnClick) {
+                selectOverlayLayer();
+            }
+            else {
+                clearComponentSelection();
+            }
+        }
+        resetMarqueeSelection();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+};
+const handleCurtainPointerDown = (event) => {
+    if (event.button !== 0)
+        return;
+    hideComponentContextMenu();
+    if (overlaySelected.value) {
+        startCurtainDrag(event);
+        return;
+    }
+    startStageMarquee(event, { selectOverlayOnClick: true });
+};
+const focusComponent = (component, options = {}) => {
+    const preserveSelection = options.preserveSelection === true && isComponentSelected(component.id);
+    if (preserveSelection) {
+        overlaySelected.value = false;
+        activeCompId.value = component.id;
+    }
+    else {
+        setSelectedComponents([component.id], component.id);
+    }
+    if (options.bringToFront === false)
+        return;
     const nextZ = getMaxZ() + 1;
     if ((component.zIndex ?? 0) < nextZ)
         component.zIndex = nextZ;
 };
 const selectOverlayLayer = () => {
     overlaySelected.value = true;
+    selectedComponentIds.value = [];
     activeCompId.value = null;
+    hideComponentContextMenu();
 };
 const selectLayerComponent = (component) => {
-    overlaySelected.value = false;
-    activeCompId.value = component.id;
+    hideComponentContextMenu();
+    setSelectedComponents([component.id], component.id);
+};
+const handleStageCardMouseDown = (event, component) => {
+    hideComponentContextMenu();
+    if (event.button !== 0)
+        return;
+    const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id);
+    focusComponent(component, { preserveSelection, bringToFront: !preserveSelection });
+};
+const openComponentContextMenu = (event, component) => {
+    if (!isComponentSelected(component.id)) {
+        setSelectedComponents([component.id], component.id);
+    }
+    else {
+        overlaySelected.value = false;
+        activeCompId.value = component.id;
+    }
+    const menuWidth = 176;
+    const menuHeight = 236;
+    componentContextMenu.x = Math.max(12, Math.min(event.clientX, window.innerWidth - menuWidth - 12));
+    componentContextMenu.y = Math.max(12, Math.min(event.clientY, window.innerHeight - menuHeight - 12));
+    componentContextMenu.visible = true;
 };
 const buildPatchedLayoutSnapshot = (component, patch) => {
     const next = cloneComponentLayout(component);
@@ -1259,6 +1437,145 @@ const bringComponentToFront = async () => {
 const bringSpecificComponentToFront = async (component) => {
     selectLayerComponent(component);
     await applyLayoutPatch({ zIndex: getMaxZ() + 1 });
+};
+const buildZOrderedComponents = () => [...components.value].sort((left, right) => {
+    const zDelta = (left.zIndex ?? 0) - (right.zIndex ?? 0);
+    if (zDelta !== 0)
+        return zDelta;
+    return left.id - right.id;
+});
+const applyOrderedZIndices = async (orderedComponents) => {
+    const persistPromises = [];
+    orderedComponents.forEach((component, index) => {
+        const nextZ = index + 2;
+        if ((component.zIndex ?? 0) === nextZ)
+            return;
+        component.zIndex = nextZ;
+        persistPromises.push(persistLayout(component, cloneComponentLayout(component)));
+    });
+    if (persistPromises.length) {
+        await Promise.all(persistPromises);
+    }
+};
+const getSelectedComponentsForAction = () => {
+    if (selectedStageComponents.value.length)
+        return [...selectedStageComponents.value];
+    return activeComponent.value ? [activeComponent.value] : [];
+};
+const bringSelectedComponentsToFront = async () => {
+    const selected = getSelectedComponentsForAction();
+    hideComponentContextMenu();
+    if (!selected.length)
+        return;
+    const selectedIds = new Set(selected.map((component) => component.id));
+    const ordered = buildZOrderedComponents();
+    const nextOrdered = [
+        ...ordered.filter((component) => !selectedIds.has(component.id)),
+        ...ordered.filter((component) => selectedIds.has(component.id)),
+    ];
+    await applyOrderedZIndices(nextOrdered);
+};
+const sendSelectedComponentsToBack = async () => {
+    const selected = getSelectedComponentsForAction();
+    hideComponentContextMenu();
+    if (!selected.length)
+        return;
+    const selectedIds = new Set(selected.map((component) => component.id));
+    const ordered = buildZOrderedComponents();
+    const nextOrdered = [
+        ...ordered.filter((component) => selectedIds.has(component.id)),
+        ...ordered.filter((component) => !selectedIds.has(component.id)),
+    ];
+    await applyOrderedZIndices(nextOrdered);
+};
+const moveSelectedComponentsForward = async () => {
+    const selected = getSelectedComponentsForAction();
+    hideComponentContextMenu();
+    if (!selected.length)
+        return;
+    const selectedIds = new Set(selected.map((component) => component.id));
+    const ordered = buildZOrderedComponents();
+    for (let index = ordered.length - 2; index >= 0; index -= 1) {
+        if (selectedIds.has(ordered[index].id) && !selectedIds.has(ordered[index + 1].id)) {
+            ;
+            [ordered[index], ordered[index + 1]] = [ordered[index + 1], ordered[index]];
+        }
+    }
+    await applyOrderedZIndices(ordered);
+};
+const moveSelectedComponentsBackward = async () => {
+    const selected = getSelectedComponentsForAction();
+    hideComponentContextMenu();
+    if (!selected.length)
+        return;
+    const selectedIds = new Set(selected.map((component) => component.id));
+    const ordered = buildZOrderedComponents();
+    for (let index = 1; index < ordered.length; index += 1) {
+        if (selectedIds.has(ordered[index].id) && !selectedIds.has(ordered[index - 1].id)) {
+            ;
+            [ordered[index], ordered[index - 1]] = [ordered[index - 1], ordered[index]];
+        }
+    }
+    await applyOrderedZIndices(ordered);
+};
+const duplicateSelectedComponents = async () => {
+    if (!currentDashboard.value)
+        return;
+    const selected = getSelectedComponentsForAction();
+    hideComponentContextMenu();
+    if (!selected.length)
+        return;
+    const nextSelectedIds = [];
+    for (const [index, component] of selected.entries()) {
+        const duplicated = await addDashboardComponent(currentDashboard.value.id, {
+            chartId: component.chartId,
+            posX: component.posX + 24 * (index + 1),
+            posY: component.posY + 24 * (index + 1),
+            width: component.width,
+            height: component.height,
+            zIndex: getMaxZ() + 1,
+            configJson: component.configJson ?? '',
+        });
+        normalizeLayout(duplicated);
+        components.value.push(duplicated);
+        nextSelectedIds.push(duplicated.id);
+        pushUndoEntry({ type: 'add-component', component: cloneComponentSnapshot(duplicated) });
+    }
+    dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length);
+    setSelectedComponents(nextSelectedIds, nextSelectedIds.at(-1) ?? null);
+    await nextTick();
+    await Promise.all(nextSelectedIds.map(async (componentId) => {
+        const duplicated = components.value.find((item) => item.id === componentId);
+        if (!duplicated)
+            return;
+        await loadComponentData(duplicated);
+    }));
+    ElMessage.success(nextSelectedIds.length > 1 ? `已复制 ${nextSelectedIds.length} 个组件` : '组件已复制');
+};
+const removeSelectedComponents = async () => {
+    const selected = getSelectedComponentsForAction();
+    hideComponentContextMenu();
+    if (!selected.length)
+        return;
+    const message = selected.length > 1
+        ? `确定删除当前选中的 ${selected.length} 个组件吗？`
+        : `确定删除组件「${getComponentDisplayName(selected[0])}」吗？`;
+    try {
+        await ElMessageBox.confirm(message, '删除组件', {
+            confirmButtonText: '删除',
+            cancelButtonText: '取消',
+            type: 'warning',
+            draggable: true,
+        });
+        for (const component of selected) {
+            await removeComponent(component.id, { silent: true });
+        }
+        clearComponentSelection();
+        ElMessage.success(selected.length > 1 ? `已删除 ${selected.length} 个组件` : '组件已移除');
+    }
+    catch {
+        // 用户取消删除
+    }
 };
 const handleRemoveActiveComponent = async () => {
     if (!activeComponent.value)
@@ -1320,6 +1637,26 @@ const getResizeTransformOrigin = (handle) => {
     const vertical = handle.includes('n') ? 'bottom' : handle.includes('s') ? 'top' : 'center';
     return `${horizontal} ${vertical}`;
 };
+const interactionGuideLines = computed(() => {
+    const preview = interactionPreview.value;
+    if (!preview) {
+        return { vertical: [], horizontal: [] };
+    }
+    const vertical = [
+        Math.round(preview.nextX),
+        Math.round(preview.nextX + preview.nextWidth / 2),
+        Math.round(preview.nextX + preview.nextWidth),
+    ];
+    const horizontal = [
+        Math.round(preview.nextY),
+        Math.round(preview.nextY + preview.nextHeight / 2),
+        Math.round(preview.nextY + preview.nextHeight),
+    ];
+    return {
+        vertical: Array.from(new Set(vertical)).filter((line) => line >= 0 && line <= canvasWorkWidth.value),
+        horizontal: Array.from(new Set(horizontal)).filter((line) => line >= 0 && line <= canvasMinHeight.value),
+    };
+});
 const applyInteractionFrame = () => {
     interactionFrame = null;
     if (!interaction || !pendingPointer)
@@ -1392,8 +1729,10 @@ const cleanupInteractionFrame = () => {
     document.body.classList.remove('canvas-interacting');
 };
 const startDrag = (event, component) => {
+    hideComponentContextMenu();
     const startZIndex = component.zIndex ?? 0;
-    focusComponent(component);
+    const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id);
+    focusComponent(component, { preserveSelection, bringToFront: !preserveSelection });
     interaction = {
         mode: 'move',
         compId: component.id,
@@ -1411,8 +1750,10 @@ const startDrag = (event, component) => {
     document.addEventListener('mouseup', onPointerUp);
 };
 const startResize = (event, component, handle = 'se') => {
+    hideComponentContextMenu();
     const startZIndex = component.zIndex ?? 0;
-    focusComponent(component);
+    const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id);
+    focusComponent(component, { preserveSelection, bringToFront: !preserveSelection });
     interaction = {
         mode: 'resize',
         compId: component.id,
@@ -1966,7 +2307,7 @@ const addChartToScreen = async (chart, configJson, size, point, options = {}) =>
     });
     normalizeLayout(component);
     components.value.push(component);
-    activeCompId.value = component.id;
+    setSelectedComponents([component.id], component.id);
     dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length);
     await nextTick();
     await loadComponentData(component);
@@ -2007,8 +2348,10 @@ const removeComponent = async (componentId, options = {}) => {
     disposeChartInstance(componentId);
     deleteComponentData(componentId);
     components.value = components.value.filter((item) => item.id !== componentId);
-    if (activeCompId.value === componentId)
-        activeCompId.value = null;
+    selectedComponentIds.value = selectedComponentIds.value.filter((id) => id !== componentId);
+    if (activeCompId.value === componentId) {
+        activeCompId.value = selectedComponentIds.value.at(-1) ?? null;
+    }
     dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length);
     if (snapshot && options.trackUndo !== false) {
         pushUndoEntry({ type: 'remove-component', component: cloneComponentSnapshot(snapshot) });
@@ -2179,13 +2522,17 @@ const handleWindowResize = () => {
     scheduleCanvasFit();
 };
 onMounted(async () => {
+    document.addEventListener('mousedown', hideComponentContextMenu);
     window.addEventListener('resize', handleWindowResize);
     handleWindowResize();
     await loadBaseData();
+    await nextTick();
+    handleStageScroll();
 });
 onBeforeUnmount(() => {
     componentDataLoadToken += 1;
     disposeComponentVisibilityObserver();
+    document.removeEventListener('mousedown', hideComponentContextMenu);
     document.removeEventListener('mousemove', onPointerMove);
     document.removeEventListener('mouseup', onPointerUp);
     cleanupInteractionFrame();
@@ -2235,12 +2582,22 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['screen-stage-scroll']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-stage--capturing']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-stage--capturing']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-stage--capturing']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-stage--capturing']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-stage--capturing']} */ ;
 /** @type {__VLS_StyleScopedClasses['curtain-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-stage--capturing']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-curtain--selected']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['active']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-card--selected']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-marquee']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-card-header']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-card-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['active']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card-header']} */ ;
@@ -2343,10 +2700,6 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['screen-root--quiet']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-root--quiet']} */ ;
-/** @type {__VLS_StyleScopedClasses['canvas-ruler-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['screen-root--quiet']} */ ;
-/** @type {__VLS_StyleScopedClasses['ruler-v-strip']} */ ;
-/** @type {__VLS_StyleScopedClasses['screen-root--quiet']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-card-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-root--quiet']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-inspector']} */ ;
@@ -2436,6 +2789,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['lp-hover-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-order-tip']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu__item']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-drag-handle']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-layer-meta']} */ ;
@@ -2924,9 +3278,16 @@ if (__VLS_ctx.screenId) {
                             return;
                         __VLS_ctx.selectLayerComponent(component);
                     } },
+                ...{ onContextmenu: (...[$event]) => {
+                        if (!(__VLS_ctx.screenId))
+                            return;
+                        if (!(!__VLS_ctx.effectiveSidebarCollapsed))
+                            return;
+                        __VLS_ctx.openComponentContextMenu($event, component);
+                    } },
                 key: (component.id),
                 ...{ class: "lp-layer-item" },
-                ...{ class: ({ 'lp-layer-item--active': __VLS_ctx.activeCompId === component.id, 'lp-layer-item--drag-over': __VLS_ctx.layerDragOverIdx === layerIdx }) },
+                ...{ class: ({ 'lp-layer-item--active': __VLS_ctx.isComponentSelected(component.id), 'lp-layer-item--drag-over': __VLS_ctx.layerDragOverIdx === layerIdx }) },
                 draggable: "true",
             });
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -4070,20 +4431,38 @@ else {
     __VLS_325.slots.default;
     var __VLS_325;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "canvas-ruler-row" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
+        ...{ class: "ruler-corner" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "ruler-h-strip" },
+    });
+    for (const [mark] of __VLS_getVForSourceType((__VLS_ctx.hRulerMarks))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            key: (mark),
+            ...{ class: "ruler-h-mark" },
+            ...{ style: (__VLS_ctx.getHRulerMarkStyle(mark)) },
+        });
+        (mark);
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "canvas-main-row" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "ruler-v-strip" },
     });
-    for (const [m] of __VLS_getVForSourceType((__VLS_ctx.vRulerMarks))) {
+    for (const [mark] of __VLS_getVForSourceType((__VLS_ctx.vRulerMarks))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-            key: (m),
+            key: (mark),
             ...{ class: "ruler-v-mark" },
-            ...{ style: ({ top: m + 'px' }) },
+            ...{ style: (__VLS_ctx.getVRulerMarkStyle(mark)) },
         });
-        (m);
+        (mark);
     }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onScroll: (__VLS_ctx.handleStageScroll) },
         ref: "stageScrollRef",
         ...{ class: "screen-stage-scroll" },
     });
@@ -4092,11 +4471,12 @@ else {
         ...{ onDragover: (__VLS_ctx.onStageDragOver) },
         ...{ onDragleave: (__VLS_ctx.onStageDragLeave) },
         ...{ onDrop: (__VLS_ctx.onStageDrop) },
-        ...{ onClick: (...[$event]) => {
+        ...{ onMousedown: (...[$event]) => {
                 if (!!(!__VLS_ctx.currentDashboard))
                     return;
-                __VLS_ctx.overlaySelected = false;
+                __VLS_ctx.startStageMarquee($event);
             } },
+        ...{ onContextmenu: (__VLS_ctx.hideComponentContextMenu) },
         ref: "canvasRef",
         ...{ class: "screen-stage" },
         ...{ class: ({ 'screen-stage--drop': __VLS_ctx.stageDropActive, 'screen-stage--capturing': __VLS_ctx.capturingCover }) },
@@ -4110,15 +4490,7 @@ else {
                         return;
                     if (!(__VLS_ctx.overlayConfig.show))
                         return;
-                    __VLS_ctx.startCurtainDrag($event);
-                } },
-            ...{ onClick: (...[$event]) => {
-                    if (!!(!__VLS_ctx.currentDashboard))
-                        return;
-                    if (!(__VLS_ctx.overlayConfig.show))
-                        return;
-                    __VLS_ctx.overlaySelected = true;
-                    __VLS_ctx.activeCompId = null;
+                    __VLS_ctx.handleCurtainPointerDown($event);
                 } },
             ...{ class: "canvas-curtain" },
             ...{ class: ({ 'canvas-curtain--selected': __VLS_ctx.overlaySelected }) },
@@ -4215,13 +4587,19 @@ else {
             ...{ onMousedown: (...[$event]) => {
                     if (!!(!__VLS_ctx.currentDashboard))
                         return;
-                    __VLS_ctx.focusComponent(component);
+                    __VLS_ctx.handleStageCardMouseDown($event, component);
+                } },
+            ...{ onContextmenu: (...[$event]) => {
+                    if (!!(!__VLS_ctx.currentDashboard))
+                        return;
+                    __VLS_ctx.openComponentContextMenu($event, component);
                 } },
             key: (component.id),
             ref: ((el) => __VLS_ctx.setStageCardRef(el, component.id)),
             ...{ class: "stage-card" },
             ...{ class: ({
                     active: __VLS_ctx.activeCompId === component.id,
+                    'stage-card--selected': __VLS_ctx.isComponentSelected(component.id),
                     'stage-card--decoration': __VLS_ctx.isDecorationComponent(component),
                     'stage-card--static': __VLS_ctx.isStaticWidget(component) && !__VLS_ctx.isDecorationComponent(component),
                     'stage-card--data': !__VLS_ctx.isStaticWidget(component),
@@ -4522,6 +4900,28 @@ else {
                 } },
             ...{ class: "resize-handle resize-handle--sw" },
         });
+    }
+    if (__VLS_ctx.marqueeSelection.visible) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
+            ...{ class: "stage-marquee" },
+            ...{ style: (__VLS_ctx.marqueeStyle) },
+        });
+    }
+    if (__VLS_ctx.interactionGuideLines.vertical.length || __VLS_ctx.interactionGuideLines.horizontal.length) {
+        for (const [line] of __VLS_getVForSourceType((__VLS_ctx.interactionGuideLines.vertical))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+                key: (`v-${line}`),
+                ...{ class: "stage-guide stage-guide--vertical" },
+                ...{ style: ({ left: `${line}px` }) },
+            });
+        }
+        for (const [line] of __VLS_getVForSourceType((__VLS_ctx.interactionGuideLines.horizontal))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
+                key: (`h-${line}`),
+                ...{ class: "stage-guide stage-guide--horizontal" },
+                ...{ style: ({ top: `${line}px` }) },
+            });
+        }
     }
     if (!__VLS_ctx.components.length) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -5072,238 +5472,290 @@ if (!__VLS_ctx.inspectorCollapsed) {
         var __VLS_506;
     }
 }
-const __VLS_515 = {}.ElDialog;
-/** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
+const __VLS_515 = {}.teleport;
+/** @type {[typeof __VLS_components.Teleport, typeof __VLS_components.teleport, typeof __VLS_components.Teleport, typeof __VLS_components.teleport, ]} */ ;
 // @ts-ignore
 const __VLS_516 = __VLS_asFunctionalComponent(__VLS_515, new __VLS_515({
-    modelValue: (__VLS_ctx.createDashVisible),
-    title: "新建数据大屏",
-    width: "420px",
-    destroyOnClose: true,
+    to: "body",
 }));
 const __VLS_517 = __VLS_516({
+    to: "body",
+}, ...__VLS_functionalComponentArgsRest(__VLS_516));
+__VLS_518.slots.default;
+if (__VLS_ctx.componentContextMenu.visible) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onMousedown: () => { } },
+        ...{ onContextmenu: () => { } },
+        ...{ class: "screen-context-menu" },
+        ...{ style: ({ left: `${__VLS_ctx.componentContextMenu.x}px`, top: `${__VLS_ctx.componentContextMenu.y}px` }) },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.bringSelectedComponentsToFront) },
+        type: "button",
+        ...{ class: "screen-context-menu__item" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.sendSelectedComponentsToBack) },
+        type: "button",
+        ...{ class: "screen-context-menu__item" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.moveSelectedComponentsForward) },
+        type: "button",
+        ...{ class: "screen-context-menu__item" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.moveSelectedComponentsBackward) },
+        type: "button",
+        ...{ class: "screen-context-menu__item" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
+        ...{ class: "screen-context-menu__divider" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.duplicateSelectedComponents) },
+        type: "button",
+        ...{ class: "screen-context-menu__item" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.removeSelectedComponents) },
+        type: "button",
+        ...{ class: "screen-context-menu__item screen-context-menu__item--danger" },
+    });
+}
+var __VLS_518;
+const __VLS_519 = {}.ElDialog;
+/** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
+// @ts-ignore
+const __VLS_520 = __VLS_asFunctionalComponent(__VLS_519, new __VLS_519({
     modelValue: (__VLS_ctx.createDashVisible),
     title: "新建数据大屏",
     width: "420px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_516));
-__VLS_518.slots.default;
-const __VLS_519 = {}.ElForm;
-/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
-// @ts-ignore
-const __VLS_520 = __VLS_asFunctionalComponent(__VLS_519, new __VLS_519({
-    model: (__VLS_ctx.dashForm),
-    labelWidth: "80px",
 }));
 const __VLS_521 = __VLS_520({
-    model: (__VLS_ctx.dashForm),
-    labelWidth: "80px",
+    modelValue: (__VLS_ctx.createDashVisible),
+    title: "新建数据大屏",
+    width: "420px",
+    destroyOnClose: true,
 }, ...__VLS_functionalComponentArgsRest(__VLS_520));
 __VLS_522.slots.default;
-const __VLS_523 = {}.ElFormItem;
-/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
+const __VLS_523 = {}.ElForm;
+/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
 const __VLS_524 = __VLS_asFunctionalComponent(__VLS_523, new __VLS_523({
-    label: "名称",
+    model: (__VLS_ctx.dashForm),
+    labelWidth: "80px",
 }));
 const __VLS_525 = __VLS_524({
-    label: "名称",
+    model: (__VLS_ctx.dashForm),
+    labelWidth: "80px",
 }, ...__VLS_functionalComponentArgsRest(__VLS_524));
 __VLS_526.slots.default;
-const __VLS_527 = {}.ElInput;
-/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+const __VLS_527 = {}.ElFormItem;
+/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
 const __VLS_528 = __VLS_asFunctionalComponent(__VLS_527, new __VLS_527({
+    label: "名称",
+}));
+const __VLS_529 = __VLS_528({
+    label: "名称",
+}, ...__VLS_functionalComponentArgsRest(__VLS_528));
+__VLS_530.slots.default;
+const __VLS_531 = {}.ElInput;
+/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+// @ts-ignore
+const __VLS_532 = __VLS_asFunctionalComponent(__VLS_531, new __VLS_531({
     modelValue: (__VLS_ctx.dashForm.name),
     placeholder: "请输入大屏名称",
 }));
-const __VLS_529 = __VLS_528({
+const __VLS_533 = __VLS_532({
     modelValue: (__VLS_ctx.dashForm.name),
     placeholder: "请输入大屏名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_528));
+}, ...__VLS_functionalComponentArgsRest(__VLS_532));
+var __VLS_530;
 var __VLS_526;
-var __VLS_522;
 {
-    const { footer: __VLS_thisSlot } = __VLS_518.slots;
-    const __VLS_531 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_522.slots;
+    const __VLS_535 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_532 = __VLS_asFunctionalComponent(__VLS_531, new __VLS_531({
+    const __VLS_536 = __VLS_asFunctionalComponent(__VLS_535, new __VLS_535({
         ...{ 'onClick': {} },
     }));
-    const __VLS_533 = __VLS_532({
+    const __VLS_537 = __VLS_536({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_532));
-    let __VLS_535;
-    let __VLS_536;
-    let __VLS_537;
-    const __VLS_538 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_536));
+    let __VLS_539;
+    let __VLS_540;
+    let __VLS_541;
+    const __VLS_542 = {
         onClick: (...[$event]) => {
             __VLS_ctx.createDashVisible = false;
         }
     };
-    __VLS_534.slots.default;
-    var __VLS_534;
-    const __VLS_539 = {}.ElButton;
+    __VLS_538.slots.default;
+    var __VLS_538;
+    const __VLS_543 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_540 = __VLS_asFunctionalComponent(__VLS_539, new __VLS_539({
+    const __VLS_544 = __VLS_asFunctionalComponent(__VLS_543, new __VLS_543({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.dashSaving),
     }));
-    const __VLS_541 = __VLS_540({
+    const __VLS_545 = __VLS_544({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.dashSaving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_540));
-    let __VLS_543;
-    let __VLS_544;
-    let __VLS_545;
-    const __VLS_546 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_544));
+    let __VLS_547;
+    let __VLS_548;
+    let __VLS_549;
+    const __VLS_550 = {
         onClick: (__VLS_ctx.handleCreateDashboard)
     };
-    __VLS_542.slots.default;
-    var __VLS_542;
+    __VLS_546.slots.default;
+    var __VLS_546;
 }
-var __VLS_518;
-const __VLS_547 = {}.ElDialog;
+var __VLS_522;
+const __VLS_551 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_548 = __VLS_asFunctionalComponent(__VLS_547, new __VLS_547({
-    modelValue: (__VLS_ctx.templateSaveVisible),
-    title: "保存为可复用组件",
-    width: "460px",
-    destroyOnClose: true,
-}));
-const __VLS_549 = __VLS_548({
-    modelValue: (__VLS_ctx.templateSaveVisible),
-    title: "保存为可复用组件",
-    width: "460px",
-    destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_548));
-__VLS_550.slots.default;
-const __VLS_551 = {}.ElForm;
-/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
-// @ts-ignore
 const __VLS_552 = __VLS_asFunctionalComponent(__VLS_551, new __VLS_551({
-    model: (__VLS_ctx.templateForm),
-    labelWidth: "90px",
+    modelValue: (__VLS_ctx.templateSaveVisible),
+    title: "保存为可复用组件",
+    width: "460px",
+    destroyOnClose: true,
 }));
 const __VLS_553 = __VLS_552({
-    model: (__VLS_ctx.templateForm),
-    labelWidth: "90px",
+    modelValue: (__VLS_ctx.templateSaveVisible),
+    title: "保存为可复用组件",
+    width: "460px",
+    destroyOnClose: true,
 }, ...__VLS_functionalComponentArgsRest(__VLS_552));
 __VLS_554.slots.default;
-const __VLS_555 = {}.ElFormItem;
-/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
+const __VLS_555 = {}.ElForm;
+/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
 const __VLS_556 = __VLS_asFunctionalComponent(__VLS_555, new __VLS_555({
-    label: "组件名称",
+    model: (__VLS_ctx.templateForm),
+    labelWidth: "90px",
 }));
 const __VLS_557 = __VLS_556({
-    label: "组件名称",
+    model: (__VLS_ctx.templateForm),
+    labelWidth: "90px",
 }, ...__VLS_functionalComponentArgsRest(__VLS_556));
 __VLS_558.slots.default;
-const __VLS_559 = {}.ElInput;
-/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
-// @ts-ignore
-const __VLS_560 = __VLS_asFunctionalComponent(__VLS_559, new __VLS_559({
-    modelValue: (__VLS_ctx.templateForm.name),
-    placeholder: "请输入组件资产名称",
-}));
-const __VLS_561 = __VLS_560({
-    modelValue: (__VLS_ctx.templateForm.name),
-    placeholder: "请输入组件资产名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_560));
-var __VLS_558;
-const __VLS_563 = {}.ElFormItem;
+const __VLS_559 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_564 = __VLS_asFunctionalComponent(__VLS_563, new __VLS_563({
-    label: "说明",
+const __VLS_560 = __VLS_asFunctionalComponent(__VLS_559, new __VLS_559({
+    label: "组件名称",
 }));
-const __VLS_565 = __VLS_564({
-    label: "说明",
-}, ...__VLS_functionalComponentArgsRest(__VLS_564));
-__VLS_566.slots.default;
-const __VLS_567 = {}.ElInput;
+const __VLS_561 = __VLS_560({
+    label: "组件名称",
+}, ...__VLS_functionalComponentArgsRest(__VLS_560));
+__VLS_562.slots.default;
+const __VLS_563 = {}.ElInput;
 /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
+const __VLS_564 = __VLS_asFunctionalComponent(__VLS_563, new __VLS_563({
+    modelValue: (__VLS_ctx.templateForm.name),
+    placeholder: "请输入组件资产名称",
+}));
+const __VLS_565 = __VLS_564({
+    modelValue: (__VLS_ctx.templateForm.name),
+    placeholder: "请输入组件资产名称",
+}, ...__VLS_functionalComponentArgsRest(__VLS_564));
+var __VLS_562;
+const __VLS_567 = {}.ElFormItem;
+/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
+// @ts-ignore
 const __VLS_568 = __VLS_asFunctionalComponent(__VLS_567, new __VLS_567({
+    label: "说明",
+}));
+const __VLS_569 = __VLS_568({
+    label: "说明",
+}, ...__VLS_functionalComponentArgsRest(__VLS_568));
+__VLS_570.slots.default;
+const __VLS_571 = {}.ElInput;
+/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+// @ts-ignore
+const __VLS_572 = __VLS_asFunctionalComponent(__VLS_571, new __VLS_571({
     modelValue: (__VLS_ctx.templateForm.description),
     type: "textarea",
     rows: (3),
     placeholder: "说明这个组件适合什么场景",
 }));
-const __VLS_569 = __VLS_568({
+const __VLS_573 = __VLS_572({
     modelValue: (__VLS_ctx.templateForm.description),
     type: "textarea",
     rows: (3),
     placeholder: "说明这个组件适合什么场景",
-}, ...__VLS_functionalComponentArgsRest(__VLS_568));
-var __VLS_566;
-var __VLS_554;
+}, ...__VLS_functionalComponentArgsRest(__VLS_572));
+var __VLS_570;
+var __VLS_558;
 {
-    const { footer: __VLS_thisSlot } = __VLS_550.slots;
-    const __VLS_571 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_554.slots;
+    const __VLS_575 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_572 = __VLS_asFunctionalComponent(__VLS_571, new __VLS_571({
+    const __VLS_576 = __VLS_asFunctionalComponent(__VLS_575, new __VLS_575({
         ...{ 'onClick': {} },
     }));
-    const __VLS_573 = __VLS_572({
+    const __VLS_577 = __VLS_576({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_572));
-    let __VLS_575;
-    let __VLS_576;
-    let __VLS_577;
-    const __VLS_578 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_576));
+    let __VLS_579;
+    let __VLS_580;
+    let __VLS_581;
+    const __VLS_582 = {
         onClick: (...[$event]) => {
             __VLS_ctx.templateSaveVisible = false;
         }
     };
-    __VLS_574.slots.default;
-    var __VLS_574;
-    const __VLS_579 = {}.ElButton;
+    __VLS_578.slots.default;
+    var __VLS_578;
+    const __VLS_583 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_580 = __VLS_asFunctionalComponent(__VLS_579, new __VLS_579({
+    const __VLS_584 = __VLS_asFunctionalComponent(__VLS_583, new __VLS_583({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.templateSaving),
     }));
-    const __VLS_581 = __VLS_580({
+    const __VLS_585 = __VLS_584({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.templateSaving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_580));
-    let __VLS_583;
-    let __VLS_584;
-    let __VLS_585;
-    const __VLS_586 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_584));
+    let __VLS_587;
+    let __VLS_588;
+    let __VLS_589;
+    const __VLS_590 = {
         onClick: (__VLS_ctx.saveActiveComponentAsAsset)
     };
-    __VLS_582.slots.default;
-    var __VLS_582;
+    __VLS_586.slots.default;
+    var __VLS_586;
 }
-var __VLS_550;
-const __VLS_587 = {}.ElDialog;
+var __VLS_554;
+const __VLS_591 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_588 = __VLS_asFunctionalComponent(__VLS_587, new __VLS_587({
+const __VLS_592 = __VLS_asFunctionalComponent(__VLS_591, new __VLS_591({
     modelValue: (__VLS_ctx.shareVisible),
     title: "分享数据大屏",
     width: "520px",
     destroyOnClose: true,
 }));
-const __VLS_589 = __VLS_588({
+const __VLS_593 = __VLS_592({
     modelValue: (__VLS_ctx.shareVisible),
     title: "分享数据大屏",
     width: "520px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_588));
-__VLS_590.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_592));
+__VLS_594.slots.default;
 if (__VLS_ctx.isPublished) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "share-block" },
@@ -5311,306 +5763,306 @@ if (__VLS_ctx.isPublished) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "share-label" },
     });
-    const __VLS_591 = {}.ElInput;
+    const __VLS_595 = {}.ElInput;
     /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
     // @ts-ignore
-    const __VLS_592 = __VLS_asFunctionalComponent(__VLS_591, new __VLS_591({
+    const __VLS_596 = __VLS_asFunctionalComponent(__VLS_595, new __VLS_595({
         modelValue: (__VLS_ctx.shareLink),
         readonly: true,
     }));
-    const __VLS_593 = __VLS_592({
+    const __VLS_597 = __VLS_596({
         modelValue: (__VLS_ctx.shareLink),
         readonly: true,
-    }, ...__VLS_functionalComponentArgsRest(__VLS_592));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_596));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "share-tip" },
     });
 }
 else {
-    const __VLS_595 = {}.ElAlert;
+    const __VLS_599 = {}.ElAlert;
     /** @type {[typeof __VLS_components.ElAlert, typeof __VLS_components.elAlert, ]} */ ;
     // @ts-ignore
-    const __VLS_596 = __VLS_asFunctionalComponent(__VLS_595, new __VLS_595({
-        title: "当前数据大屏尚未正式发布",
-        type: "warning",
-        closable: (false),
-        description: "请先设置发布状态、访问角色和正式分享链接，再对外分享。",
-    }));
-    const __VLS_597 = __VLS_596({
-        title: "当前数据大屏尚未正式发布",
-        type: "warning",
-        closable: (false),
-        description: "请先设置发布状态、访问角色和正式分享链接，再对外分享。",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_596));
-}
-{
-    const { footer: __VLS_thisSlot } = __VLS_590.slots;
-    const __VLS_599 = {}.ElButton;
-    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-    // @ts-ignore
     const __VLS_600 = __VLS_asFunctionalComponent(__VLS_599, new __VLS_599({
-        ...{ 'onClick': {} },
+        title: "当前数据大屏尚未正式发布",
+        type: "warning",
+        closable: (false),
+        description: "请先设置发布状态、访问角色和正式分享链接，再对外分享。",
     }));
     const __VLS_601 = __VLS_600({
-        ...{ 'onClick': {} },
+        title: "当前数据大屏尚未正式发布",
+        type: "warning",
+        closable: (false),
+        description: "请先设置发布状态、访问角色和正式分享链接，再对外分享。",
     }, ...__VLS_functionalComponentArgsRest(__VLS_600));
-    let __VLS_603;
-    let __VLS_604;
-    let __VLS_605;
-    const __VLS_606 = {
+}
+{
+    const { footer: __VLS_thisSlot } = __VLS_594.slots;
+    const __VLS_603 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_604 = __VLS_asFunctionalComponent(__VLS_603, new __VLS_603({
+        ...{ 'onClick': {} },
+    }));
+    const __VLS_605 = __VLS_604({
+        ...{ 'onClick': {} },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_604));
+    let __VLS_607;
+    let __VLS_608;
+    let __VLS_609;
+    const __VLS_610 = {
         onClick: (...[$event]) => {
             __VLS_ctx.shareVisible = false;
         }
     };
-    __VLS_602.slots.default;
-    var __VLS_602;
+    __VLS_606.slots.default;
+    var __VLS_606;
     if (!__VLS_ctx.isPublished) {
-        const __VLS_607 = {}.ElButton;
+        const __VLS_611 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_608 = __VLS_asFunctionalComponent(__VLS_607, new __VLS_607({
+        const __VLS_612 = __VLS_asFunctionalComponent(__VLS_611, new __VLS_611({
             ...{ 'onClick': {} },
             type: "primary",
         }));
-        const __VLS_609 = __VLS_608({
+        const __VLS_613 = __VLS_612({
             ...{ 'onClick': {} },
             type: "primary",
-        }, ...__VLS_functionalComponentArgsRest(__VLS_608));
-        let __VLS_611;
-        let __VLS_612;
-        let __VLS_613;
-        const __VLS_614 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_612));
+        let __VLS_615;
+        let __VLS_616;
+        let __VLS_617;
+        const __VLS_618 = {
             onClick: (__VLS_ctx.openPublishDialog)
         };
-        __VLS_610.slots.default;
-        var __VLS_610;
+        __VLS_614.slots.default;
+        var __VLS_614;
     }
     else {
-        const __VLS_615 = {}.ElButton;
+        const __VLS_619 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_616 = __VLS_asFunctionalComponent(__VLS_615, new __VLS_615({
+        const __VLS_620 = __VLS_asFunctionalComponent(__VLS_619, new __VLS_619({
             ...{ 'onClick': {} },
         }));
-        const __VLS_617 = __VLS_616({
+        const __VLS_621 = __VLS_620({
             ...{ 'onClick': {} },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_616));
-        let __VLS_619;
-        let __VLS_620;
-        let __VLS_621;
-        const __VLS_622 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_620));
+        let __VLS_623;
+        let __VLS_624;
+        let __VLS_625;
+        const __VLS_626 = {
             onClick: (...[$event]) => {
                 if (!!(!__VLS_ctx.isPublished))
                     return;
                 __VLS_ctx.openPreview(true);
             }
         };
-        __VLS_618.slots.default;
-        var __VLS_618;
-        const __VLS_623 = {}.ElButton;
+        __VLS_622.slots.default;
+        var __VLS_622;
+        const __VLS_627 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_624 = __VLS_asFunctionalComponent(__VLS_623, new __VLS_623({
+        const __VLS_628 = __VLS_asFunctionalComponent(__VLS_627, new __VLS_627({
             ...{ 'onClick': {} },
             type: "primary",
         }));
-        const __VLS_625 = __VLS_624({
+        const __VLS_629 = __VLS_628({
             ...{ 'onClick': {} },
             type: "primary",
-        }, ...__VLS_functionalComponentArgsRest(__VLS_624));
-        let __VLS_627;
-        let __VLS_628;
-        let __VLS_629;
-        const __VLS_630 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_628));
+        let __VLS_631;
+        let __VLS_632;
+        let __VLS_633;
+        const __VLS_634 = {
             onClick: (__VLS_ctx.copyShareLink)
         };
-        __VLS_626.slots.default;
-        var __VLS_626;
+        __VLS_630.slots.default;
+        var __VLS_630;
     }
 }
-var __VLS_590;
-const __VLS_631 = {}.ElDialog;
+var __VLS_594;
+const __VLS_635 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_632 = __VLS_asFunctionalComponent(__VLS_631, new __VLS_631({
-    modelValue: (__VLS_ctx.publishVisible),
-    title: "发布数据大屏",
-    width: "560px",
-    destroyOnClose: true,
-}));
-const __VLS_633 = __VLS_632({
-    modelValue: (__VLS_ctx.publishVisible),
-    title: "发布数据大屏",
-    width: "560px",
-    destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_632));
-__VLS_634.slots.default;
-const __VLS_635 = {}.ElForm;
-/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
-// @ts-ignore
 const __VLS_636 = __VLS_asFunctionalComponent(__VLS_635, new __VLS_635({
-    labelWidth: "120px",
+    modelValue: (__VLS_ctx.publishVisible),
+    title: "发布数据大屏",
+    width: "560px",
+    destroyOnClose: true,
 }));
 const __VLS_637 = __VLS_636({
-    labelWidth: "120px",
+    modelValue: (__VLS_ctx.publishVisible),
+    title: "发布数据大屏",
+    width: "560px",
+    destroyOnClose: true,
 }, ...__VLS_functionalComponentArgsRest(__VLS_636));
 __VLS_638.slots.default;
-const __VLS_639 = {}.ElFormItem;
-/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
+const __VLS_639 = {}.ElForm;
+/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
 const __VLS_640 = __VLS_asFunctionalComponent(__VLS_639, new __VLS_639({
-    label: "发布状态",
+    labelWidth: "120px",
 }));
 const __VLS_641 = __VLS_640({
-    label: "发布状态",
+    labelWidth: "120px",
 }, ...__VLS_functionalComponentArgsRest(__VLS_640));
 __VLS_642.slots.default;
-const __VLS_643 = {}.ElSwitch;
-/** @type {[typeof __VLS_components.ElSwitch, typeof __VLS_components.elSwitch, ]} */ ;
+const __VLS_643 = {}.ElFormItem;
+/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
 const __VLS_644 = __VLS_asFunctionalComponent(__VLS_643, new __VLS_643({
-    modelValue: (__VLS_ctx.publishForm.published),
-    activeText: "已发布",
-    inactiveText: "草稿",
+    label: "发布状态",
 }));
 const __VLS_645 = __VLS_644({
+    label: "发布状态",
+}, ...__VLS_functionalComponentArgsRest(__VLS_644));
+__VLS_646.slots.default;
+const __VLS_647 = {}.ElSwitch;
+/** @type {[typeof __VLS_components.ElSwitch, typeof __VLS_components.elSwitch, ]} */ ;
+// @ts-ignore
+const __VLS_648 = __VLS_asFunctionalComponent(__VLS_647, new __VLS_647({
     modelValue: (__VLS_ctx.publishForm.published),
     activeText: "已发布",
     inactiveText: "草稿",
-}, ...__VLS_functionalComponentArgsRest(__VLS_644));
-var __VLS_642;
-const __VLS_647 = {}.ElFormItem;
-/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
-// @ts-ignore
-const __VLS_648 = __VLS_asFunctionalComponent(__VLS_647, new __VLS_647({
-    label: "允许匿名链接",
 }));
 const __VLS_649 = __VLS_648({
-    label: "允许匿名链接",
+    modelValue: (__VLS_ctx.publishForm.published),
+    activeText: "已发布",
+    inactiveText: "草稿",
 }, ...__VLS_functionalComponentArgsRest(__VLS_648));
-__VLS_650.slots.default;
-const __VLS_651 = {}.ElSwitch;
-/** @type {[typeof __VLS_components.ElSwitch, typeof __VLS_components.elSwitch, ]} */ ;
-// @ts-ignore
-const __VLS_652 = __VLS_asFunctionalComponent(__VLS_651, new __VLS_651({
-    modelValue: (__VLS_ctx.publishForm.allowAnonymousAccess),
-    activeText: "允许",
-    inactiveText: "关闭",
-}));
-const __VLS_653 = __VLS_652({
-    modelValue: (__VLS_ctx.publishForm.allowAnonymousAccess),
-    activeText: "允许",
-    inactiveText: "关闭",
-}, ...__VLS_functionalComponentArgsRest(__VLS_652));
-var __VLS_650;
-const __VLS_655 = {}.ElFormItem;
+var __VLS_646;
+const __VLS_651 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
+const __VLS_652 = __VLS_asFunctionalComponent(__VLS_651, new __VLS_651({
+    label: "允许匿名链接",
+}));
+const __VLS_653 = __VLS_652({
+    label: "允许匿名链接",
+}, ...__VLS_functionalComponentArgsRest(__VLS_652));
+__VLS_654.slots.default;
+const __VLS_655 = {}.ElSwitch;
+/** @type {[typeof __VLS_components.ElSwitch, typeof __VLS_components.elSwitch, ]} */ ;
+// @ts-ignore
 const __VLS_656 = __VLS_asFunctionalComponent(__VLS_655, new __VLS_655({
-    label: "允许访问角色",
+    modelValue: (__VLS_ctx.publishForm.allowAnonymousAccess),
+    activeText: "允许",
+    inactiveText: "关闭",
 }));
 const __VLS_657 = __VLS_656({
-    label: "允许访问角色",
+    modelValue: (__VLS_ctx.publishForm.allowAnonymousAccess),
+    activeText: "允许",
+    inactiveText: "关闭",
 }, ...__VLS_functionalComponentArgsRest(__VLS_656));
-__VLS_658.slots.default;
-const __VLS_659 = {}.ElCheckboxGroup;
-/** @type {[typeof __VLS_components.ElCheckboxGroup, typeof __VLS_components.elCheckboxGroup, typeof __VLS_components.ElCheckboxGroup, typeof __VLS_components.elCheckboxGroup, ]} */ ;
+var __VLS_654;
+const __VLS_659 = {}.ElFormItem;
+/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
 const __VLS_660 = __VLS_asFunctionalComponent(__VLS_659, new __VLS_659({
-    modelValue: (__VLS_ctx.publishForm.allowedRoles),
+    label: "允许访问角色",
 }));
 const __VLS_661 = __VLS_660({
-    modelValue: (__VLS_ctx.publishForm.allowedRoles),
+    label: "允许访问角色",
 }, ...__VLS_functionalComponentArgsRest(__VLS_660));
 __VLS_662.slots.default;
+const __VLS_663 = {}.ElCheckboxGroup;
+/** @type {[typeof __VLS_components.ElCheckboxGroup, typeof __VLS_components.elCheckboxGroup, typeof __VLS_components.ElCheckboxGroup, typeof __VLS_components.elCheckboxGroup, ]} */ ;
+// @ts-ignore
+const __VLS_664 = __VLS_asFunctionalComponent(__VLS_663, new __VLS_663({
+    modelValue: (__VLS_ctx.publishForm.allowedRoles),
+}));
+const __VLS_665 = __VLS_664({
+    modelValue: (__VLS_ctx.publishForm.allowedRoles),
+}, ...__VLS_functionalComponentArgsRest(__VLS_664));
+__VLS_666.slots.default;
 for (const [role] of __VLS_getVForSourceType((__VLS_ctx.roleOptions))) {
-    const __VLS_663 = {}.ElCheckbox;
+    const __VLS_667 = {}.ElCheckbox;
     /** @type {[typeof __VLS_components.ElCheckbox, typeof __VLS_components.elCheckbox, typeof __VLS_components.ElCheckbox, typeof __VLS_components.elCheckbox, ]} */ ;
     // @ts-ignore
-    const __VLS_664 = __VLS_asFunctionalComponent(__VLS_663, new __VLS_663({
+    const __VLS_668 = __VLS_asFunctionalComponent(__VLS_667, new __VLS_667({
         key: (role),
         label: (role),
     }));
-    const __VLS_665 = __VLS_664({
+    const __VLS_669 = __VLS_668({
         key: (role),
         label: (role),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_664));
-    __VLS_666.slots.default;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_668));
+    __VLS_670.slots.default;
     (role);
-    var __VLS_666;
+    var __VLS_670;
 }
+var __VLS_666;
 var __VLS_662;
-var __VLS_658;
-const __VLS_667 = {}.ElFormItem;
+const __VLS_671 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_668 = __VLS_asFunctionalComponent(__VLS_667, new __VLS_667({
-    label: "正式分享链接",
-}));
-const __VLS_669 = __VLS_668({
-    label: "正式分享链接",
-}, ...__VLS_functionalComponentArgsRest(__VLS_668));
-__VLS_670.slots.default;
-const __VLS_671 = {}.ElInput;
-/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
-// @ts-ignore
 const __VLS_672 = __VLS_asFunctionalComponent(__VLS_671, new __VLS_671({
-    modelValue: (__VLS_ctx.draftPublishedLink),
-    readonly: true,
+    label: "正式分享链接",
 }));
 const __VLS_673 = __VLS_672({
+    label: "正式分享链接",
+}, ...__VLS_functionalComponentArgsRest(__VLS_672));
+__VLS_674.slots.default;
+const __VLS_675 = {}.ElInput;
+/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+// @ts-ignore
+const __VLS_676 = __VLS_asFunctionalComponent(__VLS_675, new __VLS_675({
     modelValue: (__VLS_ctx.draftPublishedLink),
     readonly: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_672));
-var __VLS_670;
-var __VLS_638;
+}));
+const __VLS_677 = __VLS_676({
+    modelValue: (__VLS_ctx.draftPublishedLink),
+    readonly: true,
+}, ...__VLS_functionalComponentArgsRest(__VLS_676));
+var __VLS_674;
+var __VLS_642;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "share-tip" },
 });
 {
-    const { footer: __VLS_thisSlot } = __VLS_634.slots;
-    const __VLS_675 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_638.slots;
+    const __VLS_679 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_676 = __VLS_asFunctionalComponent(__VLS_675, new __VLS_675({
+    const __VLS_680 = __VLS_asFunctionalComponent(__VLS_679, new __VLS_679({
         ...{ 'onClick': {} },
     }));
-    const __VLS_677 = __VLS_676({
+    const __VLS_681 = __VLS_680({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_676));
-    let __VLS_679;
-    let __VLS_680;
-    let __VLS_681;
-    const __VLS_682 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_680));
+    let __VLS_683;
+    let __VLS_684;
+    let __VLS_685;
+    const __VLS_686 = {
         onClick: (...[$event]) => {
             __VLS_ctx.publishVisible = false;
         }
     };
-    __VLS_678.slots.default;
-    var __VLS_678;
-    const __VLS_683 = {}.ElButton;
+    __VLS_682.slots.default;
+    var __VLS_682;
+    const __VLS_687 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_684 = __VLS_asFunctionalComponent(__VLS_683, new __VLS_683({
+    const __VLS_688 = __VLS_asFunctionalComponent(__VLS_687, new __VLS_687({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.publishSaving),
     }));
-    const __VLS_685 = __VLS_684({
+    const __VLS_689 = __VLS_688({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.publishSaving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_684));
-    let __VLS_687;
-    let __VLS_688;
-    let __VLS_689;
-    const __VLS_690 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_688));
+    let __VLS_691;
+    let __VLS_692;
+    let __VLS_693;
+    const __VLS_694 = {
         onClick: (__VLS_ctx.savePublishSettings)
     };
-    __VLS_686.slots.default;
-    var __VLS_686;
+    __VLS_690.slots.default;
+    var __VLS_690;
 }
-var __VLS_634;
+var __VLS_638;
 /** @type {__VLS_StyleScopedClasses['screen-root']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-left-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['lp-head']} */ ;
@@ -5745,6 +6197,10 @@ var __VLS_634;
 /** @type {__VLS_StyleScopedClasses['canvas-tb-overlay-ctrl']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-tb-zoom']} */ ;
 /** @type {__VLS_StyleScopedClasses['zoom-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['canvas-ruler-row']} */ ;
+/** @type {__VLS_StyleScopedClasses['ruler-corner']} */ ;
+/** @type {__VLS_StyleScopedClasses['ruler-h-strip']} */ ;
+/** @type {__VLS_StyleScopedClasses['ruler-h-mark']} */ ;
 /** @type {__VLS_StyleScopedClasses['canvas-main-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['ruler-v-strip']} */ ;
 /** @type {__VLS_StyleScopedClasses['ruler-v-mark']} */ ;
@@ -5797,6 +6253,11 @@ var __VLS_634;
 /** @type {__VLS_StyleScopedClasses['resize-handle--se']} */ ;
 /** @type {__VLS_StyleScopedClasses['resize-handle']} */ ;
 /** @type {__VLS_StyleScopedClasses['resize-handle--sw']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-marquee']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-guide']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-guide--vertical']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-guide']} */ ;
+/** @type {__VLS_StyleScopedClasses['stage-guide--horizontal']} */ ;
 /** @type {__VLS_StyleScopedClasses['stage-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-inspector']} */ ;
 /** @type {__VLS_StyleScopedClasses['bg-inspector']} */ ;
@@ -5823,6 +6284,15 @@ var __VLS_634;
 /** @type {__VLS_StyleScopedClasses['bg-insp-section']} */ ;
 /** @type {__VLS_StyleScopedClasses['bg-insp-section-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['bg-insp-tip']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu__divider']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['screen-context-menu__item--danger']} */ ;
 /** @type {__VLS_StyleScopedClasses['share-block']} */ ;
 /** @type {__VLS_StyleScopedClasses['share-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['share-tip']} */ ;
@@ -5892,6 +6362,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectedTemplateId: selectedTemplateId,
             stageDropActive: stageDropActive,
             layerDragOverIdx: layerDragOverIdx,
+            marqueeSelection: marqueeSelection,
+            componentContextMenu: componentContextMenu,
             templatePreviewStyle: templatePreviewStyle,
             undoApplying: undoApplying,
             canUndo: canUndo,
@@ -5906,7 +6378,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             overlayConfig: overlayConfig,
             curtainStyle: curtainStyle,
             saveOverlay: saveOverlay,
-            startCurtainDrag: startCurtainDrag,
             startCurtainResize: startCurtainResize,
             chartTypeOptions: chartTypeOptions,
             filteredCharts: filteredCharts,
@@ -5930,6 +6401,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             getComponentDisplayName: getComponentDisplayName,
             getComponentStatusText: getComponentStatusText,
             layeredComponents: layeredComponents,
+            marqueeStyle: marqueeStyle,
             canvasWorkWidth: canvasWorkWidth,
             canvasScale: canvasScale,
             zoomIn: zoomIn,
@@ -5938,7 +6410,11 @@ const __VLS_self = (await import('vue')).defineComponent({
             zoomFit: zoomFit,
             toggleInspector: toggleInspector,
             canvasMinHeight: canvasMinHeight,
+            hRulerMarks: hRulerMarks,
             vRulerMarks: vRulerMarks,
+            getHRulerMarkStyle: getHRulerMarkStyle,
+            getVRulerMarkStyle: getVRulerMarkStyle,
+            handleStageScroll: handleStageScroll,
             setChartRef: setChartRef,
             getDashboardComponentCount: getDashboardComponentCount,
             getDashboardCoverUrl: getDashboardCoverUrl,
@@ -5955,15 +6431,27 @@ const __VLS_self = (await import('vue')).defineComponent({
             showNoField: showNoField,
             getTableColumns: getTableColumns,
             setStageCardRef: setStageCardRef,
-            focusComponent: focusComponent,
+            isComponentSelected: isComponentSelected,
+            hideComponentContextMenu: hideComponentContextMenu,
+            startStageMarquee: startStageMarquee,
+            handleCurtainPointerDown: handleCurtainPointerDown,
             selectOverlayLayer: selectOverlayLayer,
             selectLayerComponent: selectLayerComponent,
+            handleStageCardMouseDown: handleStageCardMouseDown,
+            openComponentContextMenu: openComponentContextMenu,
             applyLayoutPatch: applyLayoutPatch,
             bringComponentToFront: bringComponentToFront,
             bringSpecificComponentToFront: bringSpecificComponentToFront,
+            bringSelectedComponentsToFront: bringSelectedComponentsToFront,
+            sendSelectedComponentsToBack: sendSelectedComponentsToBack,
+            moveSelectedComponentsForward: moveSelectedComponentsForward,
+            moveSelectedComponentsBackward: moveSelectedComponentsBackward,
+            duplicateSelectedComponents: duplicateSelectedComponents,
+            removeSelectedComponents: removeSelectedComponents,
             handleRemoveActiveComponent: handleRemoveActiveComponent,
             previewActiveComponent: previewActiveComponent,
             saveActiveComponent: saveActiveComponent,
+            interactionGuideLines: interactionGuideLines,
             startDrag: startDrag,
             startResize: startResize,
             openCreateDashboard: openCreateDashboard,

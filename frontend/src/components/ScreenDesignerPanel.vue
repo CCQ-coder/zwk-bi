@@ -155,7 +155,7 @@
               v-for="(component, layerIdx) in layeredComponents"
               :key="component.id"
               class="lp-layer-item"
-              :class="{ 'lp-layer-item--active': activeCompId === component.id, 'lp-layer-item--drag-over': layerDragOverIdx === layerIdx }"
+              :class="{ 'lp-layer-item--active': isComponentSelected(component.id), 'lp-layer-item--drag-over': layerDragOverIdx === layerIdx }"
               draggable="true"
               @dragstart="onLayerDragStart($event, layerIdx)"
               @dragover.prevent="onLayerDragOver($event, layerIdx)"
@@ -163,6 +163,7 @@
               @drop.prevent="onLayerDrop($event, layerIdx)"
               @dragend="onLayerDragEnd"
               @click="selectLayerComponent(component)"
+              @contextmenu.prevent.stop="openComponentContextMenu($event, component)"
             >
               <div class="lp-layer-item-main">
                 <span class="lp-layer-drag-handle">⠿</span>
@@ -413,11 +414,17 @@
               <el-button text size="small" @click="zoomReset">100%</el-button>
             </div>
           </div>
+          <div class="canvas-ruler-row">
+            <div class="ruler-corner" />
+            <div class="ruler-h-strip">
+              <span v-for="mark in hRulerMarks" :key="mark" class="ruler-h-mark" :style="getHRulerMarkStyle(mark)">{{ mark }}</span>
+            </div>
+          </div>
           <div class="canvas-main-row">
               <div class="ruler-v-strip">
-                <span v-for="m in vRulerMarks" :key="m" class="ruler-v-mark" :style="{ top: m + 'px' }">{{ m }}</span>
+                <span v-for="mark in vRulerMarks" :key="mark" class="ruler-v-mark" :style="getVRulerMarkStyle(mark)">{{ mark }}</span>
               </div>
-              <div ref="stageScrollRef" class="screen-stage-scroll">
+              <div ref="stageScrollRef" class="screen-stage-scroll" @scroll="handleStageScroll">
 
             <div
               ref="canvasRef"
@@ -427,7 +434,8 @@
               @dragover.prevent="onStageDragOver"
               @dragleave="onStageDragLeave"
               @drop.prevent="onStageDrop"
-              @click.self="overlaySelected = false"
+              @mousedown.self="startStageMarquee($event)"
+              @contextmenu.prevent="hideComponentContextMenu"
             >
               <!-- 幕布层 (z-index:1, 永远在组件下方) -->
               <div
@@ -435,8 +443,7 @@
                 class="canvas-curtain"
                 :class="{ 'canvas-curtain--selected': overlaySelected }"
                 :style="curtainStyle"
-                @mousedown.stop="startCurtainDrag($event)"
-                @click.stop="overlaySelected = true; activeCompId = null"
+                @mousedown.stop="handleCurtainPointerDown($event)"
               >
                 <span v-if="overlaySelected" class="curtain-badge">背景版</span>
                 <span class="resize-handle resize-handle--n"  @mousedown.stop.prevent="startCurtainResize($event, 'n')" />
@@ -455,12 +462,14 @@
                 class="stage-card"
                 :class="{
                   active: activeCompId === component.id,
+                  'stage-card--selected': isComponentSelected(component.id),
                   'stage-card--decoration': isDecorationComponent(component),
                   'stage-card--static': isStaticWidget(component) && !isDecorationComponent(component),
                   'stage-card--data': !isStaticWidget(component),
                 }"
                 :style="getCardStyle(component)"
-                @mousedown="focusComponent(component)"
+                @mousedown="handleStageCardMouseDown($event, component)"
+                @contextmenu.prevent.stop="openComponentContextMenu($event, component)"
               >
                 <div class="stage-card-header" @mousedown.stop.prevent="startDrag($event, component)">
                   <div class="stage-card-header-main">
@@ -558,6 +567,23 @@
                 <span class="resize-handle resize-handle--se" @mousedown.stop.prevent="startResize($event, component, 'se')" />
                 <span class="resize-handle resize-handle--sw" @mousedown.stop.prevent="startResize($event, component, 'sw')" />
               </div>
+
+              <div v-if="marqueeSelection.visible" class="stage-marquee" :style="marqueeStyle" />
+
+              <template v-if="interactionGuideLines.vertical.length || interactionGuideLines.horizontal.length">
+                <span
+                  v-for="line in interactionGuideLines.vertical"
+                  :key="`v-${line}`"
+                  class="stage-guide stage-guide--vertical"
+                  :style="{ left: `${line}px` }"
+                />
+                <span
+                  v-for="line in interactionGuideLines.horizontal"
+                  :key="`h-${line}`"
+                  class="stage-guide stage-guide--horizontal"
+                  :style="{ top: `${line}px` }"
+                />
+              </template>
 
               <div v-if="!components.length" class="stage-empty">
                 <el-empty description="请从左侧双击或拖入一个组件资产" :image-size="80" />
@@ -671,6 +697,24 @@
         @save-component="saveActiveComponent"
       />
     </aside>
+
+    <teleport to="body">
+      <div
+        v-if="componentContextMenu.visible"
+        class="screen-context-menu"
+        :style="{ left: `${componentContextMenu.x}px`, top: `${componentContextMenu.y}px` }"
+        @mousedown.stop
+        @contextmenu.prevent
+      >
+        <button type="button" class="screen-context-menu__item" @click="bringSelectedComponentsToFront">置顶</button>
+        <button type="button" class="screen-context-menu__item" @click="sendSelectedComponentsToBack">置底</button>
+        <button type="button" class="screen-context-menu__item" @click="moveSelectedComponentsForward">上移一层</button>
+        <button type="button" class="screen-context-menu__item" @click="moveSelectedComponentsBackward">下移一层</button>
+        <div class="screen-context-menu__divider" />
+        <button type="button" class="screen-context-menu__item" @click="duplicateSelectedComponents">复制</button>
+        <button type="button" class="screen-context-menu__item screen-context-menu__item--danger" @click="removeSelectedComponents">删除</button>
+      </div>
+    </teleport>
 
     <el-dialog v-model="createDashVisible" title="新建数据大屏" width="420px" destroy-on-close>
       <el-form :model="dashForm" label-width="80px">
@@ -1180,7 +1224,9 @@ const componentDataMap = shallowRef(new Map<number, ChartDataResult>())
 const leftPanelRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLElement | null>(null)
 const stageScrollRef = ref<HTMLElement | null>(null)
+const stageScrollOffset = reactive({ left: 0, top: 0 })
 const activeCompId = ref<number | null>(null)
+const selectedComponentIds = ref<number[]>([])
 const dashboardSearch = ref('')
 const shareVisible = ref(false)
 const publishVisible = ref(false)
@@ -1203,6 +1249,18 @@ const draggingTypeChip = ref<string | null>(null)
 const stageDropActive = ref(false)
 const layerDragFromIdx = ref<number | null>(null)
 const layerDragOverIdx = ref<number | null>(null)
+const marqueeSelection = reactive({
+  visible: false,
+  startX: 0,
+  startY: 0,
+  currentX: 0,
+  currentY: 0,
+})
+const componentContextMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+})
 const templatePreviewStyle = ref<Record<string, string>>({ top: '0px', left: '0px' })
 
 interface ComponentLayoutSnapshot {
@@ -1522,6 +1580,8 @@ const draftPublishedLink = computed(() => currentDashboard.value
   : '')
 const roleOptions = ['ADMIN', 'ANALYST', 'VIEWER']
 const activeComponent = computed(() => components.value.find((item) => item.id === activeCompId.value) ?? null)
+const selectedComponentIdSet = computed(() => new Set(selectedComponentIds.value))
+const selectedStageComponents = computed(() => components.value.filter((item) => selectedComponentIdSet.value.has(item.id)))
 const activeChart = computed(() => activeComponent.value ? chartMap.value.get(activeComponent.value.chartId) ?? null : null)
 const _componentConfigCache = new Map<string, ReturnType<typeof normalizeComponentConfig>>()
 const getComponentConfig = (component: DashboardComponent) => {
@@ -1552,6 +1612,18 @@ const layeredComponents = computed(() => [...components.value].sort((left, right
   if (zIndexDelta !== 0) return zIndexDelta
   return right.id - left.id
 }))
+const marqueeStyle = computed(() => {
+  const left = Math.min(marqueeSelection.startX, marqueeSelection.currentX)
+  const top = Math.min(marqueeSelection.startY, marqueeSelection.currentY)
+  const width = Math.abs(marqueeSelection.currentX - marqueeSelection.startX)
+  const height = Math.abs(marqueeSelection.currentY - marqueeSelection.startY)
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+  }
+})
 const currentCanvasConfig = computed(() => normalizeCanvasConfig(parseReportConfig(currentDashboard.value?.configJson).canvas, 'screen'))
 const matchedCanvasPreset = computed(() => SCREEN_CANVAS_PRESETS.find(
   (item) => item.width === currentCanvasConfig.value.width && item.height === currentCanvasConfig.value.height
@@ -1633,6 +1705,19 @@ const vRulerMarks = computed(() => {
   for (let i = 0; i <= canvasMinHeight.value; i += RULER_STEP) marks.push(i)
   return marks
 })
+
+const getHRulerMarkStyle = (mark: number) => ({
+  left: `${Math.round(mark + 20 - stageScrollOffset.left)}px`,
+})
+
+const getVRulerMarkStyle = (mark: number) => ({
+  top: `${Math.round(mark + 20 - stageScrollOffset.top)}px`,
+})
+
+const handleStageScroll = () => {
+  stageScrollOffset.left = stageScrollRef.value?.scrollLeft ?? 0
+  stageScrollOffset.top = stageScrollRef.value?.scrollTop ?? 0
+}
 
 const getCanvasWidth = () => Math.max(canvasRef.value?.clientWidth ?? currentCanvasConfig.value.width, MIN_CARD_WIDTH + 32)
 
@@ -1734,6 +1819,12 @@ const overlaySnapshotsEqual = (left: OverlaySnapshot, right: OverlaySnapshot) =>
   && left.bgImage === right.bgImage
 )
 
+const getEditorCardPadding = (component: DashboardComponent) => {
+  if (isDecorationComponent(component)) return 0
+  const padding = Number(getComponentConfig(component).style.padding ?? 0)
+  return Math.max(0, Math.min(padding, 6))
+}
+
 const getCardStyle = (component: DashboardComponent) => {
   const style = getComponentConfig(component).style
   const shadow = style.shadowShow
@@ -1750,7 +1841,7 @@ const getCardStyle = (component: DashboardComponent) => {
     border: style.borderShow ? `${style.borderWidth}px solid ${style.borderColor}` : undefined,
     opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
     boxShadow: shadow,
-    padding: style.padding != null && style.padding > 0 ? `${style.padding}px` : undefined,
+    padding: getEditorCardPadding(component) > 0 ? `${getEditorCardPadding(component)}px` : undefined,
     transform: preview?.transform,
     transformOrigin: preview?.transformOrigin,
   }
@@ -1980,8 +2071,10 @@ const disposeCharts = () => {
 
 const selectDashboard = async (dashboard: Dashboard) => {
   currentDashboard.value = dashboard
+  selectedComponentIds.value = []
   activeCompId.value = null
   overlaySelected.value = false
+  hideComponentContextMenu()
   clearUndoHistory()
   await loadComponents()
   loadOverlayFromConfig()
@@ -2002,6 +2095,8 @@ const loadComponents = async () => {
     if (componentDataLoadToken !== loadToken) return
     result.forEach(normalizeLayout)
     components.value = result
+    selectedComponentIds.value = []
+    hideComponentContextMenu()
     dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, result.length)
     await nextTick()
     const observerReady = setupComponentVisibilityObserver()
@@ -2104,21 +2199,157 @@ const setStageCardRef = (el: HTMLElement | null, componentId: number) => {
 
 const getMaxZ = () => components.value.reduce((max, item) => Math.max(max, item.zIndex ?? 0), 0)
 
-const focusComponent = (component: DashboardComponent) => {
+const isComponentSelected = (componentId: number) => selectedComponentIdSet.value.has(componentId)
+
+const normalizeSelectedComponentIds = (componentIds: number[]) => {
+  const availableIds = new Set(components.value.map((item) => item.id))
+  return Array.from(new Set(componentIds)).filter((id) => availableIds.has(id))
+}
+
+const setSelectedComponents = (componentIds: number[], primaryId: number | null = componentIds.at(-1) ?? null) => {
+  const nextIds = normalizeSelectedComponentIds(componentIds)
+  selectedComponentIds.value = nextIds
   overlaySelected.value = false
-  activeCompId.value = component.id
+  activeCompId.value = primaryId !== null && nextIds.includes(primaryId)
+    ? primaryId
+    : nextIds.at(-1) ?? null
+}
+
+const clearComponentSelection = () => {
+  selectedComponentIds.value = []
+  activeCompId.value = null
+  overlaySelected.value = false
+}
+
+const hideComponentContextMenu = () => {
+  componentContextMenu.visible = false
+}
+
+const resetMarqueeSelection = () => {
+  marqueeSelection.visible = false
+  marqueeSelection.startX = 0
+  marqueeSelection.startY = 0
+  marqueeSelection.currentX = 0
+  marqueeSelection.currentY = 0
+}
+
+const getCanvasPointerPosition = (event: MouseEvent) => {
+  const rect = canvasRef.value?.getBoundingClientRect()
+  const scale = canvasScale.value || 1
+  if (!rect) return { x: 0, y: 0 }
+  return {
+    x: Math.max(0, Math.min(canvasWorkWidth.value, Math.round((event.clientX - rect.left) / scale))),
+    y: Math.max(0, Math.min(canvasMinHeight.value, Math.round((event.clientY - rect.top) / scale))),
+  }
+}
+
+const collectComponentsInMarquee = () => {
+  const left = Math.min(marqueeSelection.startX, marqueeSelection.currentX)
+  const right = Math.max(marqueeSelection.startX, marqueeSelection.currentX)
+  const top = Math.min(marqueeSelection.startY, marqueeSelection.currentY)
+  const bottom = Math.max(marqueeSelection.startY, marqueeSelection.currentY)
+  return components.value
+    .filter((component) => component.posX < right
+      && component.posX + component.width > left
+      && component.posY < bottom
+      && component.posY + component.height > top)
+    .map((component) => component.id)
+}
+
+const startStageMarquee = (event: MouseEvent, options: { selectOverlayOnClick?: boolean } = {}) => {
+  if (event.button !== 0) return
+  hideComponentContextMenu()
+  const start = getCanvasPointerPosition(event)
+  marqueeSelection.startX = start.x
+  marqueeSelection.startY = start.y
+  marqueeSelection.currentX = start.x
+  marqueeSelection.currentY = start.y
+  marqueeSelection.visible = false
+  let didDrag = false
+
+  const onMove = (nextEvent: MouseEvent) => {
+    const next = getCanvasPointerPosition(nextEvent)
+    marqueeSelection.currentX = next.x
+    marqueeSelection.currentY = next.y
+    if (!didDrag && (Math.abs(next.x - start.x) > 4 || Math.abs(next.y - start.y) > 4)) {
+      didDrag = true
+      marqueeSelection.visible = true
+    }
+    if (!didDrag) return
+    setSelectedComponents(collectComponentsInMarquee())
+  }
+
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    if (!didDrag) {
+      if (options.selectOverlayOnClick) {
+        selectOverlayLayer()
+      } else {
+        clearComponentSelection()
+      }
+    }
+    resetMarqueeSelection()
+  }
+
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
+
+const handleCurtainPointerDown = (event: MouseEvent) => {
+  if (event.button !== 0) return
+  hideComponentContextMenu()
+  if (overlaySelected.value) {
+    startCurtainDrag(event)
+    return
+  }
+  startStageMarquee(event, { selectOverlayOnClick: true })
+}
+
+const focusComponent = (component: DashboardComponent, options: { preserveSelection?: boolean; bringToFront?: boolean } = {}) => {
+  const preserveSelection = options.preserveSelection === true && isComponentSelected(component.id)
+  if (preserveSelection) {
+    overlaySelected.value = false
+    activeCompId.value = component.id
+  } else {
+    setSelectedComponents([component.id], component.id)
+  }
+  if (options.bringToFront === false) return
   const nextZ = getMaxZ() + 1
   if ((component.zIndex ?? 0) < nextZ) component.zIndex = nextZ
 }
 
 const selectOverlayLayer = () => {
   overlaySelected.value = true
+  selectedComponentIds.value = []
   activeCompId.value = null
+  hideComponentContextMenu()
 }
 
 const selectLayerComponent = (component: DashboardComponent) => {
-  overlaySelected.value = false
-  activeCompId.value = component.id
+  hideComponentContextMenu()
+  setSelectedComponents([component.id], component.id)
+}
+
+const handleStageCardMouseDown = (event: MouseEvent, component: DashboardComponent) => {
+  hideComponentContextMenu()
+  if (event.button !== 0) return
+  const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id)
+  focusComponent(component, { preserveSelection, bringToFront: !preserveSelection })
+}
+
+const openComponentContextMenu = (event: MouseEvent, component: DashboardComponent) => {
+  if (!isComponentSelected(component.id)) {
+    setSelectedComponents([component.id], component.id)
+  } else {
+    overlaySelected.value = false
+    activeCompId.value = component.id
+  }
+  const menuWidth = 176
+  const menuHeight = 236
+  componentContextMenu.x = Math.max(12, Math.min(event.clientX, window.innerWidth - menuWidth - 12))
+  componentContextMenu.y = Math.max(12, Math.min(event.clientY, window.innerHeight - menuHeight - 12))
+  componentContextMenu.visible = true
 }
 
 const buildPatchedLayoutSnapshot = (component: DashboardComponent, patch: Partial<DashboardComponent>): ComponentLayoutSnapshot => {
@@ -2155,6 +2386,140 @@ const bringComponentToFront = async () => {
 const bringSpecificComponentToFront = async (component: DashboardComponent) => {
   selectLayerComponent(component)
   await applyLayoutPatch({ zIndex: getMaxZ() + 1 })
+}
+
+const buildZOrderedComponents = () => [...components.value].sort((left, right) => {
+  const zDelta = (left.zIndex ?? 0) - (right.zIndex ?? 0)
+  if (zDelta !== 0) return zDelta
+  return left.id - right.id
+})
+
+const applyOrderedZIndices = async (orderedComponents: DashboardComponent[]) => {
+  const persistPromises: Array<Promise<boolean | undefined>> = []
+  orderedComponents.forEach((component, index) => {
+    const nextZ = index + 2
+    if ((component.zIndex ?? 0) === nextZ) return
+    component.zIndex = nextZ
+    persistPromises.push(persistLayout(component, cloneComponentLayout(component)))
+  })
+  if (persistPromises.length) {
+    await Promise.all(persistPromises)
+  }
+}
+
+const getSelectedComponentsForAction = () => {
+  if (selectedStageComponents.value.length) return [...selectedStageComponents.value]
+  return activeComponent.value ? [activeComponent.value] : []
+}
+
+const bringSelectedComponentsToFront = async () => {
+  const selected = getSelectedComponentsForAction()
+  hideComponentContextMenu()
+  if (!selected.length) return
+  const selectedIds = new Set(selected.map((component) => component.id))
+  const ordered = buildZOrderedComponents()
+  const nextOrdered = [
+    ...ordered.filter((component) => !selectedIds.has(component.id)),
+    ...ordered.filter((component) => selectedIds.has(component.id)),
+  ]
+  await applyOrderedZIndices(nextOrdered)
+}
+
+const sendSelectedComponentsToBack = async () => {
+  const selected = getSelectedComponentsForAction()
+  hideComponentContextMenu()
+  if (!selected.length) return
+  const selectedIds = new Set(selected.map((component) => component.id))
+  const ordered = buildZOrderedComponents()
+  const nextOrdered = [
+    ...ordered.filter((component) => selectedIds.has(component.id)),
+    ...ordered.filter((component) => !selectedIds.has(component.id)),
+  ]
+  await applyOrderedZIndices(nextOrdered)
+}
+
+const moveSelectedComponentsForward = async () => {
+  const selected = getSelectedComponentsForAction()
+  hideComponentContextMenu()
+  if (!selected.length) return
+  const selectedIds = new Set(selected.map((component) => component.id))
+  const ordered = buildZOrderedComponents()
+  for (let index = ordered.length - 2; index >= 0; index -= 1) {
+    if (selectedIds.has(ordered[index].id) && !selectedIds.has(ordered[index + 1].id)) {
+      ;[ordered[index], ordered[index + 1]] = [ordered[index + 1], ordered[index]]
+    }
+  }
+  await applyOrderedZIndices(ordered)
+}
+
+const moveSelectedComponentsBackward = async () => {
+  const selected = getSelectedComponentsForAction()
+  hideComponentContextMenu()
+  if (!selected.length) return
+  const selectedIds = new Set(selected.map((component) => component.id))
+  const ordered = buildZOrderedComponents()
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (selectedIds.has(ordered[index].id) && !selectedIds.has(ordered[index - 1].id)) {
+      ;[ordered[index], ordered[index - 1]] = [ordered[index - 1], ordered[index]]
+    }
+  }
+  await applyOrderedZIndices(ordered)
+}
+
+const duplicateSelectedComponents = async () => {
+  if (!currentDashboard.value) return
+  const selected = getSelectedComponentsForAction()
+  hideComponentContextMenu()
+  if (!selected.length) return
+  const nextSelectedIds: number[] = []
+  for (const [index, component] of selected.entries()) {
+    const duplicated = await addDashboardComponent(currentDashboard.value.id, {
+      chartId: component.chartId,
+      posX: component.posX + 24 * (index + 1),
+      posY: component.posY + 24 * (index + 1),
+      width: component.width,
+      height: component.height,
+      zIndex: getMaxZ() + 1,
+      configJson: component.configJson ?? '',
+    })
+    normalizeLayout(duplicated)
+    components.value.push(duplicated)
+    nextSelectedIds.push(duplicated.id)
+    pushUndoEntry({ type: 'add-component', component: cloneComponentSnapshot(duplicated) })
+  }
+  dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length)
+  setSelectedComponents(nextSelectedIds, nextSelectedIds.at(-1) ?? null)
+  await nextTick()
+  await Promise.all(nextSelectedIds.map(async (componentId) => {
+    const duplicated = components.value.find((item) => item.id === componentId)
+    if (!duplicated) return
+    await loadComponentData(duplicated)
+  }))
+  ElMessage.success(nextSelectedIds.length > 1 ? `已复制 ${nextSelectedIds.length} 个组件` : '组件已复制')
+}
+
+const removeSelectedComponents = async () => {
+  const selected = getSelectedComponentsForAction()
+  hideComponentContextMenu()
+  if (!selected.length) return
+  const message = selected.length > 1
+    ? `确定删除当前选中的 ${selected.length} 个组件吗？`
+    : `确定删除组件「${getComponentDisplayName(selected[0])}」吗？`
+  try {
+    await ElMessageBox.confirm(message, '删除组件', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      draggable: true,
+    })
+    for (const component of selected) {
+      await removeComponent(component.id, { silent: true })
+    }
+    clearComponentSelection()
+    ElMessage.success(selected.length > 1 ? `已删除 ${selected.length} 个组件` : '组件已移除')
+  } catch {
+    // 用户取消删除
+  }
 }
 
 const handleRemoveActiveComponent = async () => {
@@ -2245,6 +2610,29 @@ const getResizeTransformOrigin = (handle: ResizeHandle) => {
   return `${horizontal} ${vertical}`
 }
 
+const interactionGuideLines = computed(() => {
+  const preview = interactionPreview.value
+  if (!preview) {
+    return { vertical: [] as number[], horizontal: [] as number[] }
+  }
+
+  const vertical = [
+    Math.round(preview.nextX),
+    Math.round(preview.nextX + preview.nextWidth / 2),
+    Math.round(preview.nextX + preview.nextWidth),
+  ]
+  const horizontal = [
+    Math.round(preview.nextY),
+    Math.round(preview.nextY + preview.nextHeight / 2),
+    Math.round(preview.nextY + preview.nextHeight),
+  ]
+
+  return {
+    vertical: Array.from(new Set(vertical)).filter((line) => line >= 0 && line <= canvasWorkWidth.value),
+    horizontal: Array.from(new Set(horizontal)).filter((line) => line >= 0 && line <= canvasMinHeight.value),
+  }
+})
+
 const applyInteractionFrame = () => {
   interactionFrame = null
   if (!interaction || !pendingPointer) return
@@ -2320,8 +2708,10 @@ const cleanupInteractionFrame = () => {
 }
 
 const startDrag = (event: MouseEvent, component: DashboardComponent) => {
+  hideComponentContextMenu()
   const startZIndex = component.zIndex ?? 0
-  focusComponent(component)
+  const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id)
+  focusComponent(component, { preserveSelection, bringToFront: !preserveSelection })
   interaction = {
     mode: 'move',
     compId: component.id,
@@ -2340,8 +2730,10 @@ const startDrag = (event: MouseEvent, component: DashboardComponent) => {
 }
 
 const startResize = (event: MouseEvent, component: DashboardComponent, handle: ResizeHandle = 'se') => {
+  hideComponentContextMenu()
   const startZIndex = component.zIndex ?? 0
-  focusComponent(component)
+  const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id)
+  focusComponent(component, { preserveSelection, bringToFront: !preserveSelection })
   interaction = {
     mode: 'resize',
     compId: component.id,
@@ -2899,7 +3291,7 @@ const addChartToScreen = async (
   })
   normalizeLayout(component)
   components.value.push(component)
-  activeCompId.value = component.id
+  setSelectedComponents([component.id], component.id)
   dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length)
   await nextTick()
   await loadComponentData(component)
@@ -2946,7 +3338,10 @@ const removeComponent = async (componentId: number, options: { trackUndo?: boole
   disposeChartInstance(componentId)
   deleteComponentData(componentId)
   components.value = components.value.filter((item) => item.id !== componentId)
-  if (activeCompId.value === componentId) activeCompId.value = null
+  selectedComponentIds.value = selectedComponentIds.value.filter((id) => id !== componentId)
+  if (activeCompId.value === componentId) {
+    activeCompId.value = selectedComponentIds.value.at(-1) ?? null
+  }
   dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length)
   if (snapshot && options.trackUndo !== false) {
     pushUndoEntry({ type: 'remove-component', component: cloneComponentSnapshot(snapshot) })
@@ -3133,14 +3528,18 @@ const handleWindowResize = () => {
 }
 
 onMounted(async () => {
+  document.addEventListener('mousedown', hideComponentContextMenu)
   window.addEventListener('resize', handleWindowResize)
   handleWindowResize()
   await loadBaseData()
+  await nextTick()
+  handleStageScroll()
 })
 
 onBeforeUnmount(() => {
   componentDataLoadToken += 1
   disposeComponentVisibilityObserver()
+  document.removeEventListener('mousedown', hideComponentContextMenu)
   document.removeEventListener('mousemove', onPointerMove)
   document.removeEventListener('mouseup', onPointerUp)
   cleanupInteractionFrame()
@@ -3840,6 +4239,29 @@ onBeforeUnmount(() => {
   transition: border-color 0.18s ease;
 }
 
+.stage-guide {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.stage-guide--vertical {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  border-left: 1px dashed rgba(77, 215, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(77, 215, 255, 0.14);
+}
+
+.stage-guide--horizontal {
+  left: 0;
+  right: 0;
+  height: 1px;
+  border-top: 1px dashed rgba(77, 215, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(77, 215, 255, 0.14);
+}
+
 .screen-stage--drop {
   border-color: #7bc4ff;
   box-shadow: inset 0 0 0 2px rgba(123, 196, 255, 0.25);
@@ -3848,6 +4270,15 @@ onBeforeUnmount(() => {
 .screen-stage--capturing .stage-card.active {
   border-color: transparent;
   box-shadow: none;
+}
+
+.screen-stage--capturing .stage-card.stage-card--selected {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.screen-stage--capturing .stage-marquee {
+  display: none;
 }
 
 .screen-stage--capturing .stage-card-header,
@@ -3879,17 +4310,45 @@ onBeforeUnmount(() => {
 
 .stage-card.active {
   border-color: rgba(64, 158, 255, 0.92);
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.3);
+}
+
+.stage-card--selected {
+  border-color: rgba(64, 158, 255, 0.92);
   box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.45);
 }
 
+.stage-marquee {
+  position: absolute;
+  z-index: 7;
+  border: 1px solid rgba(77, 215, 255, 0.95);
+  background: rgba(77, 215, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(77, 215, 255, 0.16);
+  pointer-events: none;
+}
+
 .stage-card-header {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  right: 8px;
+  z-index: 4;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
   cursor: move;
-  min-height: 24px;
+  min-height: 22px;
+  padding: 2px 2px 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.stage-card:hover .stage-card-header,
+.stage-card.active .stage-card-header {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .stage-card-header-main {
@@ -3919,6 +4378,7 @@ onBeforeUnmount(() => {
 .stage-card-body {
   flex: 1;
   min-height: 0;
+  height: 100%;
 }
 
 .chart-canvas,
@@ -3958,7 +4418,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding: 4px 8px;
+  padding: 2px 4px;
 }
 
 .remove-btn {
@@ -4243,14 +4703,14 @@ onBeforeUnmount(() => {
 .screen-root--quiet .lp-ac-subline,
 .screen-root--quiet .lp-hover-subtitle,
 .screen-root--quiet .lp-hover-meta,
-.screen-root--quiet .stage-card-meta,
-.screen-root--quiet .canvas-ruler-row,
-.screen-root--quiet .ruler-v-strip {
+.screen-root--quiet .stage-card-meta {
   display: none;
 }
 
 .screen-root--quiet .stage-card-header {
-  margin-bottom: 2px;
+  top: 4px;
+  left: 6px;
+  right: 6px;
   min-height: 18px;
 }
 
@@ -5213,6 +5673,43 @@ onBeforeUnmount(() => {
 .lp-layer-item--active {
   background: rgba(77,179,255,0.12);
   border-color: rgba(77,179,255,0.58);
+}
+
+.screen-context-menu {
+  position: fixed;
+  z-index: 4000;
+  min-width: 168px;
+  padding: 8px 0;
+  border-radius: 12px;
+  border: 1px solid rgba(113, 194, 255, 0.18);
+  background: linear-gradient(180deg, rgba(14, 24, 38, 0.98) 0%, rgba(9, 17, 28, 0.98) 100%);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.screen-context-menu__item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: rgba(228, 241, 255, 0.88);
+  font-size: 13px;
+  text-align: left;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+
+.screen-context-menu__item:hover {
+  background: rgba(77, 179, 255, 0.12);
+}
+
+.screen-context-menu__item--danger {
+  color: rgba(255, 151, 151, 0.96);
+}
+
+.screen-context-menu__divider {
+  height: 1px;
+  margin: 6px 0;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .lp-layer-item--drag-over {

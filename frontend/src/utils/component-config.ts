@@ -233,7 +233,7 @@ export const DEFAULT_COMPONENT_STYLE: ComponentStyleConfig = {
   shadowShow: false,
   shadowColor: 'rgba(0,0,0,0.4)',
   shadowBlur: 12,
-  padding: 12,
+  padding: 6,
 }
 
 export const DEFAULT_COMPONENT_INTERACTION: ComponentInteractionConfig = {
