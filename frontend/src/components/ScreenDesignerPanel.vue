@@ -1,5 +1,5 @@
 <template>
-  <div class="screen-root" :class="{ 'screen-root--editor': screenId, 'screen-root--quiet': screenId }">
+  <div ref="captureSurfaceRef" class="screen-root" data-capture-surface="screen-editor" :class="{ 'screen-root--editor': screenId, 'screen-root--quiet': screenId }">
     <!-- 编辑器模式：可折叠左侧综合面板 -->
     <aside
       v-if="screenId"
@@ -129,8 +129,12 @@
               <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
             </div>
 
-            <div v-if="previewTemplate" class="lp-preview-panel">
-              <div class="lp-hover-preview">
+            <div class="lp-preview-panel">
+              <div v-if="previewTemplate" class="lp-hover-preview">
+                <div class="lp-preview-status-row">
+                  <span class="lp-preview-state">{{ previewTemplateState }}</span>
+                  <el-button link type="primary" size="small" @click.stop="quickAddTemplate(previewTemplate)">加入画布</el-button>
+                </div>
                 <div class="lp-hover-head">
                   <div>
                     <div class="lp-hover-title">{{ previewTemplate.name }}</div>
@@ -155,6 +159,10 @@
                 </div>
 
                 <div class="lp-hover-meta">{{ previewTemplate.description || summarizeTemplateConfig(previewTemplate.configJson) || '拖入画布后继续配置样式和交互。' }}</div>
+              </div>
+              <div v-else class="lp-preview-empty">
+                <div class="lp-preview-empty-title">预览区</div>
+                <div class="lp-preview-empty-copy">悬停或选中组件后，在这里查看预览并直接加入画布。</div>
               </div>
             </div>
           </div>
@@ -1220,6 +1228,7 @@ const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LI
 const templateAssets = computed(() => [...localStaticTemplates.value, ...templates.value])
 const dashboardCounts = ref(new Map<number, number>())
 const componentDataMap = shallowRef(new Map<number, ChartDataResult>())
+const captureSurfaceRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLElement | null>(null)
 const stageScrollRef = ref<HTMLElement | null>(null)
 const activeCompId = ref<number | null>(null)
@@ -1455,10 +1464,13 @@ const selectedTemplate = computed(() => templateAssets.value.find((item) => item
 const previewTemplate = computed(() =>
   filteredTemplates.value.find((item) => item.id === hoveredTemplateId.value)
   ?? filteredTemplates.value.find((item) => item.id === selectedTemplateId.value)
-  ?? filteredTemplates.value[0]
-  ?? selectedTemplate.value
   ?? null
 )
+const previewTemplateState = computed(() => {
+  if (hoveredTemplateId.value && previewTemplate.value?.id === hoveredTemplateId.value) return '悬停预览'
+  if (selectedTemplateId.value && previewTemplate.value?.id === selectedTemplateId.value) return '当前选中'
+  return '预览区'
+})
 const selectedLibraryAsset = computed(() => libraryTab.value === 'templates' ? selectedTemplate.value : selectedChartAsset.value)
 const filteredDashboards = computed(() => {
   const keyword = dashboardSearch.value.trim().toLowerCase()
@@ -2371,21 +2383,9 @@ const waitForPaint = () => new Promise<void>((resolve) => {
   })
 })
 
-const prepareStageCloneForCapture = (clonedDocument: Document) => {
-  const clonedStage = clonedDocument.querySelector('.screen-stage') as HTMLElement | null
-  if (!clonedStage) return
-  clonedStage.classList.add('screen-stage--capturing')
-  clonedStage.style.transform = 'none'
-  clonedStage.style.transformOrigin = '0 0'
-  clonedStage.querySelectorAll('.stage-card.active').forEach((element) => element.classList.remove('active'))
-  clonedStage.querySelectorAll('.canvas-curtain--selected').forEach((element) => element.classList.remove('canvas-curtain--selected'))
-
-  // html2canvas clones the DOM but <canvas> elements lose their pixel data.
-  // Manually copy each original ECharts canvas into the cloned counterpart.
-  const originalStage = canvasRef.value
-  if (!originalStage) return
-  const originalCanvases = originalStage.querySelectorAll('canvas')
-  const clonedCanvases = clonedStage.querySelectorAll('canvas')
+const copyCanvasPixelsToClone = (originalRoot: HTMLElement, clonedRoot: HTMLElement) => {
+  const originalCanvases = originalRoot.querySelectorAll('canvas')
+  const clonedCanvases = clonedRoot.querySelectorAll('canvas')
   originalCanvases.forEach((orig, idx) => {
     const cloned = clonedCanvases[idx]
     if (!cloned) return
@@ -2396,13 +2396,35 @@ const prepareStageCloneForCapture = (clonedDocument: Document) => {
   })
 }
 
+const prepareCaptureClone = (clonedDocument: Document, originalTarget: HTMLElement, captureWholeEditor: boolean) => {
+  const clonedTarget = clonedDocument.querySelector('[data-capture-surface="screen-editor"]') as HTMLElement | null
+  const clonedStage = clonedDocument.querySelector('.screen-stage') as HTMLElement | null
+  if (clonedStage) {
+    clonedStage.classList.add('screen-stage--capturing')
+    if (!captureWholeEditor) {
+      clonedStage.style.transform = 'none'
+      clonedStage.style.transformOrigin = '0 0'
+    }
+    clonedStage.querySelectorAll('.stage-card.active').forEach((element) => element.classList.remove('active'))
+    clonedStage.querySelectorAll('.canvas-curtain--selected').forEach((element) => element.classList.remove('canvas-curtain--selected'))
+  }
+
+  const cloneRoot = (captureWholeEditor ? clonedTarget : clonedStage) ?? clonedStage ?? clonedTarget
+  if (!cloneRoot) return
+  copyCanvasPixelsToClone(originalTarget, cloneRoot)
+}
+
 const captureScreenCover = async () => {
   const dashboard = currentDashboard.value
   const stage = canvasRef.value
+  const captureSurface = captureSurfaceRef.value
   if (!dashboard || !stage) {
     ElMessage.warning('请先选择大屏并等待画布加载完成')
     return
   }
+
+  const captureTarget = captureSurface ?? stage
+  const captureWholeEditor = captureTarget !== stage
 
   const previousActiveCompId = activeCompId.value
   const previousOverlaySelected = overlaySelected.value
@@ -2412,30 +2434,38 @@ const captureScreenCover = async () => {
   capturingCover.value = true
   activeCompId.value = null
   overlaySelected.value = false
-  canvasScale.value = 1
+  if (!captureWholeEditor) {
+    canvasScale.value = 1
+  }
 
   try {
     await nextTick()
     await waitForPaint()
-    handleWindowResize()
+    if (!captureWholeEditor) {
+      handleWindowResize()
+      await waitForPaint()
+    }
+
+    const captureWidth = Math.max(captureTarget.scrollWidth, captureTarget.clientWidth)
+    const captureHeight = Math.max(captureTarget.scrollHeight, captureTarget.clientHeight)
 
     const captureOptions = {
       backgroundColor: null,
       useCORS: true,
       logging: false,
       scale: Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
-      x: overlayConfig.x,
-      y: overlayConfig.y,
-      width: overlayConfig.w,
-      height: overlayConfig.h,
+      x: 0,
+      y: 0,
+      width: captureWidth,
+      height: captureHeight,
       scrollX: 0,
       scrollY: 0,
-      windowWidth: Math.max(stage.scrollWidth, overlayConfig.x + overlayConfig.w),
-      windowHeight: Math.max(stage.scrollHeight, overlayConfig.y + overlayConfig.h),
-      onclone: prepareStageCloneForCapture,
+      windowWidth: captureWidth,
+      windowHeight: captureHeight,
+      onclone: (clonedDocument: Document) => prepareCaptureClone(clonedDocument, captureTarget, captureWholeEditor),
     }
     const { default: html2canvas } = await import('html2canvas')
-    const canvas = await html2canvas(stage, captureOptions as Parameters<typeof html2canvas>[1])
+    const canvas = await html2canvas(captureTarget, captureOptions as Parameters<typeof html2canvas>[1])
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((result: Blob | null) => resolve(result), 'image/png'))
     if (!blob) {
       throw new Error('封面截图生成失败')
@@ -2458,7 +2488,9 @@ const captureScreenCover = async () => {
     capturingCover.value = false
     activeCompId.value = previousActiveCompId
     overlaySelected.value = previousOverlaySelected
-    canvasScale.value = previousCanvasScale
+    if (!captureWholeEditor) {
+      canvasScale.value = previousCanvasScale
+    }
     await nextTick()
     handleWindowResize()
     coverSaving.value = false
@@ -3817,6 +3849,27 @@ onBeforeUnmount(() => {
   cursor: grabbing;
 }
 
+:global(body.canvas-interacting) .screen-stage,
+:global(body.canvas-interacting) .screen-stage * {
+  cursor: grabbing !important;
+}
+
+:global(body.canvas-interacting) .screen-stage .stage-card,
+:global(body.canvas-interacting) .screen-stage .canvas-curtain,
+:global(body.canvas-interacting) .screen-stage .resize-handle,
+:global(body.canvas-interacting) .screen-stage .remove-btn {
+  transition: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+:global(body.canvas-interacting) .screen-stage .stage-card-body,
+:global(body.canvas-interacting) .screen-stage .stage-card-body *,
+:global(body.canvas-interacting) .screen-stage .stage-card:not(.active),
+:global(body.canvas-interacting) .screen-stage .canvas-curtain {
+  pointer-events: none !important;
+}
+
 @media (max-width: 1200px) {
   .screen-root {
     grid-template-columns: 1fr;
@@ -4502,11 +4555,54 @@ onBeforeUnmount(() => {
 
 .lp-preview-panel {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   border-radius: 16px;
   border: 1px solid rgba(110,188,255,0.12);
   background: linear-gradient(180deg, rgba(10,19,31,0.98) 0%, rgba(8,15,24,0.98) 100%);
   box-shadow: 0 20px 48px rgba(0,0,0,0.24);
-  padding: 12px;
+  padding: 10px 12px;
+}
+
+.lp-preview-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lp-preview-state {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(77,179,255,0.1);
+  border: 1px solid rgba(77,179,255,0.18);
+  color: rgba(216,239,255,0.82);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.lp-preview-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 2px;
+}
+
+.lp-preview-empty-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(238,247,255,0.9);
+}
+
+.lp-preview-empty-copy {
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgba(180,208,238,0.6);
 }
 
 .lp-asset-card {
@@ -4737,7 +4833,7 @@ onBeforeUnmount(() => {
 .lp-hover-preview {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .lp-hover-head {
@@ -4773,7 +4869,7 @@ onBeforeUnmount(() => {
 }
 
 .lp-hover-stage {
-  height: 170px;
+  height: 132px;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(110,188,255,0.12);
