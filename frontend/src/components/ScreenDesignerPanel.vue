@@ -403,6 +403,15 @@
           <!-- 画布顶部栏 -->
           <div class="canvas-topbar">
             <span class="canvas-tb-label">背景版</span>
+            <div class="canvas-tb-overlay-ctrl">
+              <div class="canvas-tb-zoom">
+                <el-button text size="small" @click="zoomOut">-</el-button>
+                <span class="zoom-label" @click="zoomFit">{{ Math.round(canvasScale * 100) }}%</span>
+                <el-button text size="small" @click="zoomIn">+</el-button>
+              </div>
+              <el-button text size="small" @click="zoomFit">适配屏幕</el-button>
+              <el-button text size="small" @click="zoomReset">100%</el-button>
+            </div>
           </div>
           <div class="canvas-main-row">
               <div class="ruler-v-strip">
@@ -740,7 +749,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, triggerRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, triggerRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Grid, Operation, PictureFilled, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import ComponentDataFallback from './ComponentDataFallback.vue'
@@ -1606,6 +1615,10 @@ const canvasMinHeight = computed(() => {
   const bgBottom = overlayConfig.y + overlayConfig.h + 200
   const occupied = components.value.reduce((max, item) => Math.max(max, item.posY + item.height + 24), 0)
   return Math.max(currentCanvasConfig.value.height, bgBottom, 560, occupied)
+})
+
+watch([canvasWorkWidth, canvasMinHeight], () => {
+  scheduleCanvasFit()
 })
 
 const RULER_STEP = 200 // 加大标尺间距减少 DOM 数量

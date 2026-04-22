@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
-import { clearAuthSession, getAuthToken, getAuthUsername } from '../utils/auth-session';
+import { clearAuthSession, getAuthToken } from '../utils/auth-session';
 // 创建 axios 实例，统一设置 baseURL 与超时
 const request = axios.create({
     baseURL: '/api',
@@ -28,12 +28,8 @@ const handleUnauthorized = (message) => {
 // 请求拦截器：自动附加 token（若存在）
 request.interceptors.request.use((config) => {
     const token = getAuthToken();
-    const operator = getAuthUsername();
     if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    if (operator) {
-        config.headers['X-Operator'] = operator;
     }
     return config;
 });
