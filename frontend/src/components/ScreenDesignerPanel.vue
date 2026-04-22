@@ -1,5 +1,5 @@
 <template>
-  <div ref="captureSurfaceRef" class="screen-root" data-capture-surface="screen-editor" :class="{ 'screen-root--editor': screenId, 'screen-root--quiet': screenId }">
+  <div class="screen-root" :class="{ 'screen-root--editor': screenId, 'screen-root--quiet': screenId }">
     <!-- 编辑器模式：可折叠左侧综合面板 -->
     <aside
       v-if="screenId"
@@ -99,70 +99,72 @@
               </div>
             </div>
 
-            <div class="lp-asset-scroll">
-              <div
-                v-for="template in filteredTemplates"
-                :key="template.id"
-                class="lp-asset-card lp-asset-card--compact"
-                :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
-                draggable="true"
-                @click="selectedTemplateId = template.id"
-                @mouseenter="hoveredTemplateId = template.id"
-                @mouseleave="hoveredTemplateId = null"
-                @dblclick="quickAddTemplate(template)"
-                @dragstart="onTemplateDragStart($event, template)"
-                @dragend="onTemplateDragEnd"
-              >
-                <div class="lp-ac-row">
-                  <span class="lp-ac-name">{{ template.name }}</span>
-                  <div class="lp-ac-tags">
-                    <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
-                    <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
+            <div class="lp-library-body" @mouseleave="clearTemplatePreviewState">
+              <div class="lp-asset-scroll">
+                <div
+                  v-for="template in filteredTemplates"
+                  :key="template.id"
+                  class="lp-asset-card lp-asset-card--compact"
+                  :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
+                  draggable="true"
+                  @click="selectTemplatePreview(template.id)"
+                  @mouseenter="hoverTemplatePreview(template.id)"
+                  @mouseleave="hoveredTemplateId = null"
+                  @dblclick="quickAddTemplate(template)"
+                  @dragstart="onTemplateDragStart($event, template)"
+                  @dragend="onTemplateDragEnd"
+                >
+                  <div class="lp-ac-row">
+                    <span class="lp-ac-name">{{ template.name }}</span>
+                    <div class="lp-ac-tags">
+                      <el-tag v-if="template.builtIn" size="small" type="success" class="lp-tag">默</el-tag>
+                      <el-tag size="small" effect="dark" class="lp-tag">{{ chartTypeLabel(template.chartType) }}</el-tag>
+                    </div>
+                  </div>
+                  <div class="lp-ac-subline">
+                    <span class="lp-ac-size">{{ getTemplateLayoutText(template) }}</span>
+                    <span class="lp-ac-lite-badge">{{ getAssetBadgeText(template.chartType) }}</span>
                   </div>
                 </div>
-                <div class="lp-ac-subline">
-                  <span class="lp-ac-size">{{ getTemplateLayoutText(template) }}</span>
-                  <span class="lp-ac-lite-badge">{{ getAssetBadgeText(template.chartType) }}</span>
-                </div>
+
+                <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
               </div>
 
-              <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
-            </div>
-
-            <div class="lp-preview-panel">
-              <div v-if="previewTemplate" class="lp-hover-preview">
-                <div class="lp-preview-status-row">
-                  <span class="lp-preview-state">{{ previewTemplateState }}</span>
-                  <el-button link type="primary" size="small" @click.stop="quickAddTemplate(previewTemplate)">加入画布</el-button>
-                </div>
-                <div class="lp-hover-head">
-                  <div>
-                    <div class="lp-hover-title">{{ previewTemplate.name }}</div>
-                    <div class="lp-hover-subtitle">{{ chartTypeLabel(previewTemplate.chartType) }} · {{ getTemplateLayoutText(previewTemplate) }}</div>
+              <div class="lp-preview-panel" :class="{ 'lp-preview-panel--empty': !previewTemplate }">
+                <div v-if="previewTemplate" class="lp-hover-preview">
+                  <div class="lp-preview-status-row">
+                    <span class="lp-preview-state">{{ previewTemplateState }}</span>
+                    <el-button link type="primary" size="small" @click.stop="quickAddTemplate(previewTemplate)">加入画布</el-button>
                   </div>
-                  <span class="lp-hover-pill">{{ getAssetBadgeText(previewTemplate.chartType) }}</span>
-                </div>
+                  <div class="lp-hover-head">
+                    <div>
+                      <div class="lp-hover-title">{{ previewTemplate.name }}</div>
+                      <div class="lp-hover-subtitle">{{ chartTypeLabel(previewTemplate.chartType) }} · {{ getTemplateLayoutText(previewTemplate) }}</div>
+                    </div>
+                    <span class="lp-hover-pill">{{ getAssetBadgeText(previewTemplate.chartType) }}</span>
+                  </div>
 
-                <div class="lp-hover-stage">
-                  <ComponentStaticPreview
-                    v-if="isTemplateStaticAsset(previewTemplate)"
-                    :chart-type="getTemplateAssetConfig(previewTemplate).chart.chartType"
-                    :chart-config="getTemplateAssetConfig(previewTemplate).chart"
-                    :show-title="false"
-                    dark
-                  />
-                  <ComponentTemplatePreview
-                    v-else
-                    :chart-config="getTemplateAssetConfig(previewTemplate).chart"
-                    :style-config="getTemplateAssetConfig(previewTemplate).style"
-                  />
-                </div>
+                  <div class="lp-hover-stage">
+                    <ComponentStaticPreview
+                      v-if="isTemplateStaticAsset(previewTemplate)"
+                      :chart-type="getTemplateAssetConfig(previewTemplate).chart.chartType"
+                      :chart-config="getTemplateAssetConfig(previewTemplate).chart"
+                      :show-title="false"
+                      dark
+                    />
+                    <ComponentTemplatePreview
+                      v-else
+                      :chart-config="getTemplateAssetConfig(previewTemplate).chart"
+                      :style-config="getTemplateAssetConfig(previewTemplate).style"
+                    />
+                  </div>
 
-                <div class="lp-hover-meta">{{ previewTemplate.description || summarizeTemplateConfig(previewTemplate.configJson) || '拖入画布后继续配置样式和交互。' }}</div>
-              </div>
-              <div v-else class="lp-preview-empty">
-                <div class="lp-preview-empty-title">预览区</div>
-                <div class="lp-preview-empty-copy">悬停或选中组件后，在这里查看预览并直接加入画布。</div>
+                  <div class="lp-hover-meta">{{ previewTemplate.description || summarizeTemplateConfig(previewTemplate.configJson) || '拖入画布后继续配置样式和交互。' }}</div>
+                </div>
+                <div v-else class="lp-preview-placeholder">
+                  <div class="lp-preview-placeholder-title">悬停预览</div>
+                  <div class="lp-preview-placeholder-copy">把鼠标移到组件上，或点击组件后在这里查看稳定预览。</div>
+                </div>
               </div>
             </div>
           </div>
@@ -378,6 +380,7 @@
           <div class="screen-actions">
             <el-button size="small" :icon="Refresh" :loading="compLoading" @click="loadComponents" title="刷新画布" />
             <el-button size="small" :icon="PictureFilled" :loading="coverSaving" @click="captureScreenCover">{{ currentCoverConfig.url ? '更新封面' : '生成封面' }}</el-button>
+            <el-button size="small" :disabled="!canUndo" :loading="undoApplying" @click="undoLastChange">撤销</el-button>
             <el-button size="small" :icon="View" @click="openPreview" title="预览" />
             <el-button size="small" :icon="Download" @click="exportScreenJson" title="导出JSON" />
             <el-divider direction="vertical" />
@@ -397,69 +400,8 @@
           <!-- 画布顶部栏 -->
           <div class="canvas-topbar">
             <span class="canvas-tb-label">背景版</span>
-            <div class="canvas-tb-controls">
-              <el-select
-                :model-value="matchedBgPreset"
-                size="small"
-                style="width: 130px"
-                :disabled="canvasSaving"
-                @change="applyBgPreset"
-              >
-                <el-option
-                  v-for="item in SCREEN_CANVAS_PRESETS"
-                  :key="item.id"
-                  :label="item.label"
-                  :value="item.id"
-                />
-                <el-option label="自定义" value="custom" />
-              </el-select>
-              <el-input-number
-                :model-value="overlayConfig.w"
-                :min="640" :max="7680" :step="10"
-                size="small" controls-position="right" :disabled="canvasSaving"
-                @change="onBgWidthChange"
-              />
-              <span class="canvas-tb-sep">×</span>
-              <el-input-number
-                :model-value="overlayConfig.h"
-                :min="360" :max="4320" :step="10"
-                size="small" controls-position="right" :disabled="canvasSaving"
-                @change="onBgHeightChange"
-              />
-            </div>
-            <span v-if="!screenId" class="canvas-tb-tip">{{ components.length }} 组件 · 双击左侧加入 · 拖标题移动 · 点击背景版编辑样式</span>
-            <!-- 缩放控制 -->
-            <div class="canvas-tb-zoom">
-              <el-tooltip content="缩小"><el-button link size="small" @click="zoomOut" :disabled="canvasScale <= SCALE_MIN">−</el-button></el-tooltip>
-              <span class="zoom-label" @click="zoomReset">{{ Math.round(canvasScale * 100) }}%</span>
-              <el-tooltip content="放大"><el-button link size="small" @click="zoomIn" :disabled="canvasScale >= SCALE_MAX">+</el-button></el-tooltip>
-              <el-tooltip content="适应屏幕"><el-button link size="small" @click="zoomFit">适应</el-button></el-tooltip>
-            </div>
-            <!-- 背景版快速颜色控制 -->
-            <div class="canvas-tb-overlay-ctrl">
-              <span style="color:#8899aa;font-size:12px;margin-right:4px">背景:</span>
-              <el-color-picker v-model="overlayConfig.bgColor" show-alpha size="small" @change="saveOverlay" />
-              <el-tooltip content="不透明度" placement="bottom">
-                <el-input-number
-                  v-model="overlayConfig.opacity"
-                  :min="0.05" :max="1" :step="0.05" :precision="2"
-                  size="small" controls-position="right"
-                  style="width:76px"
-                  @change="saveOverlay"
-                />
-              </el-tooltip>
-            </div>
           </div>
-
-          <!-- 标尺 + 画布工作区 -->
-          <div class="canvas-work-area">
-            <div class="canvas-ruler-row">
-              <div class="ruler-corner"></div>
-              <div class="ruler-h-strip">
-                <span v-for="m in hRulerMarks" :key="m" class="ruler-h-mark" :style="{ left: m + 'px' }">{{ m }}</span>
-              </div>
-            </div>
-            <div class="canvas-main-row">
+          <div class="canvas-main-row">
               <div class="ruler-v-strip">
                 <span v-for="m in vRulerMarks" :key="m" class="ruler-v-mark" :style="{ top: m + 'px' }">{{ m }}</span>
               </div>
@@ -539,10 +481,6 @@
                   </div>
                   <div v-else-if="isTableChart(component)" class="table-wrapper">
                     <el-table
-                      :data="getTableRows(component.id)"
-                      height="100%"
-                      size="small"
-                      :stripe="getComponentConfig(component).style.tableStriped"
                       :show-header="true"
                       :header-cell-style="{
                         background: getComponentConfig(component).style.tableHeaderBg,
@@ -616,7 +554,6 @@
               </div>
             </div>
           </div>
-        </div>
       </template>
     </main>
 
@@ -1228,7 +1165,6 @@ const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LI
 const templateAssets = computed(() => [...localStaticTemplates.value, ...templates.value])
 const dashboardCounts = ref(new Map<number, number>())
 const componentDataMap = shallowRef(new Map<number, ChartDataResult>())
-const captureSurfaceRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLElement | null>(null)
 const stageScrollRef = ref<HTMLElement | null>(null)
 const activeCompId = ref<number | null>(null)
@@ -1248,12 +1184,63 @@ const assetType = ref('')
 const selectedChartId = ref<number | null>(null)
 const selectedTemplateId = ref<number | null>(null)
 const hoveredTemplateId = ref<number | null>(null)
+const previewTemplateId = ref<number | null>(null)
 const draggingTemplateId = ref<number | null>(null)
 const draggingChartId = ref<number | null>(null)
 const draggingTypeChip = ref<string | null>(null)
 const stageDropActive = ref(false)
 const layerDragFromIdx = ref<number | null>(null)
 const layerDragOverIdx = ref<number | null>(null)
+
+interface ComponentLayoutSnapshot {
+  posX: number
+  posY: number
+  width: number
+  height: number
+  zIndex: number
+}
+
+interface ComponentSnapshot extends ComponentLayoutSnapshot {
+  id: number
+  chartId: number
+  configJson: string
+}
+
+interface OverlaySnapshot {
+  show: boolean
+  bgColor: string
+  opacity: number
+  x: number
+  y: number
+  w: number
+  h: number
+  bgType: 'solid' | 'gradient' | 'image'
+  gradientStart: string
+  gradientEnd: string
+  gradientAngle: number
+  bgImage: string
+}
+
+type UndoEntry =
+  | { type: 'layout'; componentId: number; before: ComponentLayoutSnapshot; after: ComponentLayoutSnapshot }
+  | { type: 'component-config'; componentId: number; before: { chartId: number; configJson: string }; after: { chartId: number; configJson: string } }
+  | { type: 'overlay'; before: OverlaySnapshot; after: OverlaySnapshot }
+  | { type: 'add-component'; component: ComponentSnapshot }
+  | { type: 'remove-component'; component: ComponentSnapshot }
+
+const undoStack = ref<UndoEntry[]>([])
+const undoApplying = ref(false)
+const canUndo = computed(() => undoStack.value.length > 0 && !undoApplying.value)
+const lastSavedOverlaySnapshot = ref<OverlaySnapshot | null>(null)
+
+const clearUndoHistory = () => {
+  undoStack.value = []
+}
+
+const pushUndoEntry = (entry: UndoEntry) => {
+  if (undoApplying.value) return
+  undoStack.value = [...undoStack.value, entry].slice(-3)
+}
 
 const createDashVisible = ref(false)
 const dashSaving = ref(false)
@@ -1339,25 +1326,16 @@ const loadOverlayFromConfig = () => {
     overlayConfig.w = currentCanvasConfig.value.width
     overlayConfig.h = currentCanvasConfig.value.height
   }
+  lastSavedOverlaySnapshot.value = cloneOverlaySnapshot()
 }
 
 const saveOverlay = async () => {
-  await updateCanvasConfig({
-    overlay: {
-      show: overlayConfig.show,
-      bgColor: overlayConfig.bgColor,
-      opacity: overlayConfig.opacity,
-      x: overlayConfig.x,
-      y: overlayConfig.y,
-      w: overlayConfig.w,
-      h: overlayConfig.h,
-      bgType: overlayConfig.bgType,
-      gradientStart: overlayConfig.gradientStart,
-      gradientEnd: overlayConfig.gradientEnd,
-      gradientAngle: overlayConfig.gradientAngle,
-      bgImage: overlayConfig.bgImage,
-    }
-  })
+  const before = lastSavedOverlaySnapshot.value ? cloneOverlaySnapshot(lastSavedOverlaySnapshot.value) : cloneOverlaySnapshot()
+  const next = cloneOverlaySnapshot()
+  if (overlaySnapshotsEqual(before, next)) return
+  await updateCanvasConfig({ overlay: next })
+  pushUndoEntry({ type: 'overlay', before, after: next })
+  lastSavedOverlaySnapshot.value = cloneOverlaySnapshot(next)
 }
 
 const toggleOverlay = async () => {
@@ -1459,16 +1437,33 @@ const filteredTemplates = computed(() => {
   })
 })
 
+const hoverTemplatePreview = (templateId: number) => {
+  hoveredTemplateId.value = templateId
+  previewTemplateId.value = templateId
+}
+
+const selectTemplatePreview = (templateId: number) => {
+  selectedTemplateId.value = templateId
+  previewTemplateId.value = templateId
+}
+
+const clearTemplatePreviewState = () => {
+  hoveredTemplateId.value = null
+  if (!selectedTemplateId.value) previewTemplateId.value = null
+}
+
 const selectedChartAsset = computed(() => charts.value.find((item) => item.id === selectedChartId.value) ?? null)
 const selectedTemplate = computed(() => templateAssets.value.find((item) => item.id === selectedTemplateId.value) ?? null)
 const previewTemplate = computed(() =>
   filteredTemplates.value.find((item) => item.id === hoveredTemplateId.value)
   ?? filteredTemplates.value.find((item) => item.id === selectedTemplateId.value)
+  ?? filteredTemplates.value.find((item) => item.id === previewTemplateId.value)
   ?? null
 )
 const previewTemplateState = computed(() => {
   if (hoveredTemplateId.value && previewTemplate.value?.id === hoveredTemplateId.value) return '悬停预览'
   if (selectedTemplateId.value && previewTemplate.value?.id === selectedTemplateId.value) return '当前选中'
+  if (previewTemplateId.value && previewTemplate.value?.id === previewTemplateId.value) return '最近浏览'
   return '预览区'
 })
 const selectedLibraryAsset = computed(() => libraryTab.value === 'templates' ? selectedTemplate.value : selectedChartAsset.value)
@@ -1621,11 +1616,89 @@ const normalizeLayout = (component: DashboardComponent) => {
   component.zIndex = Number(component.zIndex) || 0
 }
 
+const cloneComponentLayout = (component: Pick<DashboardComponent, 'posX' | 'posY' | 'width' | 'height' | 'zIndex'>): ComponentLayoutSnapshot => ({
+  posX: Math.max(0, Math.round(Number(component.posX) || 0)),
+  posY: Math.max(0, Math.round(Number(component.posY) || 0)),
+  width: Math.max(MIN_CARD_WIDTH, Math.round(Number(component.width) || MIN_CARD_WIDTH)),
+  height: Math.max(MIN_CARD_HEIGHT, Math.round(Number(component.height) || MIN_CARD_HEIGHT)),
+  zIndex: Math.max(0, Math.round(Number(component.zIndex) || 0)),
+})
+
+const cloneComponentSnapshot = (component: DashboardComponent): ComponentSnapshot => ({
+  id: component.id,
+  chartId: component.chartId,
+  configJson: component.configJson ?? '',
+  ...cloneComponentLayout(component),
+})
+
+const cloneOverlaySnapshot = (source: OverlaySnapshot | typeof overlayConfig = overlayConfig): OverlaySnapshot => ({
+  show: source.show,
+  bgColor: source.bgColor,
+  opacity: source.opacity,
+  x: source.x,
+  y: source.y,
+  w: source.w,
+  h: source.h,
+  bgType: source.bgType,
+  gradientStart: source.gradientStart,
+  gradientEnd: source.gradientEnd,
+  gradientAngle: source.gradientAngle,
+  bgImage: source.bgImage,
+})
+
+const applyOverlaySnapshot = (snapshot: OverlaySnapshot) => {
+  overlayConfig.show = snapshot.show
+  overlayConfig.bgColor = snapshot.bgColor
+  overlayConfig.opacity = snapshot.opacity
+  overlayConfig.x = snapshot.x
+  overlayConfig.y = snapshot.y
+  overlayConfig.w = snapshot.w
+  overlayConfig.h = snapshot.h
+  overlayConfig.bgType = snapshot.bgType
+  overlayConfig.gradientStart = snapshot.gradientStart
+  overlayConfig.gradientEnd = snapshot.gradientEnd
+  overlayConfig.gradientAngle = snapshot.gradientAngle
+  overlayConfig.bgImage = snapshot.bgImage
+}
+
+const applyComponentLayoutSnapshot = (component: DashboardComponent, snapshot: ComponentLayoutSnapshot) => {
+  component.posX = snapshot.posX
+  component.posY = snapshot.posY
+  component.width = snapshot.width
+  component.height = snapshot.height
+  component.zIndex = snapshot.zIndex
+  normalizeLayout(component)
+}
+
+const layoutSnapshotsEqual = (left: ComponentLayoutSnapshot, right: ComponentLayoutSnapshot) => (
+  left.posX === right.posX
+  && left.posY === right.posY
+  && left.width === right.width
+  && left.height === right.height
+  && left.zIndex === right.zIndex
+)
+
+const overlaySnapshotsEqual = (left: OverlaySnapshot, right: OverlaySnapshot) => (
+  left.show === right.show
+  && left.bgColor === right.bgColor
+  && left.opacity === right.opacity
+  && left.x === right.x
+  && left.y === right.y
+  && left.w === right.w
+  && left.h === right.h
+  && left.bgType === right.bgType
+  && left.gradientStart === right.gradientStart
+  && left.gradientEnd === right.gradientEnd
+  && left.gradientAngle === right.gradientAngle
+  && left.bgImage === right.bgImage
+)
+
 const getCardStyle = (component: DashboardComponent) => {
   const style = getComponentConfig(component).style
   const shadow = style.shadowShow
     ? `0 4px ${style.shadowBlur ?? 12}px ${style.shadowColor ?? 'rgba(0,0,0,0.4)'}`
     : undefined
+  const preview = interactionPreview.value?.compId === component.id ? interactionPreview.value : null
   return {
     left: `${component.posX}px`,
     top: `${component.posY}px`,
@@ -1637,6 +1710,8 @@ const getCardStyle = (component: DashboardComponent) => {
     opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
     boxShadow: shadow,
     padding: style.padding != null && style.padding > 0 ? `${style.padding}px` : undefined,
+    transform: preview?.transform,
+    transformOrigin: preview?.transformOrigin,
   }
 }
 
@@ -1837,7 +1912,6 @@ const loadBaseData = async () => {
     charts.value = chartList
     datasets.value = datasetList
     templates.value = templateList
-    if (!selectedTemplateId.value && templateAssets.value.length) selectedTemplateId.value = templateAssets.value[0].id
     if (!selectedChartId.value && chartList.length) selectedChartId.value = chartList[0].id
 
     if (props.screenId) {
@@ -1867,6 +1941,7 @@ const selectDashboard = async (dashboard: Dashboard) => {
   currentDashboard.value = dashboard
   activeCompId.value = null
   overlaySelected.value = false
+  clearUndoHistory()
   await loadComponents()
   loadOverlayFromConfig()
   await nextTick()
@@ -2005,18 +2080,29 @@ const selectLayerComponent = (component: DashboardComponent) => {
   activeCompId.value = component.id
 }
 
+const buildPatchedLayoutSnapshot = (component: DashboardComponent, patch: Partial<DashboardComponent>): ComponentLayoutSnapshot => {
+  const next = cloneComponentLayout(component)
+  if (typeof patch.posX === 'number') next.posX = Math.max(0, Math.round(patch.posX))
+  if (typeof patch.posY === 'number') next.posY = Math.max(0, Math.round(patch.posY))
+  if (typeof patch.width === 'number') next.width = Math.max(MIN_CARD_WIDTH, Math.round(patch.width))
+  if (typeof patch.height === 'number') next.height = Math.max(MIN_CARD_HEIGHT, Math.round(patch.height))
+  if (typeof patch.zIndex === 'number') next.zIndex = Math.max(0, Math.round(patch.zIndex))
+  return next
+}
+
 const applyLayoutPatch = async (patch: Partial<DashboardComponent>) => {
   const component = activeComponent.value
   if (!component) return
-  if (typeof patch.posX === 'number') component.posX = Math.max(0, Math.round(patch.posX))
-  if (typeof patch.posY === 'number') component.posY = Math.max(0, Math.round(patch.posY))
-  if (typeof patch.width === 'number') component.width = Math.max(MIN_CARD_WIDTH, Math.round(patch.width))
-  if (typeof patch.height === 'number') component.height = Math.max(MIN_CARD_HEIGHT, Math.round(patch.height))
-  if (typeof patch.zIndex === 'number') component.zIndex = Math.max(0, Math.round(patch.zIndex))
-  normalizeLayout(component)
+  const before = cloneComponentLayout(component)
+  const next = buildPatchedLayoutSnapshot(component, patch)
+  if (layoutSnapshotsEqual(before, next)) return
+  applyComponentLayoutSnapshot(component, next)
   await nextTick()
   chartInstances.get(component.id)?.resize()
-  await persistLayout(component)
+  const persisted = await persistLayout(component, next)
+  if (persisted) {
+    pushUndoEntry({ type: 'layout', componentId: component.id, before, after: next })
+  }
 }
 
 const bringComponentToFront = async () => {
@@ -2044,26 +2130,36 @@ const previewActiveComponent = async (payload: { chartId: number; configJson: st
 const saveActiveComponent = async (payload: { chartId: number; configJson: string }) => {
   const component = activeComponent.value
   if (!component || !currentDashboard.value) return
+  const before = {
+    chartId: component.chartId,
+    configJson: component.configJson ?? '',
+  }
   const updated = await updateDashboardComponent(currentDashboard.value.id, component.id, payload)
-  await syncComponentPreview(component, {
+  const next = {
     chartId: updated.chartId ?? payload.chartId,
     configJson: updated.configJson ?? payload.configJson,
-  })
+  }
+  await syncComponentPreview(component, next)
+  if (before.chartId !== next.chartId || before.configJson !== next.configJson) {
+    pushUndoEntry({ type: 'component-config', componentId: component.id, before, after: next })
+  }
   ElMessage.success('组件实例配置已保存')
 }
 
-const persistLayout = async (component: DashboardComponent) => {
+const persistLayout = async (component: DashboardComponent, layout: ComponentLayoutSnapshot = cloneComponentLayout(component)) => {
   if (!currentDashboard.value) return
   try {
     await updateDashboardComponent(currentDashboard.value.id, component.id, {
-      posX: Math.round(component.posX),
-      posY: Math.round(component.posY),
-      width: Math.round(component.width),
-      height: Math.round(component.height),
-      zIndex: component.zIndex,
+      posX: layout.posX,
+      posY: layout.posY,
+      width: layout.width,
+      height: layout.height,
+      zIndex: layout.zIndex,
     })
+    return true
   } catch {
     ElMessage.warning('布局保存失败，请重试')
+    return false
   }
 }
 
@@ -2078,23 +2174,34 @@ interface InteractionState {
   startY: number
   startWidth: number
   startHeight: number
+  startZIndex: number
   handle?: ResizeHandle
 }
 
+interface InteractionPreview {
+  compId: number
+  nextX: number
+  nextY: number
+  nextWidth: number
+  nextHeight: number
+  transform: string
+  transformOrigin: string
+}
+
 let interaction: InteractionState | null = null
+const interactionPreview = shallowRef<InteractionPreview | null>(null)
 const resizeHandles: ResizeHandle[] = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw']
-const INTERACTION_CHART_RESIZE_INTERVAL = 48
-let lastInteractionChartResizeAt = 0
 
 const findComponent = (id: number) => components.value.find((item) => item.id === id)
 
-const resizeInteractionChart = (componentId: number, force = false) => {
-  const instance = chartInstances.get(componentId)
-  if (!instance) return
-  const now = performance.now()
-  if (!force && now - lastInteractionChartResizeAt < INTERACTION_CHART_RESIZE_INTERVAL) return
-  lastInteractionChartResizeAt = now
-  instance.resize()
+const resizeInteractionChart = (componentId: number) => {
+  chartInstances.get(componentId)?.resize()
+}
+
+const getResizeTransformOrigin = (handle: ResizeHandle) => {
+  const horizontal = handle.includes('w') ? 'right' : handle.includes('e') ? 'left' : 'center'
+  const vertical = handle.includes('n') ? 'bottom' : handle.includes('s') ? 'top' : 'center'
+  return `${horizontal} ${vertical}`
 }
 
 const applyInteractionFrame = () => {
@@ -2108,9 +2215,17 @@ const applyInteractionFrame = () => {
   const dy = (pendingPointer.y - interaction.startMouseY) / scale
 
   if (interaction.mode === 'move') {
-    const maxX = Math.max(0, getCanvasWidth() - component.width)
-    component.posX = Math.min(maxX, Math.max(0, interaction.startX + dx))
-    component.posY = Math.max(0, interaction.startY + dy)
+    const nextX = Math.min(Math.max(0, getCanvasWidth() - interaction.startWidth), Math.max(0, interaction.startX + dx))
+    const nextY = Math.max(0, interaction.startY + dy)
+    interactionPreview.value = {
+      compId: component.id,
+      nextX: Math.round(nextX),
+      nextY: Math.round(nextY),
+      nextWidth: interaction.startWidth,
+      nextHeight: interaction.startHeight,
+      transform: `translate(${Math.round(nextX - interaction.startX)}px, ${Math.round(nextY - interaction.startY)}px)`,
+      transformOrigin: 'left top',
+    }
   } else {
     const handle = interaction.handle ?? 'se'
     let nextX = interaction.startX
@@ -2136,11 +2251,15 @@ const applyInteractionFrame = () => {
       nextHeight = interaction.startHeight - (nextY - interaction.startY)
     }
 
-    component.posX = Math.round(nextX)
-    component.posY = Math.round(nextY)
-    component.width = Math.round(nextWidth)
-    component.height = Math.round(nextHeight)
-    resizeInteractionChart(component.id)
+    interactionPreview.value = {
+      compId: component.id,
+      nextX: Math.round(nextX),
+      nextY: Math.round(nextY),
+      nextWidth: Math.round(nextWidth),
+      nextHeight: Math.round(nextHeight),
+      transform: `translate(${Math.round(nextX - interaction.startX)}px, ${Math.round(nextY - interaction.startY)}px) scale(${nextWidth / interaction.startWidth}, ${nextHeight / interaction.startHeight})`,
+      transformOrigin: getResizeTransformOrigin(handle),
+    }
   }
 }
 
@@ -2155,12 +2274,13 @@ const cleanupInteractionFrame = () => {
     interactionFrame = null
   }
   pendingPointer = null
+  interactionPreview.value = null
   document.body.classList.remove('canvas-interacting')
 }
 
 const startDrag = (event: MouseEvent, component: DashboardComponent) => {
+  const startZIndex = component.zIndex ?? 0
   focusComponent(component)
-  lastInteractionChartResizeAt = 0
   interaction = {
     mode: 'move',
     compId: component.id,
@@ -2170,6 +2290,7 @@ const startDrag = (event: MouseEvent, component: DashboardComponent) => {
     startY: component.posY,
     startWidth: component.width,
     startHeight: component.height,
+    startZIndex,
   }
   pendingPointer = { x: event.clientX, y: event.clientY }
   document.body.classList.add('canvas-interacting')
@@ -2178,8 +2299,8 @@ const startDrag = (event: MouseEvent, component: DashboardComponent) => {
 }
 
 const startResize = (event: MouseEvent, component: DashboardComponent, handle: ResizeHandle = 'se') => {
+  const startZIndex = component.zIndex ?? 0
   focusComponent(component)
-  lastInteractionChartResizeAt = 0
   interaction = {
     mode: 'resize',
     compId: component.id,
@@ -2189,6 +2310,7 @@ const startResize = (event: MouseEvent, component: DashboardComponent, handle: R
     startY: component.posY,
     startWidth: component.width,
     startHeight: component.height,
+    startZIndex,
     handle,
   }
   pendingPointer = { x: event.clientX, y: event.clientY }
@@ -2205,17 +2327,40 @@ const onPointerMove = (event: MouseEvent) => {
 
 const onPointerUp = async () => {
   if (!interaction) return
-  const component = findComponent(interaction.compId)
+  const finalizedInteraction = interaction
+  const component = findComponent(finalizedInteraction.compId)
   if (pendingPointer) {
     applyInteractionFrame()
   }
+  const preview = interactionPreview.value?.compId === finalizedInteraction.compId ? { ...interactionPreview.value } : null
   interaction = null
   document.removeEventListener('mousemove', onPointerMove)
   document.removeEventListener('mouseup', onPointerUp)
   cleanupInteractionFrame()
   if (component) {
-    resizeInteractionChart(component.id, true)
-    await persistLayout(component)
+    const before: ComponentLayoutSnapshot = {
+      posX: finalizedInteraction.startX,
+      posY: finalizedInteraction.startY,
+      width: finalizedInteraction.startWidth,
+      height: finalizedInteraction.startHeight,
+      zIndex: finalizedInteraction.startZIndex,
+    }
+    const next: ComponentLayoutSnapshot = preview
+      ? {
+          posX: preview.nextX,
+          posY: preview.nextY,
+          width: preview.nextWidth,
+          height: preview.nextHeight,
+          zIndex: Math.max(0, Math.round(Number(component.zIndex) || before.zIndex)),
+        }
+      : cloneComponentLayout(component)
+    applyComponentLayoutSnapshot(component, next)
+    await nextTick()
+    resizeInteractionChart(component.id)
+    const persisted = await persistLayout(component, next)
+    if (persisted && !layoutSnapshotsEqual(before, next)) {
+      pushUndoEntry({ type: 'layout', componentId: component.id, before, after: next })
+    }
   }
 }
 
@@ -2249,6 +2394,7 @@ const handleDeleteDashboard = async (id: number) => {
   nextCounts.delete(id)
   dashboardCounts.value = nextCounts
   if (currentDashboard.value?.id === id) {
+    clearUndoHistory()
     currentDashboard.value = dashboards.value[0] ?? null
     if (currentDashboard.value) await loadComponents()
     else components.value = []
@@ -2294,6 +2440,71 @@ const savePublishSettings = async () => {
     ElMessage.success('发布设置已保存')
   } finally {
     publishSaving.value = false
+  }
+}
+
+const undoLastChange = async () => {
+  const dashboard = currentDashboard.value
+  const entry = undoStack.value[undoStack.value.length - 1]
+  if (!dashboard || !entry || undoApplying.value) return
+
+  const remaining = undoStack.value.slice(0, -1)
+  undoStack.value = remaining
+  undoApplying.value = true
+  try {
+    if (entry.type === 'layout') {
+      const component = findComponent(entry.componentId)
+      if (!component) throw new Error('目标组件不存在，无法撤销布局修改')
+      applyComponentLayoutSnapshot(component, entry.before)
+      await nextTick()
+      resizeInteractionChart(component.id)
+      const restored = await persistLayout(component, entry.before)
+      if (!restored) throw new Error('布局撤销失败')
+    } else if (entry.type === 'component-config') {
+      const component = findComponent(entry.componentId)
+      if (!component) throw new Error('目标组件不存在，无法撤销配置修改')
+      await updateDashboardComponent(dashboard.id, component.id, {
+        chartId: entry.before.chartId,
+        configJson: entry.before.configJson,
+      })
+      await syncComponentPreview(component, entry.before)
+    } else if (entry.type === 'overlay') {
+      applyOverlaySnapshot(entry.before)
+      await updateCanvasConfig({ overlay: cloneOverlaySnapshot(entry.before) })
+      lastSavedOverlaySnapshot.value = cloneOverlaySnapshot(entry.before)
+    } else if (entry.type === 'add-component') {
+      const component = findComponent(entry.component.id)
+      if (component) {
+        await removeDashboardComponent(dashboard.id, component.id)
+        disposeChartInstance(component.id)
+        deleteComponentData(component.id)
+        components.value = components.value.filter((item) => item.id !== component.id)
+        if (activeCompId.value === component.id) activeCompId.value = null
+        dashboardCounts.value = new Map(dashboardCounts.value).set(dashboard.id, components.value.length)
+      }
+    } else if (entry.type === 'remove-component') {
+      const restored = await addDashboardComponent(dashboard.id, {
+        chartId: entry.component.chartId,
+        posX: entry.component.posX,
+        posY: entry.component.posY,
+        width: entry.component.width,
+        height: entry.component.height,
+        zIndex: entry.component.zIndex,
+        configJson: entry.component.configJson,
+      })
+      normalizeLayout(restored)
+      components.value.push(restored)
+      activeCompId.value = restored.id
+      dashboardCounts.value = new Map(dashboardCounts.value).set(dashboard.id, components.value.length)
+      await nextTick()
+      await loadComponentData(restored)
+    }
+    ElMessage.success('已撤销最近一次修改')
+  } catch (error) {
+    undoStack.value = [...remaining, entry].slice(-3)
+    ElMessage.error(error instanceof Error ? error.message : '撤销失败')
+  } finally {
+    undoApplying.value = false
   }
 }
 
@@ -2396,35 +2607,24 @@ const copyCanvasPixelsToClone = (originalRoot: HTMLElement, clonedRoot: HTMLElem
   })
 }
 
-const prepareCaptureClone = (clonedDocument: Document, originalTarget: HTMLElement, captureWholeEditor: boolean) => {
-  const clonedTarget = clonedDocument.querySelector('[data-capture-surface="screen-editor"]') as HTMLElement | null
+const prepareCaptureClone = (clonedDocument: Document, originalTarget: HTMLElement) => {
   const clonedStage = clonedDocument.querySelector('.screen-stage') as HTMLElement | null
-  if (clonedStage) {
-    clonedStage.classList.add('screen-stage--capturing')
-    if (!captureWholeEditor) {
-      clonedStage.style.transform = 'none'
-      clonedStage.style.transformOrigin = '0 0'
-    }
-    clonedStage.querySelectorAll('.stage-card.active').forEach((element) => element.classList.remove('active'))
-    clonedStage.querySelectorAll('.canvas-curtain--selected').forEach((element) => element.classList.remove('canvas-curtain--selected'))
-  }
-
-  const cloneRoot = (captureWholeEditor ? clonedTarget : clonedStage) ?? clonedStage ?? clonedTarget
-  if (!cloneRoot) return
-  copyCanvasPixelsToClone(originalTarget, cloneRoot)
+  if (!clonedStage) return
+  clonedStage.classList.add('screen-stage--capturing')
+  clonedStage.style.transform = 'none'
+  clonedStage.style.transformOrigin = '0 0'
+  clonedStage.querySelectorAll('.stage-card.active').forEach((element) => element.classList.remove('active'))
+  clonedStage.querySelectorAll('.canvas-curtain--selected').forEach((element) => element.classList.remove('canvas-curtain--selected'))
+  copyCanvasPixelsToClone(originalTarget, clonedStage)
 }
 
 const captureScreenCover = async () => {
   const dashboard = currentDashboard.value
   const stage = canvasRef.value
-  const captureSurface = captureSurfaceRef.value
   if (!dashboard || !stage) {
     ElMessage.warning('请先选择大屏并等待画布加载完成')
     return
   }
-
-  const captureTarget = captureSurface ?? stage
-  const captureWholeEditor = captureTarget !== stage
 
   const previousActiveCompId = activeCompId.value
   const previousOverlaySelected = overlaySelected.value
@@ -2434,38 +2634,31 @@ const captureScreenCover = async () => {
   capturingCover.value = true
   activeCompId.value = null
   overlaySelected.value = false
-  if (!captureWholeEditor) {
-    canvasScale.value = 1
-  }
+  canvasScale.value = 1
 
   try {
     await nextTick()
     await waitForPaint()
-    if (!captureWholeEditor) {
-      handleWindowResize()
-      await waitForPaint()
-    }
-
-    const captureWidth = Math.max(captureTarget.scrollWidth, captureTarget.clientWidth)
-    const captureHeight = Math.max(captureTarget.scrollHeight, captureTarget.clientHeight)
+    handleWindowResize()
+    await waitForPaint()
 
     const captureOptions = {
       backgroundColor: null,
       useCORS: true,
       logging: false,
       scale: Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
-      x: 0,
-      y: 0,
-      width: captureWidth,
-      height: captureHeight,
+      x: overlayConfig.x,
+      y: overlayConfig.y,
+      width: overlayConfig.w,
+      height: overlayConfig.h,
       scrollX: 0,
       scrollY: 0,
-      windowWidth: captureWidth,
-      windowHeight: captureHeight,
-      onclone: (clonedDocument: Document) => prepareCaptureClone(clonedDocument, captureTarget, captureWholeEditor),
+      windowWidth: Math.max(stage.scrollWidth, overlayConfig.x + overlayConfig.w),
+      windowHeight: Math.max(stage.scrollHeight, overlayConfig.y + overlayConfig.h),
+      onclone: (clonedDocument: Document) => prepareCaptureClone(clonedDocument, stage),
     }
     const { default: html2canvas } = await import('html2canvas')
-    const canvas = await html2canvas(captureTarget, captureOptions as Parameters<typeof html2canvas>[1])
+    const canvas = await html2canvas(stage, captureOptions as Parameters<typeof html2canvas>[1])
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((result: Blob | null) => resolve(result), 'image/png'))
     if (!blob) {
       throw new Error('封面截图生成失败')
@@ -2488,9 +2681,7 @@ const captureScreenCover = async () => {
     capturingCover.value = false
     activeCompId.value = previousActiveCompId
     overlaySelected.value = previousOverlaySelected
-    if (!captureWholeEditor) {
-      canvasScale.value = previousCanvasScale
-    }
+    canvasScale.value = previousCanvasScale
     await nextTick()
     handleWindowResize()
     coverSaving.value = false
@@ -2585,6 +2776,7 @@ const saveActiveComponentAsAsset = async () => {
     })
     templates.value = [created, ...templates.value]
     selectedTemplateId.value = created.id
+    previewTemplateId.value = created.id
     libraryTab.value = 'templates'
     templateSaveVisible.value = false
     ElMessage.success('组件已保存到组件库')
@@ -2615,7 +2807,7 @@ const quickAddChart = async (chart: Chart) => {
 }
 
 const quickAddTemplate = async (template: ChartTemplate) => {
-  selectedTemplateId.value = template.id
+  selectTemplatePreview(template.id)
   await addTemplateToScreen(template)
 }
 
@@ -2642,7 +2834,8 @@ const addChartToScreen = async (
   chart: Chart,
   configJson?: string,
   size?: { width: number; height: number },
-  point?: { clientX: number; clientY: number }
+  point?: { clientX: number; clientY: number },
+  options: { trackUndo?: boolean; silent?: boolean } = {}
 ) => {
   if (!currentDashboard.value) {
     ElMessage.warning('请先选择大屏')
@@ -2670,7 +2863,12 @@ const addChartToScreen = async (
   dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length)
   await nextTick()
   await loadComponentData(component)
-  ElMessage.success('组件已加入大屏')
+  if (options.trackUndo !== false) {
+    pushUndoEntry({ type: 'add-component', component: cloneComponentSnapshot(component) })
+  }
+  if (options.silent !== true) {
+    ElMessage.success('组件已加入大屏')
+  }
 }
 
 const addTemplateToScreen = async (template: ChartTemplate, point?: { clientX: number; clientY: number }) => {
@@ -2701,15 +2899,21 @@ const addTemplateToScreen = async (template: ChartTemplate, point?: { clientX: n
   )
 }
 
-const removeComponent = async (componentId: number) => {
+const removeComponent = async (componentId: number, options: { trackUndo?: boolean; silent?: boolean } = {}) => {
   if (!currentDashboard.value) return
+  const snapshot = components.value.find((item) => item.id === componentId)
   await removeDashboardComponent(currentDashboard.value.id, componentId)
   disposeChartInstance(componentId)
   deleteComponentData(componentId)
   components.value = components.value.filter((item) => item.id !== componentId)
   if (activeCompId.value === componentId) activeCompId.value = null
   dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length)
-  ElMessage.success('组件已移除')
+  if (snapshot && options.trackUndo !== false) {
+    pushUndoEntry({ type: 'remove-component', component: cloneComponentSnapshot(snapshot) })
+  }
+  if (options.silent !== true) {
+    ElMessage.success('组件已移除')
+  }
 }
 
 const confirmRemoveComponent = async (component: DashboardComponent) => {
@@ -2731,7 +2935,7 @@ const confirmRemoveComponent = async (component: DashboardComponent) => {
 }
 
 const onTemplateDragStart = (event: DragEvent, template: ChartTemplate) => {
-  selectedTemplateId.value = template.id
+  selectTemplatePreview(template.id)
   draggingTemplateId.value = template.id
   draggingChartId.value = null
   stageDropActive.value = true
@@ -2854,7 +3058,7 @@ const onLayerDrop = async (_event: DragEvent, toIdx: number) => {
 
   // Assign descending zIndex starting from the count
   const baseZ = ordered.length + 1
-  const persistPromises: Promise<void>[] = []
+  const persistPromises: Array<Promise<boolean | undefined>> = []
   for (let i = 0; i < ordered.length; i++) {
     const newZ = baseZ - i
     if (ordered[i].zIndex !== newZ) {
@@ -4543,6 +4747,14 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
+.lp-library-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .lp-asset-scroll {
   flex: 1;
   min-height: 0;
@@ -4554,7 +4766,9 @@ onBeforeUnmount(() => {
 }
 
 .lp-preview-panel {
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 228px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -4563,6 +4777,33 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, rgba(10,19,31,0.98) 0%, rgba(8,15,24,0.98) 100%);
   box-shadow: 0 20px 48px rgba(0,0,0,0.24);
   padding: 10px 12px;
+}
+
+.lp-preview-panel--empty {
+  justify-content: center;
+}
+
+.lp-preview-placeholder {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 2px;
+}
+
+.lp-preview-placeholder-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(226,240,255,0.9);
+}
+
+.lp-preview-placeholder-copy {
+  font-size: 11px;
+  line-height: 1.7;
+  color: rgba(188,211,236,0.58);
 }
 
 .lp-preview-status-row {
@@ -4584,25 +4825,6 @@ onBeforeUnmount(() => {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.05em;
-}
-
-.lp-preview-empty {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 4px 2px;
-}
-
-.lp-preview-empty-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(238,247,255,0.9);
-}
-
-.lp-preview-empty-copy {
-  font-size: 11px;
-  line-height: 1.6;
-  color: rgba(180,208,238,0.6);
 }
 
 .lp-asset-card {
