@@ -9,6 +9,7 @@ const DashboardView = () => import('../views/DashboardView.vue')
 const DashboardEditorView = () => import('../views/DashboardEditorView.vue')
 const DataScreenView = () => import('../views/DataScreenView.vue')
 const ScreenEditorView = () => import('../views/ScreenEditorView.vue')
+const BIPublishView = () => import('../views/BIPublishView.vue')
 const DataPrepareView = () => import('../views/DataPrepareView.vue')
 const ModelingView = () => import('../views/ModelingView.vue')
 const ReportPreviewView = () => import('../views/ReportPreviewView.vue')
@@ -24,6 +25,8 @@ const router = createRouter({
     { path: '/home/dashboard/edit/:id', name: 'dashboard-edit', component: DashboardEditorView, meta: { requiresAuth: true } },
     { path: '/home/screen', name: 'screen', component: DataScreenView, meta: { requiresAuth: true } },
     { path: '/home/screen/edit/:id', name: 'screen-edit', component: ScreenEditorView, meta: { requiresAuth: true } },
+    { path: '/home/publish/groups', name: 'publish-groups', component: BIPublishView, meta: { requiresAuth: true } },
+    { path: '/home/publish/panels', name: 'publish-panels', component: BIPublishView, meta: { requiresAuth: true } },
     { path: '/preview/dashboard/:id', name: 'dashboard-preview', component: ReportPreviewView, meta: { scene: 'dashboard' } },
     { path: '/preview/screen/:id', name: 'screen-preview', component: ReportPreviewView, meta: { scene: 'screen' } },
     { path: '/home/prepare', name: 'prepare', component: DataPrepareView, meta: { requiresAuth: true } },

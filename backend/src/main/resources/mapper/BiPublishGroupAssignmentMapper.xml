@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aibi.bi.mapper.BiPublishGroupAssignmentMapper">
+
+    <resultMap id="BiPublishGroupAssignmentMap" type="com.aibi.bi.domain.BiPublishGroupAssignment">
+        <result column="group_id" property="groupId"/>
+        <result column="dashboard_id" property="dashboardId"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <select id="listAll" resultMap="BiPublishGroupAssignmentMap">
+        SELECT group_id, dashboard_id, created_at
+        FROM bi_publish_group_dashboard
+    </select>
+
+    <delete id="deleteByGroupId" parameterType="long">
+        DELETE FROM bi_publish_group_dashboard
+        WHERE group_id = #{groupId}
+    </delete>
+
+    <delete id="deleteByDashboardIds">
+        DELETE FROM bi_publish_group_dashboard
+        WHERE dashboard_id IN
+        <foreach collection="dashboardIds" item="dashboardId" open="(" separator="," close=")">
+            #{dashboardId}
+        </foreach>
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO bi_publish_group_dashboard (group_id, dashboard_id)
+        VALUES
+        <foreach collection="dashboardIds" item="dashboardId" separator=",">
+            (#{groupId}, #{dashboardId})
+        </foreach>
+    </insert>
+</mapper>

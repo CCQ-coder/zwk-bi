@@ -80,7 +80,7 @@ import {
   type AuthMenuItem,
 } from '../utils/auth-session'
 
-defineProps<{ active?: 'workbench' | 'dashboard' | 'screen' | 'prepare' | 'modeling' | 'system' }>()
+defineProps<{ active?: 'workbench' | 'dashboard' | 'screen' | 'publish' | 'prepare' | 'modeling' | 'system' }>()
 
 interface ResolvedNavItem {
   id: number

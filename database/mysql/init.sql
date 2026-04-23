@@ -94,6 +94,26 @@ CREATE TABLE IF NOT EXISTS bi_dashboard (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS bi_publish_group (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(128) NOT NULL,
+  description VARCHAR(255) NOT NULL DEFAULT '',
+  sort INT NOT NULL DEFAULT 100,
+  visible TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS bi_publish_group_dashboard (
+  group_id BIGINT NOT NULL,
+  dashboard_id BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (group_id, dashboard_id),
+  UNIQUE KEY uk_bi_publish_group_dashboard_dashboard (dashboard_id),
+  CONSTRAINT fk_bi_publish_group_dashboard_group FOREIGN KEY (group_id) REFERENCES bi_publish_group(id) ON DELETE CASCADE,
+  CONSTRAINT fk_bi_publish_group_dashboard_dashboard FOREIGN KEY (dashboard_id) REFERENCES bi_dashboard(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS sys_menu (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(64) NOT NULL,
@@ -148,6 +168,8 @@ CREATE TABLE IF NOT EXISTS bi_chart_template (
 );
 
 -- Reset seed data to keep local environment consistent.
+DELETE FROM bi_publish_group_dashboard;
+DELETE FROM bi_publish_group;
 DELETE FROM bi_dashboard_component;
 DELETE FROM bi_dataset_field;
 DELETE FROM bi_chart_template;
@@ -167,6 +189,7 @@ ALTER TABLE bi_dataset_field AUTO_INCREMENT = 1;
 ALTER TABLE bi_chart AUTO_INCREMENT = 1;
 ALTER TABLE bi_chart_template AUTO_INCREMENT = 1;
 ALTER TABLE bi_datasource AUTO_INCREMENT = 1;
+ALTER TABLE bi_publish_group AUTO_INCREMENT = 1;
 
 INSERT INTO sys_user(username, password_hash, display_name, role, email)
 VALUES ('admin', '123456', 'Admin', 'ADMIN', 'admin@aibi.local');
@@ -241,6 +264,7 @@ VALUES
 ('工作台', '/home', 'HomeView', NULL, 'menu', 'workbench:view', 'House', 10, 1, NULL),
 ('仪表板', '/home/dashboard', 'DashboardView', NULL, 'menu', 'dashboard:view', 'DataBoard', 20, 1, 1),
 ('数据大屏', '/home/screen', 'DataScreenView', NULL, 'menu', 'screen:view', 'Monitor', 30, 1, 1),
+('BI发布平台', '', 'BIPublishView', NULL, 'catalog', 'publish:view', 'Promotion', 35, 1, NULL),
 ('数据准备', '/home/prepare', 'DataPrepareView', NULL, 'menu', 'dataset:view', 'Collection', 40, 1, NULL),
 ('数据建模', '/home/modeling', 'ModelingView', NULL, 'menu', 'model:view', 'Connection', 50, 1, NULL),
 ('系统管理', '/home/system', 'SystemView', NULL, 'menu', 'system:view', 'Setting', 60, 1, NULL);
@@ -264,6 +288,16 @@ INSERT INTO sys_menu(name, path, component, parent_id, type, permission, icon, s
 SELECT '数据抽取', '/home/prepare/extract', 'DataPrepareView', p.id, 'menu', 'extract:view', 'Refresh', 44, 1, NULL
 FROM sys_menu p
 WHERE p.path = '/home/prepare';
+
+INSERT INTO sys_menu(name, path, component, parent_id, type, permission, icon, sort, visible, dashboard_id)
+SELECT '分组管理', '/home/publish/groups', 'BIPublishView', p.id, 'menu', 'publish:group', 'Files', 10, 1, NULL
+FROM sys_menu p
+WHERE p.permission = 'publish:view';
+
+INSERT INTO sys_menu(name, path, component, parent_id, type, permission, icon, sort, visible, dashboard_id)
+SELECT 'BI面板展示', '/home/publish/panels', 'BIPublishView', p.id, 'menu', 'publish:panel', 'Monitor', 20, 1, NULL
+FROM sys_menu p
+WHERE p.permission = 'publish:view';
 
 INSERT INTO sys_menu(name, path, component, parent_id, type, permission, icon, sort, visible, dashboard_id)
 SELECT '基础设置', '/home/system/settings', 'SystemView', p.id, 'menu', 'system:settings', 'Tools', 61, 1, NULL
@@ -321,7 +355,19 @@ WHERE r.name = 'ANALYST';
 INSERT INTO sys_role_menu(role_id, menu_id)
 SELECT r.id, m.id
 FROM sys_role r
+INNER JOIN sys_menu m ON m.permission IN ('publish:view', 'publish:group', 'publish:panel')
+WHERE r.name = 'ANALYST';
+
+INSERT INTO sys_role_menu(role_id, menu_id)
+SELECT r.id, m.id
+FROM sys_role r
 INNER JOIN sys_menu m ON m.path IN ('/home', '/home/dashboard', '/home/screen')
+WHERE r.name = 'VIEWER';
+
+INSERT INTO sys_role_menu(role_id, menu_id)
+SELECT r.id, m.id
+FROM sys_role r
+INNER JOIN sys_menu m ON m.permission IN ('publish:view', 'publish:panel')
 WHERE r.name = 'VIEWER';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height)
