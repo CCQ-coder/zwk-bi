@@ -96,7 +96,7 @@
               <el-option v-for="field in datasetFields" :key="field.fieldName" :label="field.fieldName" :value="field.fieldName" />
             </el-select>
           </el-form-item>
-          <el-form-item label="分组字段">
+          <el-form-item v-if="showGroupField" label="分组字段">
             <el-select v-model="form.groupField" clearable filterable style="width: 100%">
               <el-option v-for="field in datasetFields" :key="field.fieldName" :label="field.fieldName" :value="field.fieldName" />
             </el-select>
@@ -152,7 +152,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { createTemplate, deleteTemplate, getTemplateList, updateTemplate, type ChartTemplate } from '../api/chart-template'
 import { getChartList, type Chart } from '../api/chart'
 import { getDatasetFields, getDatasetList, getDatasetPreviewData, type Dataset, type DatasetField } from '../api/dataset'
-import { buildComponentOption, COLOR_THEMES, chartTypeLabel, getChartFieldLabels, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config'
+import { buildComponentOption, COLOR_THEMES, chartTypeLabel, getChartFieldLabels, getChartTypeMeta, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config'
 import { echarts, type ECharts } from '../utils/echarts'
 
 interface TemplateFormState {
@@ -188,7 +188,9 @@ const editingId = ref<number | null>(null)
 const currentTemplate = ref<ChartTemplate | null>(null)
 const formRef = ref<FormInstance>()
 const themeOptions = Object.keys(COLOR_THEMES)
+const currentChartMeta = computed(() => getChartTypeMeta(form.chartType))
 const fieldLabels = computed(() => getChartFieldLabels(form.chartType))
+const showGroupField = computed(() => currentChartMeta.value.requiresGroup || currentChartMeta.value.allowsGroup)
 const staticChartTypeValues = [
   'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
   'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',
@@ -304,7 +306,7 @@ const buildPayloadConfig = () => {
       chartType: form.chartType,
       xField: form.xField,
       yField: form.yField,
-      groupField: form.groupField,
+      groupField: showGroupField.value ? form.groupField : '',
     },
     style: {
       ...(existing?.style ?? {}),
@@ -490,6 +492,15 @@ const updatePreview = () => {
     }
   }, 400)
 }
+
+watch(
+  () => [form.chartType, form.groupField],
+  () => {
+    if (!showGroupField.value && form.groupField) {
+      form.groupField = ''
+    }
+  }
+)
 
 watch(
   () => [form.datasetId, form.chartType, form.xField, form.yField, form.groupField,

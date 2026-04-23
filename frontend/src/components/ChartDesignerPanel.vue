@@ -52,7 +52,7 @@
           <el-tag size="small" effect="plain" type="info">类型: {{ chartTypeLabel(selected.chartType) }}</el-tag>
           <el-tag size="small" effect="plain" type="success">X/维度: {{ selected.xField || '未设置' }}</el-tag>
           <el-tag size="small" effect="plain" type="warning">Y/度量: {{ selected.yField || '未设置' }}</el-tag>
-          <el-tag v-if="selected.groupField" size="small" effect="plain">分组: {{ selected.groupField }}</el-tag>
+          <el-tag v-if="selectedShowGroupField && selected.groupField" size="small" effect="plain">分组: {{ selected.groupField }}</el-tag>
         </div>
 
         <!-- 图表画布 -->
@@ -252,7 +252,7 @@
           <el-option v-for="col in previewColumns" :key="col" :label="col" :value="col" />
         </el-select>
       </el-form-item>
-      <el-form-item label="分组字段">
+      <el-form-item v-if="showGroupField" label="分组字段">
         <el-select v-model="form.groupField" placeholder="可选" clearable style="width:100%">
           <el-option v-for="col in previewColumns" :key="col" :label="col" :value="col" />
         </el-select>
@@ -278,6 +278,7 @@ import {
   type Chart, type ChartForm
 } from '../api/chart'
 import { getDatasetList, previewDatasetSql, type Dataset } from '../api/dataset'
+import { getChartTypeMeta } from '../utils/component-config'
 import { echarts, type ECharts } from '../utils/echarts'
 
 // ─── 颜色主题 ──────────────────────────────────────────────────────────────────
@@ -344,6 +345,10 @@ const chartTagType = (t: string): '' | 'success' | 'warning' | 'info' | 'danger'
 const isPieType  = computed(() => selected.value?.chartType === 'pie' || selected.value?.chartType === 'doughnut')
 const isBarType  = computed(() => selected.value?.chartType === 'bar' || selected.value?.chartType === 'bar_horizontal')
 const isLineType = computed(() => selected.value?.chartType === 'line')
+const selectedShowGroupField = computed(() => {
+  const meta = getChartTypeMeta(selected.value?.chartType ?? '')
+  return meta.requiresGroup || meta.allowsGroup
+})
 
 // ─── 列表 ──────────────────────────────────────────────────────────────────────
 const rows        = ref<Chart[]>([])
@@ -527,6 +532,10 @@ const editId        = ref<number | null>(null)
 const formRef       = ref<FormInstance>()
 const emptyForm = (): ChartForm => ({ name: '', datasetId: '', chartType: '', xField: '', yField: '', groupField: '' })
 const form = reactive<ChartForm>(emptyForm())
+const showGroupField = computed(() => {
+  const meta = getChartTypeMeta(form.chartType)
+  return meta.requiresGroup || meta.allowsGroup
+})
 
 const rules: FormRules = {
   name:      [{ required: true, message: '请输入名称', trigger: 'blur' }],
@@ -569,19 +578,29 @@ const openEdit = (row: Chart) => {
   onDatasetChange(row.datasetId)
 }
 
+watch(
+  () => [form.chartType, form.groupField],
+  () => {
+    if (!showGroupField.value && form.groupField) {
+      form.groupField = ''
+    }
+  }
+)
+
 const handleSubmit = async () => {
   await formRef.value?.validate()
   saving.value = true
   try {
+    const payload = { ...form, groupField: showGroupField.value ? form.groupField : '' }
     if (editId.value) {
-      const updated = await updateChart(editId.value, form)
+      const updated = await updateChart(editId.value, payload)
       ElMessage.success('更新成功')
       dialogVisible.value = false
       await loadList()
       selectedId.value = updated.id
       if (updated.xField && updated.yField) loadChartData(updated.id)
     } else {
-      const created = await createChart(form)
+      const created = await createChart(payload)
       ElMessage.success('创建成功')
       dialogVisible.value = false
       await loadList()

@@ -3199,10 +3199,10 @@ const onPointerUp = async () => {
           zIndex: Math.max(0, Math.round(Number(component.zIndex) || before.zIndex)),
         }
       : cloneComponentLayout(component)
-    applyComponentLayoutSnapshot(component, next)
-    await nextTick()
     clearInteractionPreviewFromCard(component.id)
     interactionPreviewSnapshot = null
+    applyComponentLayoutSnapshot(component, next)
+    await nextTick()
     resizeInteractionChart(component.id)
     const persisted = await persistLayout(component, next)
     if (persisted && !layoutSnapshotsEqual(before, next)) {

@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus';
 import { createTemplate, deleteTemplate, getTemplateList, updateTemplate } from '../api/chart-template';
 import { getChartList } from '../api/chart';
 import { getDatasetFields, getDatasetList, getDatasetPreviewData } from '../api/dataset';
-import { buildComponentOption, COLOR_THEMES, chartTypeLabel, getChartFieldLabels, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config';
+import { buildComponentOption, COLOR_THEMES, chartTypeLabel, getChartFieldLabels, getChartTypeMeta, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 const loading = ref(false);
 const saving = ref(false);
@@ -18,7 +18,9 @@ const editingId = ref(null);
 const currentTemplate = ref(null);
 const formRef = ref();
 const themeOptions = Object.keys(COLOR_THEMES);
+const currentChartMeta = computed(() => getChartTypeMeta(form.chartType));
 const fieldLabels = computed(() => getChartFieldLabels(form.chartType));
+const showGroupField = computed(() => currentChartMeta.value.requiresGroup || currentChartMeta.value.allowsGroup);
 const staticChartTypeValues = [
     'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
     'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',
@@ -127,7 +129,7 @@ const buildPayloadConfig = () => {
             chartType: form.chartType,
             xField: form.xField,
             yField: form.yField,
-            groupField: form.groupField,
+            groupField: showGroupField.value ? form.groupField : '',
         },
         style: {
             ...(existing?.style ?? {}),
@@ -309,6 +311,11 @@ const updatePreview = () => {
         }
     }, 400);
 };
+watch(() => [form.chartType, form.groupField], () => {
+    if (!showGroupField.value && form.groupField) {
+        form.groupField = '';
+    }
+});
 watch(() => [form.datasetId, form.chartType, form.xField, form.yField, form.groupField,
     form.theme, form.showLegend, form.showLabel, form.showGrid, form.smooth, form.areaFill], updatePreview);
 onUnmounted(() => {
@@ -1019,49 +1026,51 @@ for (const [field] of __VLS_getVForSourceType((__VLS_ctx.datasetFields))) {
 }
 var __VLS_189;
 var __VLS_185;
-const __VLS_194 = {}.ElFormItem;
-/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
-// @ts-ignore
-const __VLS_195 = __VLS_asFunctionalComponent(__VLS_194, new __VLS_194({
-    label: "分组字段",
-}));
-const __VLS_196 = __VLS_195({
-    label: "分组字段",
-}, ...__VLS_functionalComponentArgsRest(__VLS_195));
-__VLS_197.slots.default;
-const __VLS_198 = {}.ElSelect;
-/** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
-// @ts-ignore
-const __VLS_199 = __VLS_asFunctionalComponent(__VLS_198, new __VLS_198({
-    modelValue: (__VLS_ctx.form.groupField),
-    clearable: true,
-    filterable: true,
-    ...{ style: {} },
-}));
-const __VLS_200 = __VLS_199({
-    modelValue: (__VLS_ctx.form.groupField),
-    clearable: true,
-    filterable: true,
-    ...{ style: {} },
-}, ...__VLS_functionalComponentArgsRest(__VLS_199));
-__VLS_201.slots.default;
-for (const [field] of __VLS_getVForSourceType((__VLS_ctx.datasetFields))) {
-    const __VLS_202 = {}.ElOption;
-    /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+if (__VLS_ctx.showGroupField) {
+    const __VLS_194 = {}.ElFormItem;
+    /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
     // @ts-ignore
-    const __VLS_203 = __VLS_asFunctionalComponent(__VLS_202, new __VLS_202({
-        key: (field.fieldName),
-        label: (field.fieldName),
-        value: (field.fieldName),
+    const __VLS_195 = __VLS_asFunctionalComponent(__VLS_194, new __VLS_194({
+        label: "分组字段",
     }));
-    const __VLS_204 = __VLS_203({
-        key: (field.fieldName),
-        label: (field.fieldName),
-        value: (field.fieldName),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_203));
+    const __VLS_196 = __VLS_195({
+        label: "分组字段",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_195));
+    __VLS_197.slots.default;
+    const __VLS_198 = {}.ElSelect;
+    /** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
+    // @ts-ignore
+    const __VLS_199 = __VLS_asFunctionalComponent(__VLS_198, new __VLS_198({
+        modelValue: (__VLS_ctx.form.groupField),
+        clearable: true,
+        filterable: true,
+        ...{ style: {} },
+    }));
+    const __VLS_200 = __VLS_199({
+        modelValue: (__VLS_ctx.form.groupField),
+        clearable: true,
+        filterable: true,
+        ...{ style: {} },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_199));
+    __VLS_201.slots.default;
+    for (const [field] of __VLS_getVForSourceType((__VLS_ctx.datasetFields))) {
+        const __VLS_202 = {}.ElOption;
+        /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+        // @ts-ignore
+        const __VLS_203 = __VLS_asFunctionalComponent(__VLS_202, new __VLS_202({
+            key: (field.fieldName),
+            label: (field.fieldName),
+            value: (field.fieldName),
+        }));
+        const __VLS_204 = __VLS_203({
+            key: (field.fieldName),
+            label: (field.fieldName),
+            value: (field.fieldName),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_203));
+    }
+    var __VLS_201;
+    var __VLS_197;
 }
-var __VLS_201;
-var __VLS_197;
 const __VLS_206 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
@@ -1374,6 +1383,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             formRef: formRef,
             themeOptions: themeOptions,
             fieldLabels: fieldLabels,
+            showGroupField: showGroupField,
             chartTypeOptions: chartTypeOptions,
             form: form,
             isStaticAssetType: isStaticAssetType,

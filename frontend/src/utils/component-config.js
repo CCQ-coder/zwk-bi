@@ -162,7 +162,7 @@ export const CHART_TYPE_META = {
         requiresDimension: true,
         allowsOptionalDimension: false,
         requiresMetric: true,
-        allowsGroup: true,
+        allowsGroup: false,
         supportsLegend: true,
         supportsAxisNames: true,
         supportsGrid: true,
@@ -916,6 +916,7 @@ const normalizeTableCustomColumns = (value, fallbackFields) => {
     return normalizeFieldList(fallbackFields).map((field, index) => createTableColumnConfig(field, index));
 };
 const normalizeTableChartFields = (chart) => {
+    const meta = getChartTypeMeta(chart.chartType);
     const tableDimensionFields = normalizeFieldList(chart.tableDimensionFields);
     const tableMetricFields = normalizeFieldList(chart.tableMetricFields);
     const fallbackColumns = [...tableDimensionFields, ...tableMetricFields];
@@ -925,9 +926,11 @@ const normalizeTableChartFields = (chart) => {
     const tableCarouselMode = chart.tableCarouselMode === 'page' ? 'page' : 'single';
     const tableCarouselInterval = clampInteger(chart.tableCarouselInterval, 20000, 1000, 120000);
     const dataRefreshInterval = clampInteger(chart.dataRefreshInterval, 0, 0, 86400);
+    const groupField = meta.requiresGroup || meta.allowsGroup ? chart.groupField : '';
     if (!TABLE_LIKE_CHART_TYPES.has(chart.chartType)) {
         return {
             ...chart,
+            groupField,
             tableDimensionFields,
             tableMetricFields,
             tableCustomColumns,
@@ -940,7 +943,7 @@ const normalizeTableChartFields = (chart) => {
     }
     const normalizedDimensions = tableDimensionFields.length
         ? tableDimensionFields
-        : normalizeFieldList([chart.xField, chart.groupField]);
+        : normalizeFieldList([chart.xField, groupField]);
     const normalizedMetrics = tableMetricFields.length
         ? tableMetricFields
         : normalizeFieldList([chart.yField]);

@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus';
 import { DataLine, Delete, Edit, PieChart, TrendCharts, Histogram, Plus, RefreshRight } from '@element-plus/icons-vue';
 import { createChart, deleteChart, getChartData, getChartList, updateChart } from '../api/chart';
 import { getDatasetList, previewDatasetSql } from '../api/dataset';
+import { getChartTypeMeta } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 // ─── 颜色主题 ──────────────────────────────────────────────────────────────────
 const COLOR_THEMES = {
@@ -51,6 +52,10 @@ const chartTagType = (t) => {
 const isPieType = computed(() => selected.value?.chartType === 'pie' || selected.value?.chartType === 'doughnut');
 const isBarType = computed(() => selected.value?.chartType === 'bar' || selected.value?.chartType === 'bar_horizontal');
 const isLineType = computed(() => selected.value?.chartType === 'line');
+const selectedShowGroupField = computed(() => {
+    const meta = getChartTypeMeta(selected.value?.chartType ?? '');
+    return meta.requiresGroup || meta.allowsGroup;
+});
 // ─── 列表 ──────────────────────────────────────────────────────────────────────
 const rows = ref([]);
 const loading = ref(false);
@@ -221,6 +226,10 @@ const editId = ref(null);
 const formRef = ref();
 const emptyForm = () => ({ name: '', datasetId: '', chartType: '', xField: '', yField: '', groupField: '' });
 const form = reactive(emptyForm());
+const showGroupField = computed(() => {
+    const meta = getChartTypeMeta(form.chartType);
+    return meta.requiresGroup || meta.allowsGroup;
+});
 const rules = {
     name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
     datasetId: [{ required: true, message: '请选择数据集', trigger: 'change' }],
@@ -261,12 +270,18 @@ const openEdit = (row) => {
     dialogVisible.value = true;
     onDatasetChange(row.datasetId);
 };
+watch(() => [form.chartType, form.groupField], () => {
+    if (!showGroupField.value && form.groupField) {
+        form.groupField = '';
+    }
+});
 const handleSubmit = async () => {
     await formRef.value?.validate();
     saving.value = true;
     try {
+        const payload = { ...form, groupField: showGroupField.value ? form.groupField : '' };
         if (editId.value) {
-            const updated = await updateChart(editId.value, form);
+            const updated = await updateChart(editId.value, payload);
             ElMessage.success('更新成功');
             dialogVisible.value = false;
             await loadList();
@@ -275,7 +290,7 @@ const handleSubmit = async () => {
                 loadChartData(updated.id);
         }
         else {
-            const created = await createChart(form);
+            const created = await createChart(payload);
             ElMessage.success('创建成功');
             dialogVisible.value = false;
             await loadList();
@@ -609,7 +624,7 @@ else {
     __VLS_71.slots.default;
     (__VLS_ctx.selected.yField || '未设置');
     var __VLS_71;
-    if (__VLS_ctx.selected.groupField) {
+    if (__VLS_ctx.selectedShowGroupField && __VLS_ctx.selected.groupField) {
         const __VLS_72 = {}.ElTag;
         /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
         // @ts-ignore
@@ -1727,49 +1742,51 @@ for (const [col] of __VLS_getVForSourceType((__VLS_ctx.previewColumns))) {
 }
 var __VLS_377;
 var __VLS_373;
-const __VLS_382 = {}.ElFormItem;
-/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
-// @ts-ignore
-const __VLS_383 = __VLS_asFunctionalComponent(__VLS_382, new __VLS_382({
-    label: "分组字段",
-}));
-const __VLS_384 = __VLS_383({
-    label: "分组字段",
-}, ...__VLS_functionalComponentArgsRest(__VLS_383));
-__VLS_385.slots.default;
-const __VLS_386 = {}.ElSelect;
-/** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
-// @ts-ignore
-const __VLS_387 = __VLS_asFunctionalComponent(__VLS_386, new __VLS_386({
-    modelValue: (__VLS_ctx.form.groupField),
-    placeholder: "可选",
-    clearable: true,
-    ...{ style: {} },
-}));
-const __VLS_388 = __VLS_387({
-    modelValue: (__VLS_ctx.form.groupField),
-    placeholder: "可选",
-    clearable: true,
-    ...{ style: {} },
-}, ...__VLS_functionalComponentArgsRest(__VLS_387));
-__VLS_389.slots.default;
-for (const [col] of __VLS_getVForSourceType((__VLS_ctx.previewColumns))) {
-    const __VLS_390 = {}.ElOption;
-    /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+if (__VLS_ctx.showGroupField) {
+    const __VLS_382 = {}.ElFormItem;
+    /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
     // @ts-ignore
-    const __VLS_391 = __VLS_asFunctionalComponent(__VLS_390, new __VLS_390({
-        key: (col),
-        label: (col),
-        value: (col),
+    const __VLS_383 = __VLS_asFunctionalComponent(__VLS_382, new __VLS_382({
+        label: "分组字段",
     }));
-    const __VLS_392 = __VLS_391({
-        key: (col),
-        label: (col),
-        value: (col),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_391));
+    const __VLS_384 = __VLS_383({
+        label: "分组字段",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_383));
+    __VLS_385.slots.default;
+    const __VLS_386 = {}.ElSelect;
+    /** @type {[typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, typeof __VLS_components.ElSelect, typeof __VLS_components.elSelect, ]} */ ;
+    // @ts-ignore
+    const __VLS_387 = __VLS_asFunctionalComponent(__VLS_386, new __VLS_386({
+        modelValue: (__VLS_ctx.form.groupField),
+        placeholder: "可选",
+        clearable: true,
+        ...{ style: {} },
+    }));
+    const __VLS_388 = __VLS_387({
+        modelValue: (__VLS_ctx.form.groupField),
+        placeholder: "可选",
+        clearable: true,
+        ...{ style: {} },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_387));
+    __VLS_389.slots.default;
+    for (const [col] of __VLS_getVForSourceType((__VLS_ctx.previewColumns))) {
+        const __VLS_390 = {}.ElOption;
+        /** @type {[typeof __VLS_components.ElOption, typeof __VLS_components.elOption, ]} */ ;
+        // @ts-ignore
+        const __VLS_391 = __VLS_asFunctionalComponent(__VLS_390, new __VLS_390({
+            key: (col),
+            label: (col),
+            value: (col),
+        }));
+        const __VLS_392 = __VLS_391({
+            key: (col),
+            label: (col),
+            value: (col),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_391));
+    }
+    var __VLS_389;
+    var __VLS_385;
 }
-var __VLS_389;
-var __VLS_385;
 if (__VLS_ctx.previewLoading) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ style: {} },
@@ -1908,6 +1925,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             isPieType: isPieType,
             isBarType: isBarType,
             isLineType: isLineType,
+            selectedShowGroupField: selectedShowGroupField,
             loading: loading,
             sideSearch: sideSearch,
             selectedId: selectedId,
@@ -1929,6 +1947,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             editId: editId,
             formRef: formRef,
             form: form,
+            showGroupField: showGroupField,
             rules: rules,
             onDatasetChange: onDatasetChange,
             openCreate: openCreate,
