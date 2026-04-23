@@ -1,5 +1,13 @@
 import type { Chart, ChartDataResult } from '../api/chart'
 
+export interface TableColumnConfig {
+  id: string
+  field: string
+  label: string
+  width: number
+  align: 'left' | 'center' | 'right'
+}
+
 export interface ComponentChartConfig {
   name: string
   datasetId: number | '' | null
@@ -14,6 +22,11 @@ export interface ComponentChartConfig {
   groupField: string
   tableDimensionFields: string[]
   tableMetricFields: string[]
+  tableCustomColumns: TableColumnConfig[]
+  tableLoadLimit: number
+  tableVisibleRows: number
+  tableCarouselMode: 'single' | 'page'
+  tableCarouselInterval: number
 }
 
 export interface ComponentStyleConfig {
@@ -1031,15 +1044,66 @@ const normalizeFieldList = (value: unknown) => {
   ))
 }
 
+const clampInteger = (value: unknown, fallback: number, min: number, max: number) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return fallback
+  return Math.min(max, Math.max(min, Math.round(numeric)))
+}
+
+const normalizeTableColumnAlign = (value: unknown): TableColumnConfig['align'] => (
+  value === 'left' || value === 'right' || value === 'center' ? value : 'center'
+)
+
+const createTableColumnConfig = (field: string, index: number, patch?: Partial<TableColumnConfig>): TableColumnConfig => ({
+  id: patch?.id ? String(patch.id) : `table-col-${field}-${index + 1}`,
+  field,
+  label: patch?.label?.trim() || field,
+  width: clampInteger(patch?.width, 180, 80, 480),
+  align: normalizeTableColumnAlign(patch?.align),
+})
+
+const normalizeTableCustomColumns = (value: unknown, fallbackFields: string[]) => {
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((item, index) => {
+        if (!item || typeof item !== 'object') return null
+        const columnRecord = item as Record<string, unknown>
+        const rawField = typeof columnRecord.field === 'string'
+          ? columnRecord.field.trim()
+          : ''
+        if (!rawField) return null
+        return createTableColumnConfig(rawField, index, item as Partial<TableColumnConfig>)
+      })
+      .filter((item): item is TableColumnConfig => Boolean(item))
+
+    if (normalized.length) {
+      return normalized.filter((item, index, items) => items.findIndex((candidate) => candidate.field === item.field) === index)
+    }
+  }
+
+  return normalizeFieldList(fallbackFields).map((field, index) => createTableColumnConfig(field, index))
+}
+
 const normalizeTableChartFields = (chart: ComponentChartConfig): ComponentChartConfig => {
   const tableDimensionFields = normalizeFieldList(chart.tableDimensionFields)
   const tableMetricFields = normalizeFieldList(chart.tableMetricFields)
+  const fallbackColumns = [...tableDimensionFields, ...tableMetricFields]
+  const tableCustomColumns = normalizeTableCustomColumns(chart.tableCustomColumns, fallbackColumns)
+  const tableLoadLimit = clampInteger(chart.tableLoadLimit, 100, 1, 5000)
+  const tableVisibleRows = clampInteger(chart.tableVisibleRows, 10, 1, 200)
+  const tableCarouselMode = chart.tableCarouselMode === 'page' ? 'page' : 'single'
+  const tableCarouselInterval = clampInteger(chart.tableCarouselInterval, 20000, 1000, 120000)
 
   if (!TABLE_LIKE_CHART_TYPES.has(chart.chartType)) {
     return {
       ...chart,
       tableDimensionFields,
       tableMetricFields,
+      tableCustomColumns,
+      tableLoadLimit,
+      tableVisibleRows,
+      tableCarouselMode,
+      tableCarouselInterval,
     }
   }
 
@@ -1049,6 +1113,9 @@ const normalizeTableChartFields = (chart: ComponentChartConfig): ComponentChartC
   const normalizedMetrics = tableMetricFields.length
     ? tableMetricFields
     : normalizeFieldList([chart.yField])
+  const normalizedCustomColumns = tableCustomColumns.length
+    ? tableCustomColumns
+    : normalizeTableCustomColumns([], [...normalizedDimensions, ...normalizedMetrics])
 
   return {
     ...chart,
@@ -1057,16 +1124,55 @@ const normalizeTableChartFields = (chart: ComponentChartConfig): ComponentChartC
     groupField: normalizedDimensions[1] ?? '',
     tableDimensionFields: normalizedDimensions,
     tableMetricFields: normalizedMetrics,
+    tableCustomColumns: normalizedCustomColumns,
+    tableLoadLimit,
+    tableVisibleRows,
+    tableCarouselMode,
+    tableCarouselInterval,
   }
 }
 
-export const getConfiguredTableColumns = (chartConfig: ComponentChartConfig, availableColumns: string[]) => {
-  const availableSet = new Set(availableColumns)
-  const selected = Array.from(new Set([
+export const resolveConfiguredTableColumns = (chartConfig: ComponentChartConfig, availableColumns: string[]) => {
+  const normalizedColumns = normalizeTableCustomColumns(chartConfig.tableCustomColumns, [
     ...normalizeFieldList(chartConfig.tableDimensionFields),
     ...normalizeFieldList(chartConfig.tableMetricFields),
-  ])).filter((column) => availableSet.has(column))
-  return selected.length ? selected : availableColumns
+  ])
+  if (!availableColumns.length) return normalizedColumns
+
+  const availableSet = new Set(availableColumns)
+  const selectedColumns = normalizedColumns.filter((column) => availableSet.has(column.field))
+
+  if (selectedColumns.length) return selectedColumns
+  return availableColumns.map((field, index) => createTableColumnConfig(field, index))
+}
+
+export const getConfiguredTableColumns = (chartConfig: ComponentChartConfig, availableColumns: string[]) => {
+  return resolveConfiguredTableColumns(chartConfig, availableColumns).map((column) => column.field)
+}
+
+export const getConfiguredTableRows = (
+  chartConfig: ComponentChartConfig,
+  rawRows: Record<string, unknown>[],
+  carouselStep = 0,
+) => {
+  const loadLimit = clampInteger(chartConfig.tableLoadLimit, 100, 1, 5000)
+  const visibleRows = clampInteger(chartConfig.tableVisibleRows, 10, 1, 200)
+  const limitedRows = rawRows.slice(0, loadLimit)
+  if (limitedRows.length <= visibleRows) return limitedRows
+
+  const stepSize = chartConfig.tableCarouselMode === 'page' ? visibleRows : 1
+  const maxStart = Math.max(0, limitedRows.length - visibleRows)
+  const start = Math.min(Math.max(0, carouselStep * stepSize), maxStart)
+  return limitedRows.slice(start, start + visibleRows)
+}
+
+export const getConfiguredTableStepCount = (chartConfig: ComponentChartConfig, rawRows: Record<string, unknown>[]) => {
+  const loadLimit = clampInteger(chartConfig.tableLoadLimit, 100, 1, 5000)
+  const visibleRows = clampInteger(chartConfig.tableVisibleRows, 10, 1, 200)
+  const limitedLength = rawRows.slice(0, loadLimit).length
+  if (limitedLength <= visibleRows) return 1
+  const stepSize = chartConfig.tableCarouselMode === 'page' ? visibleRows : 1
+  return Math.ceil((limitedLength - visibleRows) / stepSize) + 1
 }
 
 const scoreColumn = (column: string, keywords: string[]) => {
@@ -1104,6 +1210,7 @@ export const suggestChartFields = (columns: string[], chartType: string): Partia
   if (TABLE_LIKE_CHART_TYPES.has(chartType)) {
     nextConfig.tableDimensionFields = normalizeFieldList([xField, groupField])
     nextConfig.tableMetricFields = normalizeFieldList([yField])
+    nextConfig.tableCustomColumns = normalizeTableCustomColumns([], [xField, groupField, yField])
   }
   return nextConfig
 }
@@ -1137,6 +1244,11 @@ export const buildChartSnapshot = (chart?: Chart | null): ComponentChartConfig =
   groupField: chart?.groupField ?? '',
   tableDimensionFields: [],
   tableMetricFields: [],
+  tableCustomColumns: [],
+  tableLoadLimit: 100,
+  tableVisibleRows: 10,
+  tableCarouselMode: 'single',
+  tableCarouselInterval: 20000,
 })
 
 const parseRawComponentConfig = (configJson?: string | null): Record<string, any> => {
@@ -1173,6 +1285,15 @@ export const parseComponentConfig = (configJson?: string | null): Partial<Compon
   if (typeof parsed.groupField === 'string') chartPatch.groupField = parsed.groupField
   chartPatch.tableDimensionFields = normalizeFieldList(parsed.tableDimensionFields)
   chartPatch.tableMetricFields = normalizeFieldList(parsed.tableMetricFields)
+  chartPatch.tableCustomColumns = normalizeTableCustomColumns(parsed.tableCustomColumns, [
+    typeof parsed.xField === 'string' ? parsed.xField : '',
+    typeof parsed.groupField === 'string' ? parsed.groupField : '',
+    typeof parsed.yField === 'string' ? parsed.yField : '',
+  ])
+  chartPatch.tableLoadLimit = clampInteger(parsed.tableLoadLimit, 100, 1, 5000)
+  chartPatch.tableVisibleRows = clampInteger(parsed.tableVisibleRows, 10, 1, 200)
+  chartPatch.tableCarouselMode = parsed.tableCarouselMode === 'page' ? 'page' : 'single'
+  chartPatch.tableCarouselInterval = clampInteger(parsed.tableCarouselInterval, 20000, 1000, 120000)
   if (typeof parsed.theme === 'string') stylePatch.theme = parsed.theme
   if (typeof parsed.bgColor === 'string') stylePatch.bgColor = parsed.bgColor
   if (typeof parsed.showLegend === 'boolean') stylePatch.showLegend = parsed.showLegend

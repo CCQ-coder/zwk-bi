@@ -502,6 +502,12 @@
                   </div>
                   <div v-else-if="isTableChart(component)" class="table-wrapper">
                     <el-table
+                      :data="getTableRows(component)"
+                      size="small"
+                      border
+                      height="100%"
+                      empty-text="暂无数据"
+                      :stripe="getComponentConfig(component).style.tableStriped"
                       :show-header="true"
                       :header-cell-style="{
                         background: getComponentConfig(component).style.tableHeaderBg,
@@ -524,10 +530,13 @@
                       />
                       <el-table-column
                         v-for="column in getTableColumns(component)"
-                        :key="column"
-                        :prop="column"
-                        :label="column"
-                        min-width="120"
+                        :key="column.id"
+                        :prop="column.field"
+                        :label="column.label"
+                        :width="column.width"
+                        :align="column.align"
+                        :header-align="column.align"
+                        show-overflow-tooltip
                         :sortable="getComponentConfig(component).style.tableEnableSort ? 'custom' : false"
                       />
                     </el-table>
@@ -821,7 +830,8 @@ import {
   buildComponentConfig,
   buildComponentOption,
   chartTypeLabel,
-  getConfiguredTableColumns,
+  getConfiguredTableRows,
+  getConfiguredTableStepCount,
   getMissingChartFields,
   isCanvasRenderableChartType,
   isDecorationChartType,
@@ -831,6 +841,7 @@ import {
   normalizeComponentAssetConfig,
   normalizeComponentConfig,
   postProcessChartOption,
+  resolveConfiguredTableColumns,
 } from '../utils/component-config'
 import { echarts, type ECharts } from '../utils/echarts'
 import {
@@ -1214,6 +1225,11 @@ const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LI
       groupField: '',
       tableDimensionFields: [],
       tableMetricFields: [],
+      tableCustomColumns: [],
+      tableLoadLimit: 100,
+      tableVisibleRows: 10,
+      tableCarouselMode: 'single',
+      tableCarouselInterval: 20000,
     },
   }, item.layout),
   builtIn: true,
@@ -1224,6 +1240,7 @@ const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LI
 const templateAssets = computed(() => [...localStaticTemplates.value, ...templates.value])
 const dashboardCounts = ref(new Map<number, number>())
 const componentDataMap = shallowRef(new Map<number, ChartDataResult>())
+const tableCarouselSteps = shallowRef(new Map<number, number>())
 const leftPanelRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLElement | null>(null)
 const stageScrollRef = ref<HTMLElement | null>(null)
@@ -1859,21 +1876,34 @@ const buildCounts = async () => {
 
 const yieldToMainThread = () => new Promise<void>((resolve) => window.setTimeout(resolve, 0))
 
+let componentDataRefreshFrame: number | null = null
+
+const flushComponentDataRefresh = () => {
+  componentDataRefreshFrame = null
+  triggerRef(componentDataMap)
+  scheduleTableCarouselSync()
+}
+
+const scheduleComponentDataRefresh = () => {
+  if (componentDataRefreshFrame !== null) return
+  componentDataRefreshFrame = window.requestAnimationFrame(flushComponentDataRefresh)
+}
+
 const setComponentData = (componentId: number, data: ChartDataResult) => {
   componentDataMap.value.set(componentId, data)
-  triggerRef(componentDataMap)
+  scheduleComponentDataRefresh()
 }
 
 const deleteComponentData = (componentId: number) => {
   if (!componentDataMap.value.has(componentId)) return
   componentDataMap.value.delete(componentId)
-  triggerRef(componentDataMap)
+  scheduleComponentDataRefresh()
 }
 
 const clearComponentData = () => {
   if (!componentDataMap.value.size) return
   componentDataMap.value.clear()
-  triggerRef(componentDataMap)
+  scheduleComponentDataRefresh()
 }
 
 const clearVisibleComponentIds = () => {
@@ -2182,11 +2212,110 @@ const showNoField = (component: DashboardComponent) => {
   return getMissingChartFields(config).length > 0
 }
 
-const getTableColumns = (component: DashboardComponent) => getConfiguredTableColumns(
+const tableCarouselTimers = new Map<number, number>()
+const tableCarouselRuntimeSignatures = new Map<number, string>()
+let tableCarouselSyncFrame: number | null = null
+
+const scheduleTableCarouselSync = () => {
+  if (tableCarouselSyncFrame !== null) return
+  tableCarouselSyncFrame = window.requestAnimationFrame(() => {
+    tableCarouselSyncFrame = null
+    syncTableCarousels()
+  })
+}
+
+const setTableCarouselStep = (componentId: number, step: number) => {
+  tableCarouselSteps.value.set(componentId, step)
+  triggerRef(tableCarouselSteps)
+}
+
+const clearTableCarouselStep = (componentId: number) => {
+  if (!tableCarouselSteps.value.delete(componentId)) return
+  triggerRef(tableCarouselSteps)
+}
+
+const stopTableCarousel = (componentId: number) => {
+  const timerId = tableCarouselTimers.get(componentId)
+  if (timerId == null) return
+  window.clearInterval(timerId)
+  tableCarouselTimers.delete(componentId)
+}
+
+const stopAllTableCarousels = () => {
+  Array.from(tableCarouselTimers.keys()).forEach((componentId) => stopTableCarousel(componentId))
+  tableCarouselRuntimeSignatures.clear()
+  tableCarouselSteps.value.clear()
+  triggerRef(tableCarouselSteps)
+}
+
+const syncTableCarousels = () => {
+  const activeTableIds = new Set<number>()
+  components.value.forEach((component) => {
+    if (!isTableChart(component)) return
+    activeTableIds.add(component.id)
+    const chartConfig = getComponentConfig(component).chart
+    const rawRows = componentDataMap.value.get(component.id)?.rawRows ?? []
+    const stepCount = getConfiguredTableStepCount(chartConfig, rawRows)
+    const runtimeSignature = [
+      chartConfig.tableLoadLimit,
+      chartConfig.tableVisibleRows,
+      chartConfig.tableCarouselMode,
+      chartConfig.tableCarouselInterval,
+      rawRows.length,
+    ].join(':')
+    const previousSignature = tableCarouselRuntimeSignatures.get(component.id)
+
+    if (previousSignature === runtimeSignature && (stepCount <= 1 || tableCarouselTimers.has(component.id))) {
+      if (stepCount <= 1 && (tableCarouselSteps.value.get(component.id) ?? 0) !== 0) {
+        setTableCarouselStep(component.id, 0)
+      }
+      return
+    }
+
+    tableCarouselRuntimeSignatures.set(component.id, runtimeSignature)
+    stopTableCarousel(component.id)
+    if (stepCount <= 1) {
+      setTableCarouselStep(component.id, 0)
+      return
+    }
+    const currentStep = tableCarouselSteps.value.get(component.id) ?? 0
+    setTableCarouselStep(component.id, currentStep >= stepCount ? 0 : currentStep)
+    tableCarouselTimers.set(component.id, window.setInterval(() => {
+      const nextStep = ((tableCarouselSteps.value.get(component.id) ?? 0) + 1) % stepCount
+      setTableCarouselStep(component.id, nextStep)
+    }, Math.max(1000, chartConfig.tableCarouselInterval || 20000)))
+  })
+
+  Array.from(tableCarouselTimers.keys()).forEach((componentId) => {
+    if (!activeTableIds.has(componentId)) stopTableCarousel(componentId)
+  })
+  Array.from(tableCarouselRuntimeSignatures.keys()).forEach((componentId) => {
+    if (!activeTableIds.has(componentId)) tableCarouselRuntimeSignatures.delete(componentId)
+  })
+  Array.from(tableCarouselSteps.value.keys()).forEach((componentId) => {
+    if (!activeTableIds.has(componentId)) clearTableCarouselStep(componentId)
+  })
+}
+
+const tableCarouselComponentSignature = computed(() => components.value
+  .filter((component) => isTableChart(component))
+  .map((component) => `${component.id}:${component.chartId}:${component.configJson ?? ''}`)
+  .join('|'))
+
+watch(tableCarouselComponentSignature, () => {
+  scheduleTableCarouselSync()
+}, { immediate: true })
+
+const getTableColumns = (component: DashboardComponent) => resolveConfiguredTableColumns(
   getComponentConfig(component).chart,
   componentDataMap.value.get(component.id)?.columns ?? []
 )
-const getTableRows = (componentId: number) => componentDataMap.value.get(componentId)?.rawRows ?? []
+
+const getTableRows = (component: DashboardComponent) => getConfiguredTableRows(
+  getComponentConfig(component).chart,
+  componentDataMap.value.get(component.id)?.rawRows ?? [],
+  tableCarouselSteps.value.get(component.id) ?? 0,
+)
 
 const setStageCardRef = (el: HTMLElement | null, componentId: number) => {
   const previous = stageCardRefs.get(componentId)
@@ -3692,6 +3821,15 @@ onBeforeUnmount(() => {
   document.removeEventListener('mouseup', onPointerUp)
   cleanupInteractionFrame()
   window.removeEventListener('resize', handleWindowResize)
+  if (componentDataRefreshFrame !== null) {
+    window.cancelAnimationFrame(componentDataRefreshFrame)
+    componentDataRefreshFrame = null
+  }
+  if (tableCarouselSyncFrame !== null) {
+    window.cancelAnimationFrame(tableCarouselSyncFrame)
+    tableCarouselSyncFrame = null
+  }
+  stopAllTableCarousels()
   disposeCharts()
   if (sidebarHoverTimer !== null) { clearTimeout(sidebarHoverTimer); sidebarHoverTimer = null }
   if (templatePreviewHideTimer !== null) { clearTimeout(templatePreviewHideTimer); templatePreviewHideTimer = null }

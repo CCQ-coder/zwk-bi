@@ -14,7 +14,7 @@
 
     <template v-else>
       <el-tabs v-model="activeTab" class="inspector-tabs" stretch>
-        <el-tab-pane label="概览" name="summary">
+        <el-tab-pane label="基础设置" name="summary">
           <section class="inspector-section">
             <div class="section-title">组件概览</div>
             <div class="summary-card">
@@ -49,6 +49,32 @@
                 </el-select>
                 <div class="helper-text">{{ currentChartMeta.description }}</div>
               </el-form-item>
+            </el-form>
+          </section>
+
+          <section v-if="isTableComponentType" class="inspector-section">
+            <div class="section-title">表格基础设置</div>
+            <el-form label-position="top" class="chart-form summary-form">
+              <div class="table-basic-grid">
+                <el-form-item label="最大加载量">
+                  <el-input-number v-model="configForm.chart.tableLoadLimit" :min="1" :max="5000" controls-position="right" style="width: 100%" />
+                  <div class="helper-text">控制当前表格一次最多参与展示的数据量。</div>
+                </el-form-item>
+                <el-form-item label="表行数">
+                  <el-input-number v-model="configForm.chart.tableVisibleRows" :min="1" :max="200" controls-position="right" style="width: 100%" />
+                  <div class="helper-text">页面内同时显示的行数，默认 10 行。</div>
+                </el-form-item>
+                <el-form-item label="轮播方式">
+                  <el-select v-model="configForm.chart.tableCarouselMode" style="width: 100%">
+                    <el-option label="单行滚动" value="single" />
+                    <el-option label="整页滚动" value="page" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="轮播间隔时间">
+                  <el-input-number v-model="configForm.chart.tableCarouselInterval" :min="1000" :max="120000" :step="1000" controls-position="right" style="width: 100%" />
+                  <div class="helper-text">单位毫秒，默认 20000ms。</div>
+                </el-form-item>
+              </div>
             </el-form>
           </section>
 
@@ -270,114 +296,75 @@
                   <el-button size="small" type="primary" :loading="previewLoading" @click="onPageSourceQuery">预览数据</el-button>
                 </div>
               </template>
-              <div v-if="suggestionSummary.length" class="suggestion-card">
+              <div v-if="suggestionSummary.length && !isTableComponentType" class="suggestion-card">
                 <div class="suggestion-head">
                   <span>推荐字段</span>
                   <el-button size="small" link type="primary" @click="applySuggestedFields">一键应用</el-button>
                 </div>
                 <div class="suggestion-body">{{ suggestionSummary.join(' · ') }}</div>
               </div>
-              <div v-if="isTableComponentType" class="table-field-builder">
-                <div class="table-field-builder__board">
-                  <div class="table-field-zone">
-                    <div class="table-field-zone__head">
-                      <span>维度字段</span>
-                      <el-button size="small" link type="primary" :disabled="!configForm.chart.tableDimensionFields.length" @click="clearTableFieldBucket('dimension')">清空</el-button>
-                    </div>
-                    <div class="table-field-zone__body" @dragover.prevent @drop.prevent="onTableFieldDrop('dimension', configForm.chart.tableDimensionFields.length)">
-                      <div v-if="!configForm.chart.tableDimensionFields.length" class="table-field-zone__empty">拖入左侧维度、层级或明细列</div>
-                      <div
-                        v-for="(field, index) in configForm.chart.tableDimensionFields"
-                        :key="`dimension-${field}-${index}`"
-                        class="table-field-pill"
-                        draggable="true"
-                        @dragstart="onTableFieldDragStart('dimension', field, index)"
-                        @dragend="clearTableFieldDrag"
-                        @dragover.prevent
-                        @drop.prevent="onTableFieldDrop('dimension', index)"
-                      >
-                        <span class="table-field-pill__badge">维</span>
-                        <span class="table-field-pill__label">{{ field }}</span>
-                        <button type="button" class="table-field-pill__remove" @click.stop="removeTableField('dimension', index)">移除</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="table-field-zone">
-                    <div class="table-field-zone__head">
-                      <span>指标字段</span>
-                      <el-button size="small" link type="primary" :disabled="!configForm.chart.tableMetricFields.length" @click="clearTableFieldBucket('metric')">清空</el-button>
-                    </div>
-                    <div class="table-field-zone__body" @dragover.prevent @drop.prevent="onTableFieldDrop('metric', configForm.chart.tableMetricFields.length)">
-                      <div v-if="!configForm.chart.tableMetricFields.length" class="table-field-zone__empty">拖入数值、金额、次数等指标列</div>
-                      <div
-                        v-for="(field, index) in configForm.chart.tableMetricFields"
-                        :key="`metric-${field}-${index}`"
-                        class="table-field-pill table-field-pill--metric"
-                        draggable="true"
-                        @dragstart="onTableFieldDragStart('metric', field, index)"
-                        @dragend="clearTableFieldDrag"
-                        @dragover.prevent
-                        @drop.prevent="onTableFieldDrop('metric', index)"
-                      >
-                        <span class="table-field-pill__badge">值</span>
-                        <span class="table-field-pill__label">{{ field }}</span>
-                        <button type="button" class="table-field-pill__remove" @click.stop="removeTableField('metric', index)">移除</button>
-                      </div>
-                    </div>
-                  </div>
+              <div v-if="isTableComponentType" class="table-column-editor">
+                <div class="table-column-editor__head">
+                  <span>自定义列</span>
+                  <el-button size="small" link type="primary" @click="addTableColumn">新增列</el-button>
                 </div>
-
-                <div class="table-field-palette">
-                  <div class="table-field-palette__head">
-                    <span>可用字段</span>
-                    <span>拖入左侧区域，或直接点按钮追加</span>
-                  </div>
-                  <div class="table-field-palette__list">
-                    <div
-                      v-for="field in availableTableFields"
-                      :key="field"
-                      class="table-field-source"
-                      draggable="true"
-                      @dragstart="onTableFieldDragStart('available', field)"
-                      @dragend="clearTableFieldDrag"
-                    >
-                      <div class="table-field-source__main">
-                        <span class="table-field-source__kind" :class="{ 'table-field-source__kind--metric': getTableFieldKind(field) === 'metric' }">
-                          {{ getTableFieldKind(field) === 'metric' ? '值' : '维' }}
-                        </span>
-                        <span class="table-field-source__label">{{ field }}</span>
-                      </div>
-                      <div class="table-field-source__actions">
-                        <el-button size="small" text @click="addTableField('dimension', field)">维度</el-button>
-                        <el-button size="small" text @click="addTableField('metric', field)">指标</el-button>
-                      </div>
+                <div class="table-column-editor__hint">字段自己选取，不再区分维度和指标；可修改列名、宽度、对齐方式，并支持拖拽调整顺序。</div>
+                <div class="table-column-editor__list">
+                  <div v-if="!configForm.chart.tableCustomColumns.length" class="table-column-editor__empty">先执行一次预览数据，或直接新增列后选择字段。</div>
+                  <div
+                    v-for="(column, index) in configForm.chart.tableCustomColumns"
+                    :key="column.id"
+                    class="table-column-item"
+                    draggable="true"
+                    @dragstart="onTableColumnDragStart(index)"
+                    @dragend="clearTableColumnDrag"
+                    @dragover.prevent
+                    @drop.prevent="onTableColumnDrop(index)"
+                  >
+                    <div class="table-column-item__label">第{{ index + 1 }}列</div>
+                    <div class="table-column-item__grid">
+                      <label class="table-column-field">
+                        <span>字段选择</span>
+                        <el-select v-model="column.field" placeholder="选择字段" filterable clearable style="width: 100%" @change="handleTableColumnFieldChange(index)">
+                          <el-option v-for="field in previewColumns" :key="field" :label="field" :value="field" />
+                        </el-select>
+                      </label>
+                      <label class="table-column-field">
+                        <span>列名称</span>
+                        <el-input v-model="column.label" placeholder="列名称(可修改)" />
+                      </label>
+                      <label class="table-column-field">
+                        <span>宽度</span>
+                        <el-input-number v-model="column.width" :min="80" :max="480" controls-position="right" style="width: 100%" />
+                      </label>
+                      <label class="table-column-field">
+                        <span>对齐方式</span>
+                        <el-select v-model="column.align" style="width: 100%">
+                          <el-option label="居左对齐" value="left" />
+                          <el-option label="居中对齐" value="center" />
+                          <el-option label="居右对齐" value="right" />
+                        </el-select>
+                      </label>
                     </div>
-                    <div v-if="!availableTableFields.length" class="table-field-palette__empty">全部字段都已加入当前表格布局。</div>
+                    <div class="table-column-item__actions">
+                      <span class="table-column-item__drag">:: 拖拽排序</span>
+                      <el-button size="small" text @click="removeTableColumn(index)">删除</el-button>
+                    </div>
                   </div>
                 </div>
               </div>
-              <el-form-item v-if="currentChartMeta.requiresDimension || currentChartMeta.allowsOptionalDimension || isTableComponentType || isFilterComponentType || isMetricComponentType" :label="dimensionFieldLabel">
-                <template v-if="isTableComponentType">
-                  <div class="helper-text helper-text--compact">主维度会自动同步为左侧第一个维度字段，用于兼容旧配置与 schema 展示。</div>
-                </template>
-                <el-select v-else v-model="configForm.chart.xField" placeholder="选择维度字段" clearable filterable style="width: 100%">
+              <el-form-item v-if="currentChartMeta.requiresDimension || currentChartMeta.allowsOptionalDimension || isFilterComponentType || isMetricComponentType" :label="dimensionFieldLabel">
+                <el-select v-model="configForm.chart.xField" placeholder="选择维度字段" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
               </el-form-item>
-              <el-form-item v-if="currentChartMeta.requiresMetric || isTableComponentType || isMetricComponentType" :label="metricFieldLabel">
-                <template v-if="isTableComponentType">
-                  <div class="helper-text helper-text--compact">主指标会自动同步为左侧第一个指标字段，拖拽即可改变展示顺序。</div>
-                </template>
-                <el-select v-else v-model="configForm.chart.yField" placeholder="选择度量字段" clearable filterable style="width: 100%">
+              <el-form-item v-if="currentChartMeta.requiresMetric || isMetricComponentType" :label="metricFieldLabel">
+                <el-select v-model="configForm.chart.yField" placeholder="选择度量字段" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
               </el-form-item>
-              <el-form-item v-if="currentChartMeta.allowsGroup || isTableComponentType || isMetricComponentType" :label="groupFieldLabel">
-                <template v-if="isTableComponentType">
-                  <div class="helper-text helper-text--compact">第二个维度会自动映射到兼容分组字段，其余展示列全部保存在实例配置数组中。</div>
-                </template>
-                <el-select v-else v-model="configForm.chart.groupField" placeholder="可选" clearable filterable style="width: 100%">
+              <el-form-item v-if="currentChartMeta.allowsGroup || isMetricComponentType" :label="groupFieldLabel">
+                <el-select v-model="configForm.chart.groupField" placeholder="可选" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
               </el-form-item>
@@ -390,6 +377,12 @@
               <el-table :data="previewRows.slice(0, 5)" size="small" max-height="240" border>
                 <el-table-column v-for="column in previewVisibleColumns" :key="column" :prop="column" :label="column" min-width="120" show-overflow-tooltip />
               </el-table>
+            </div>
+            <div v-if="isTableComponentType && tablePreviewJson" class="preview-card preview-card--json">
+              <div class="preview-head">
+                <span>返回 JSON</span>
+              </div>
+              <pre class="query-json-block">{{ tablePreviewJson }}</pre>
             </div>
           </section>
         </el-tab-pane>
@@ -1012,21 +1005,21 @@ import {
   DEFAULT_COMPONENT_INTERACTION,
   DEFAULT_COMPONENT_STYLE,
   buildPresetChartConfig,
-  getConfiguredTableColumns,
   getChartTypeMeta,
   getMissingChartFields,
   isDecorationChartType,
   isStaticWidgetChartType,
   normalizeComponentDataFilters,
   normalizeComponentConfig,
+  resolveConfiguredTableColumns,
   suggestChartFields,
   TABLE_LIKE_CHART_TYPES,
   type ComponentInstanceConfig,
+  type TableColumnConfig,
 } from '../utils/component-config'
 
 type LayoutField = 'posX' | 'posY' | 'width' | 'height' | 'zIndex'
-type TableFieldBucket = 'dimension' | 'metric'
-type TableFieldDragSource = TableFieldBucket | 'available'
+type TableColumnDragState = { sourceIndex: number }
 
 const props = defineProps<{
   scene: 'dashboard' | 'screen'
@@ -1181,7 +1174,7 @@ const saving = ref(false)
 const themeNames = Object.keys(COLOR_THEMES)
 const activeTab = ref('summary')
 const syncingFromProps = ref(false)
-const tableFieldDrag = ref<{ source: TableFieldDragSource; field: string; index: number } | null>(null)
+const tableFieldDrag = ref<TableColumnDragState | null>(null)
 const componentPresets = COMPONENT_PRESETS
 const openSections = ref(new Set(['legend', 'label']))
 const toggleSection = (name: string) => {
@@ -1359,24 +1352,50 @@ const normalizeFieldRoleList = (fields: string[]) => Array.from(new Set(
     .filter(Boolean)
 ))
 
-const syncTableFieldBindings = () => {
-  const dimensionFields = normalizeFieldRoleList(configForm.chart.tableDimensionFields ?? [])
-  const metricFields = normalizeFieldRoleList(configForm.chart.tableMetricFields ?? [])
-    .filter((field) => !dimensionFields.includes(field))
+const createDraftTableColumn = (field = '', index = configForm.chart.tableCustomColumns.length): TableColumnConfig => ({
+  id: `table-column-${Date.now()}-${index}`,
+  field,
+  label: field,
+  width: 180,
+  align: 'center',
+})
 
-  configForm.chart.tableDimensionFields = dimensionFields
-  configForm.chart.tableMetricFields = metricFields
+const normalizeDraftTableColumns = (columns: TableColumnConfig[]) => columns
+  .map((column, index) => ({
+    id: column.id || `table-column-${index + 1}`,
+    field: String(column.field ?? '').trim(),
+    label: String(column.label ?? '').trim(),
+    width: Math.min(480, Math.max(80, Math.round(Number(column.width) || 180))),
+    align: column.align === 'left' || column.align === 'right' || column.align === 'center' ? column.align : 'center',
+  }))
+  .filter((column) => column.field)
+  .map((column) => ({
+    ...column,
+    label: column.label || column.field,
+  }))
 
-  if (isTableComponentType.value) {
-    configForm.chart.xField = dimensionFields[0] ?? ''
-    configForm.chart.yField = metricFields[0] ?? ''
-    configForm.chart.groupField = dimensionFields[1] ?? ''
-  }
+const syncTableColumnConfig = () => {
+  configForm.chart.tableCustomColumns = normalizeDraftTableColumns(configForm.chart.tableCustomColumns ?? [])
+  if (!isTableComponentType.value) return
+  configForm.chart.tableDimensionFields = []
+  configForm.chart.tableMetricFields = []
+  configForm.chart.xField = ''
+  configForm.chart.yField = ''
+  configForm.chart.groupField = ''
 }
 
 const previewVisibleColumns = computed(() => isTableComponentType.value
-  ? getConfiguredTableColumns(configForm.chart, previewColumns.value)
+  ? resolveConfiguredTableColumns(configForm.chart, previewColumns.value).map((column) => column.field)
   : previewColumns.value)
+
+const tablePreviewJson = computed(() => {
+  if (!isTableComponentType.value || !previewColumns.value.length) return ''
+  return JSON.stringify({
+    columns: previewColumns.value,
+    rows: previewRows.value,
+    rowCount: previewRowCount.value,
+  }, null, 2)
+})
 
 const previewColumnSummary = computed(() => {
   const visibleCount = previewVisibleColumns.value.length
@@ -1387,118 +1406,63 @@ const previewColumnSummary = computed(() => {
   return `字段 ${visibleCount} 个 / 样例 ${previewRows.value.length} 行 / 总计 ${previewRowCount.value} 行`
 })
 
-const availableTableFields = computed(() => {
-  const selected = new Set([
-    ...configForm.chart.tableDimensionFields,
-    ...configForm.chart.tableMetricFields,
-  ])
-  return previewColumns.value.filter((column) => !selected.has(column))
-})
-
-const getTableFieldBucket = (bucket: TableFieldBucket) => (
-  bucket === 'dimension' ? configForm.chart.tableDimensionFields : configForm.chart.tableMetricFields
-)
-
-const setTableFieldBuckets = (dimensionFields: string[], metricFields: string[]) => {
-  configForm.chart.tableDimensionFields = dimensionFields
-  configForm.chart.tableMetricFields = metricFields
-  syncTableFieldBindings()
-}
-
-const getTableFieldKind = (field: string) => {
-  const sampleValue = previewRows.value
-    .map((row) => row[field])
-    .find((value) => value != null && String(value).trim() !== '')
-  if (typeof sampleValue === 'number') return 'metric'
-  if (typeof sampleValue === 'string') {
-    const trimmed = sampleValue.trim()
-    return trimmed !== '' && !Number.isNaN(Number(trimmed)) ? 'metric' : 'dimension'
-  }
-  return 'dimension'
-}
-
-const placeTableField = (
-  bucket: TableFieldBucket,
-  field: string,
-  targetIndex: number,
-  dragSource?: TableFieldDragSource,
-  sourceIndex = -1,
-) => {
-  const nextDimensions = configForm.chart.tableDimensionFields.filter((item) => item !== field)
-  const nextMetrics = configForm.chart.tableMetricFields.filter((item) => item !== field)
-  const targetFields = bucket === 'dimension' ? nextDimensions : nextMetrics
-  const adjustedIndex = dragSource === bucket && sourceIndex > -1 && sourceIndex < targetIndex
-    ? targetIndex - 1
-    : targetIndex
-  const insertIndex = Math.max(0, Math.min(adjustedIndex, targetFields.length))
-  targetFields.splice(insertIndex, 0, field)
-  setTableFieldBuckets(nextDimensions, nextMetrics)
-}
-
-const addTableField = (bucket: TableFieldBucket, field: string) => {
-  if (!field) return
-  placeTableField(bucket, field, getTableFieldBucket(bucket).length)
-}
-
-const removeTableField = (bucket: TableFieldBucket, index: number) => {
-  const nextFields = getTableFieldBucket(bucket).filter((_, itemIndex) => itemIndex !== index)
-  if (bucket === 'dimension') {
-    setTableFieldBuckets(nextFields, [...configForm.chart.tableMetricFields])
+const addTableColumn = () => {
+  if (!previewColumns.value.length) {
+    ElMessage.warning('请先预览数据，再新增表格列')
     return
   }
-  setTableFieldBuckets([...configForm.chart.tableDimensionFields], nextFields)
+  const usedFields = new Set(configForm.chart.tableCustomColumns.map((column) => column.field))
+  const nextField = previewColumns.value.find((field) => !usedFields.has(field)) ?? previewColumns.value[0] ?? ''
+  configForm.chart.tableCustomColumns = [...configForm.chart.tableCustomColumns, createDraftTableColumn(nextField)]
+  syncTableColumnConfig()
 }
 
-const clearTableFieldBucket = (bucket: TableFieldBucket) => {
-  if (bucket === 'dimension') {
-    setTableFieldBuckets([], [...configForm.chart.tableMetricFields])
-    return
+const removeTableColumn = (index: number) => {
+  configForm.chart.tableCustomColumns = configForm.chart.tableCustomColumns.filter((_, itemIndex) => itemIndex !== index)
+  syncTableColumnConfig()
+}
+
+const handleTableColumnFieldChange = (index: number) => {
+  const column = configForm.chart.tableCustomColumns[index]
+  if (!column) return
+  if (!column.label.trim()) {
+    column.label = column.field
   }
-  setTableFieldBuckets([...configForm.chart.tableDimensionFields], [])
+  syncTableColumnConfig()
 }
 
-const onTableFieldDragStart = (source: TableFieldDragSource, field: string, index = -1) => {
-  tableFieldDrag.value = { source, field, index }
+const onTableColumnDragStart = (sourceIndex: number) => {
+  tableFieldDrag.value = { sourceIndex }
 }
 
-const clearTableFieldDrag = () => {
+const clearTableColumnDrag = () => {
   tableFieldDrag.value = null
 }
 
-const onTableFieldDrop = (bucket: TableFieldBucket, targetIndex: number) => {
+const onTableColumnDrop = (targetIndex: number) => {
   const dragging = tableFieldDrag.value
-  if (!dragging?.field) return
-  placeTableField(bucket, dragging.field, targetIndex, dragging.source, dragging.index)
-  clearTableFieldDrag()
+  if (!dragging || dragging.sourceIndex === targetIndex) return
+  const nextColumns = [...configForm.chart.tableCustomColumns]
+  const [movedColumn] = nextColumns.splice(dragging.sourceIndex, 1)
+  if (!movedColumn) return
+  nextColumns.splice(targetIndex, 0, movedColumn)
+  configForm.chart.tableCustomColumns = nextColumns
+  clearTableColumnDrag()
+  syncTableColumnConfig()
 }
 
 const suggestionSummary = computed(() => {
-  const dimensionFields = normalizeFieldRoleList(
-    suggestedFields.value.tableDimensionFields?.length
-      ? suggestedFields.value.tableDimensionFields
-      : [suggestedFields.value.xField ?? '', suggestedFields.value.groupField ?? '']
-  )
-  const metricFields = normalizeFieldRoleList(
-    suggestedFields.value.tableMetricFields?.length
-      ? suggestedFields.value.tableMetricFields
-      : [suggestedFields.value.yField ?? '']
-  )
-  const entries = isTableComponentType.value
-    ? [
-        dimensionFields.length ? `维度 ${dimensionFields.join('、')}` : '',
-        metricFields.length ? `指标 ${metricFields.join('、')}` : '',
-      ]
-    : [
-        suggestedFields.value.xField ? `维度 ${suggestedFields.value.xField}` : '',
-        suggestedFields.value.yField ? `度量 ${suggestedFields.value.yField}` : '',
-        suggestedFields.value.groupField ? `分组 ${suggestedFields.value.groupField}` : '',
-      ]
+  const entries = [
+    suggestedFields.value.xField ? `维度 ${suggestedFields.value.xField}` : '',
+    suggestedFields.value.yField ? `度量 ${suggestedFields.value.yField}` : '',
+    suggestedFields.value.groupField ? `分组 ${suggestedFields.value.groupField}` : '',
+  ]
   return entries.filter(Boolean)
 })
 const dataModeTitle = computed(() => {
   switch (componentKind.value) {
     case 'table':
-      return '表格型组件建议优先绑定结构稳定的数据集，再补充维度与指标角色。'
+      return '表格型组件直接基于查询结果配置自定义列，不再区分维度和指标。'
     case 'metric':
       return '指标型组件以单一核心数值为主，可附加标签字段或对比字段强化语义。'
     case 'content':
@@ -1517,30 +1481,31 @@ const dataModeDescription = computed(() => {
 })
 const dataCapabilityTags = computed(() => {
   const tags = [bindingEntryMode.value === 'DATASET' ? '复用数据集' : '页面实时取数']
-  if (currentChartMeta.value.requiresDimension || isTableComponentType.value || isFilterComponentType.value || isMetricComponentType.value) {
+  if (isTableComponentType.value) {
+    tags.push('自定义列', '结果 JSON')
+    return tags.slice(0, 4)
+  }
+  if (currentChartMeta.value.requiresDimension || isFilterComponentType.value || isMetricComponentType.value) {
     tags.push('维度角色')
   }
-  if (currentChartMeta.value.requiresMetric || isTableComponentType.value || isMetricComponentType.value) {
+  if (currentChartMeta.value.requiresMetric || isMetricComponentType.value) {
     tags.push('指标角色')
   }
-  if (currentChartMeta.value.allowsGroup || isTableComponentType.value || isMetricComponentType.value) {
+  if (currentChartMeta.value.allowsGroup || isMetricComponentType.value) {
     tags.push('分组扩展')
   }
   return tags.slice(0, 4)
 })
 const dimensionFieldLabel = computed(() => {
   if (isFilterComponentType.value) return '筛选字段'
-  if (isTableComponentType.value) return '主维度字段'
   if (isMetricComponentType.value) return currentChartMeta.value.requiresDimension ? '标签字段' : '标签字段（可选）'
   return currentChartMeta.value.requiresDimension ? '维度字段' : '维度字段（可选）'
 })
 const metricFieldLabel = computed(() => {
-  if (isTableComponentType.value) return '主指标字段'
   if (isMetricComponentType.value) return '数值字段'
   return '度量字段'
 })
 const groupFieldLabel = computed(() => {
-  if (isTableComponentType.value) return '分组 / 列字段'
   if (isMetricComponentType.value) return '对比字段'
   return '分组字段'
 })
@@ -1555,7 +1520,7 @@ const healthReadyText = computed(() => {
     case 'metric':
       return '当前指标组件已可预览，建议继续检查标签字段和数值字段是否表达清晰。'
     case 'table':
-      return '当前表格组件已满足预览条件，可继续优化表头、行态与排序体验。'
+      return '当前表格组件已满足预览条件，可继续调整自定义列、表头样式和轮播设置。'
     case 'control':
       return '当前筛选控件已满足预览条件，可直接保存并用于页面全局筛选。'
     default:
@@ -1577,15 +1542,6 @@ const currentComponentChartId = computed(() => props.component?.chartId ?? props
 
 const schemaPreview = computed(() => {
   if (!props.component) return ''
-  const dimensions = isTableComponentType.value
-    ? [...configForm.chart.tableDimensionFields]
-    : (configForm.chart.xField ? [configForm.chart.xField] : [])
-  const metrics = isTableComponentType.value
-    ? [...configForm.chart.tableMetricFields]
-    : (configForm.chart.yField ? [configForm.chart.yField] : [])
-  const groups = isTableComponentType.value
-    ? []
-    : (configForm.chart.groupField ? [configForm.chart.groupField] : [])
   return JSON.stringify({
     id: `comp_${props.component.id}`,
     type: configForm.chart.chartType,
@@ -1605,9 +1561,16 @@ const schemaPreview = computed(() => {
       sqlText: configForm.chart.sqlText,
       runtimeConfigText: configForm.chart.runtimeConfigText,
       chartId: props.component.chartId,
-      dimensions,
-      metrics,
-      groups,
+      dimensions: isTableComponentType.value ? [] : (configForm.chart.xField ? [configForm.chart.xField] : []),
+      metrics: isTableComponentType.value ? [] : (configForm.chart.yField ? [configForm.chart.yField] : []),
+      groups: isTableComponentType.value ? [] : (configForm.chart.groupField ? [configForm.chart.groupField] : []),
+      table: isTableComponentType.value ? {
+        loadLimit: configForm.chart.tableLoadLimit,
+        visibleRows: configForm.chart.tableVisibleRows,
+        carouselMode: configForm.chart.tableCarouselMode,
+        carouselInterval: configForm.chart.tableCarouselInterval,
+        columns: configForm.chart.tableCustomColumns,
+      } : undefined,
       filters: configForm.interaction.dataFilters,
       mode: 'instance-override',
     },
@@ -1788,6 +1751,7 @@ const clearChartDataBinding = () => {
   configForm.chart.groupField = ''
   configForm.chart.tableDimensionFields = []
   configForm.chart.tableMetricFields = []
+  configForm.chart.tableCustomColumns = []
   resetPageSourceForms()
   clearPreviewData()
 }
@@ -1815,6 +1779,7 @@ const syncFromProps = async () => {
   configForm.chart = { ...normalized.chart }
   configForm.style = { ...normalized.style }
   configForm.interaction = { ...normalized.interaction }
+  syncTableColumnConfig()
   syncPageSourceFormsFromRuntime(configForm.chart.runtimeConfigText)
   syncRuntimeConfigTextFromForms()
 
@@ -1872,7 +1837,12 @@ watch(isFilterComponentType, (isFilter) => {
 })
 watch(isTableComponentType, (isTable) => {
   if (!isTable) return
-  syncTableFieldBindings()
+  syncTableColumnConfig()
+})
+watch(previewColumns, (columns) => {
+  if (!isTableComponentType.value || configForm.chart.tableCustomColumns.length || !columns.length) return
+  configForm.chart.tableCustomColumns = columns.map((field, index) => createDraftTableColumn(field, index))
+  syncTableColumnConfig()
 })
 
 const loadMeta = async () => {
@@ -1995,23 +1965,16 @@ const handleZIndexChange = (value: number | null | undefined) => applyLayout('zI
 
 const applySuggestedFields = () => {
   if (isTableComponentType.value) {
-    const nextDimensions = normalizeFieldRoleList(
-      suggestedFields.value.tableDimensionFields?.length
-        ? suggestedFields.value.tableDimensionFields
-        : [suggestedFields.value.xField ?? '', suggestedFields.value.groupField ?? '']
-    )
-    const nextMetrics = normalizeFieldRoleList(
-      suggestedFields.value.tableMetricFields?.length
-        ? suggestedFields.value.tableMetricFields
-        : [suggestedFields.value.yField ?? '']
-    )
-    if (!configForm.chart.tableDimensionFields.length && nextDimensions.length) {
-      configForm.chart.tableDimensionFields = nextDimensions
+    if (!configForm.chart.tableCustomColumns.length) {
+      const suggestedColumns = resolveConfiguredTableColumns({
+        ...configForm.chart,
+        tableCustomColumns: [],
+      }, previewColumns.value)
+      if (suggestedColumns.length) {
+        configForm.chart.tableCustomColumns = suggestedColumns
+      }
     }
-    if (!configForm.chart.tableMetricFields.length && nextMetrics.length) {
-      configForm.chart.tableMetricFields = nextMetrics
-    }
-    syncTableFieldBindings()
+    syncTableColumnConfig()
     return
   }
   if (suggestedFields.value.xField && !configForm.chart.xField) {
@@ -2339,32 +2302,21 @@ onBeforeUnmount(() => {
   color: rgba(191, 213, 234, 0.68);
 }
 
-.helper-text--compact {
-  margin-top: 0;
-}
-
-.table-field-builder {
+.table-basic-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.table-field-builder__board {
-  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-.table-field-zone,
-.table-field-palette {
+.table-column-editor {
   padding: 12px;
+  margin-bottom: 14px;
   border-radius: 16px;
   border: 1px solid rgba(95, 146, 199, 0.16);
   background: rgba(6, 19, 32, 0.72);
 }
 
-.table-field-zone__head,
-.table-field-palette__head {
+.table-column-editor__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2374,96 +2326,79 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.table-field-palette__head span:last-child,
-.table-field-zone__empty,
-.table-field-palette__empty {
+.table-column-editor__hint,
+.table-column-editor__empty {
+  margin-top: 8px;
   font-size: 12px;
   line-height: 1.6;
   color: rgba(191, 213, 234, 0.68);
 }
 
-.table-field-zone__body,
-.table-field-palette__list {
+.table-column-editor__list {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-top: 12px;
 }
 
-.table-field-zone__body {
-  min-height: 84px;
-  padding: 10px;
+.table-column-item {
+  padding: 12px;
   border-radius: 14px;
-  border: 1px dashed rgba(111, 188, 255, 0.18);
-  background: rgba(4, 13, 24, 0.58);
+  border: 1px solid rgba(111, 188, 255, 0.16);
+  background: linear-gradient(180deg, rgba(13, 36, 58, 0.88) 0%, rgba(7, 18, 31, 0.96) 100%);
+  cursor: grab;
 }
 
-.table-field-pill,
-.table-field-source {
+.table-column-item__label {
+  color: #eff7ff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.table-column-item__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin-top: 10px;
+}
+
+.table-column-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.table-column-field span,
+.table-column-item__drag {
+  color: rgba(191, 213, 234, 0.78);
+  font-size: 12px;
+}
+
+.table-column-item__actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 12px;
+  margin-top: 10px;
+}
+
+.preview-card--json {
+  margin-top: 12px;
+}
+
+.query-json-block {
+  margin: 0;
+  padding: 12px;
+  max-height: 260px;
+  overflow: auto;
   border-radius: 12px;
-  border: 1px solid rgba(111, 188, 255, 0.16);
-  background: linear-gradient(180deg, rgba(13, 36, 58, 0.88) 0%, rgba(7, 18, 31, 0.96) 100%);
-}
-
-.table-field-pill {
-  cursor: grab;
-}
-
-.table-field-pill--metric {
-  border-color: rgba(81, 198, 171, 0.24);
-}
-
-.table-field-pill__badge,
-.table-field-source__kind {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(84, 167, 255, 0.16);
-  color: #dff2ff;
+  background: rgba(4, 13, 24, 0.72);
+  color: #dff3ff;
   font-size: 12px;
-  font-weight: 700;
-}
-
-.table-field-source__kind--metric {
-  background: rgba(81, 198, 171, 0.18);
-  color: #d6fff1;
-}
-
-.table-field-pill__label,
-.table-field-source__label {
-  min-width: 0;
-  flex: 1;
-  color: #f4fbff;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.table-field-pill__remove {
-  border: 0;
-  background: transparent;
-  color: rgba(191, 213, 234, 0.78);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.table-field-source__main,
-.table-field-source__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.table-field-source__main {
-  min-width: 0;
-  flex: 1;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .profile-kicker,
@@ -2889,7 +2824,8 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1360px) {
-  .table-field-builder {
+  .table-basic-grid,
+  .table-column-item__grid {
     grid-template-columns: 1fr;
   }
 }

@@ -4,7 +4,7 @@ import ComponentStaticPreview from './ComponentStaticPreview.vue';
 import { getChartData, getChartList } from '../api/chart';
 import { getDashboardById, getDashboardComponents } from '../api/dashboard';
 import { getPublicChartList, getPublicComponentData, getPublicDashboardById, getPublicDashboardComponents, } from '../api/report';
-import { buildComponentOption, getConfiguredTableColumns, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
+import { buildComponentOption, getConfiguredTableRows, getConfiguredTableStepCount, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, resolveConfiguredTableColumns, } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 import { normalizeCanvasConfig, parseReportConfig } from '../utils/report-config';
 const props = defineProps();
@@ -16,6 +16,7 @@ const components = ref([]);
 const charts = ref([]);
 const chartMap = computed(() => new Map(charts.value.map((item) => [item.id, item])));
 const componentDataMap = ref(new Map());
+const tableCarouselSteps = ref(new Map());
 const activeFilters = reactive({});
 const canvasRef = ref(null);
 const chartRefs = new Map();
@@ -234,8 +235,96 @@ const isRenderableChart = (component) => {
     const type = getComponentChartConfig(component).chartType ?? '';
     return isCanvasRenderableChartType(type);
 };
-const getTableColumns = (component) => getConfiguredTableColumns(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.columns ?? []);
-const getTableRows = (componentId) => componentDataMap.value.get(componentId)?.rawRows ?? [];
+const tableCarouselTimers = new Map();
+const tableCarouselRuntimeSignatures = new Map();
+let tableCarouselSyncFrame = null;
+const scheduleTableCarouselSync = () => {
+    if (tableCarouselSyncFrame !== null)
+        return;
+    tableCarouselSyncFrame = window.requestAnimationFrame(() => {
+        tableCarouselSyncFrame = null;
+        syncTableCarousels();
+    });
+};
+const setTableCarouselStep = (componentId, step) => {
+    tableCarouselSteps.value.set(componentId, step);
+    tableCarouselSteps.value = new Map(tableCarouselSteps.value);
+};
+const clearTableCarouselStep = (componentId) => {
+    if (!tableCarouselSteps.value.delete(componentId))
+        return;
+    tableCarouselSteps.value = new Map(tableCarouselSteps.value);
+};
+const stopTableCarousel = (componentId) => {
+    const timerId = tableCarouselTimers.get(componentId);
+    if (timerId == null)
+        return;
+    window.clearInterval(timerId);
+    tableCarouselTimers.delete(componentId);
+};
+const stopAllTableCarousels = () => {
+    Array.from(tableCarouselTimers.keys()).forEach((componentId) => stopTableCarousel(componentId));
+    tableCarouselRuntimeSignatures.clear();
+    tableCarouselSteps.value = new Map();
+};
+const syncTableCarousels = () => {
+    const activeTableIds = new Set();
+    components.value.forEach((component) => {
+        if (!isTableChart(component))
+            return;
+        activeTableIds.add(component.id);
+        const chartConfig = getComponentConfig(component).chart;
+        const rawRows = componentDataMap.value.get(component.id)?.rawRows ?? [];
+        const stepCount = getConfiguredTableStepCount(chartConfig, rawRows);
+        const runtimeSignature = [
+            chartConfig.tableLoadLimit,
+            chartConfig.tableVisibleRows,
+            chartConfig.tableCarouselMode,
+            chartConfig.tableCarouselInterval,
+            rawRows.length,
+        ].join(':');
+        const previousSignature = tableCarouselRuntimeSignatures.get(component.id);
+        if (previousSignature === runtimeSignature && (stepCount <= 1 || tableCarouselTimers.has(component.id))) {
+            if (stepCount <= 1 && (tableCarouselSteps.value.get(component.id) ?? 0) !== 0) {
+                setTableCarouselStep(component.id, 0);
+            }
+            return;
+        }
+        tableCarouselRuntimeSignatures.set(component.id, runtimeSignature);
+        stopTableCarousel(component.id);
+        if (stepCount <= 1) {
+            setTableCarouselStep(component.id, 0);
+            return;
+        }
+        const currentStep = tableCarouselSteps.value.get(component.id) ?? 0;
+        setTableCarouselStep(component.id, currentStep >= stepCount ? 0 : currentStep);
+        tableCarouselTimers.set(component.id, window.setInterval(() => {
+            const nextStep = ((tableCarouselSteps.value.get(component.id) ?? 0) + 1) % stepCount;
+            setTableCarouselStep(component.id, nextStep);
+        }, Math.max(1000, chartConfig.tableCarouselInterval || 20000)));
+    });
+    Array.from(tableCarouselTimers.keys()).forEach((componentId) => {
+        if (!activeTableIds.has(componentId))
+            stopTableCarousel(componentId);
+    });
+    Array.from(tableCarouselRuntimeSignatures.keys()).forEach((componentId) => {
+        if (!activeTableIds.has(componentId))
+            tableCarouselRuntimeSignatures.delete(componentId);
+    });
+    Array.from(tableCarouselSteps.value.keys()).forEach((componentId) => {
+        if (!activeTableIds.has(componentId))
+            clearTableCarouselStep(componentId);
+    });
+};
+const tableCarouselComponentSignature = computed(() => components.value
+    .filter((component) => isTableChart(component))
+    .map((component) => `${component.id}:${component.chartId}:${component.configJson ?? ''}`)
+    .join('|'));
+watch(tableCarouselComponentSignature, () => {
+    scheduleTableCarouselSync();
+}, { immediate: true });
+const getTableColumns = (component) => resolveConfiguredTableColumns(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.columns ?? []);
+const getTableRows = (component) => getConfiguredTableRows(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.rawRows ?? [], tableCarouselSteps.value.get(component.id) ?? 0);
 const renderChart = (component, data) => {
     const el = chartRefs.get(component.id);
     if (!el)
@@ -285,8 +374,10 @@ const disposeCharts = () => {
 const reloadComponentData = async () => {
     chartLoading.value = true;
     componentDataMap.value = new Map();
+    scheduleTableCarouselSync();
     try {
         await nextTick();
+        const nextDataMap = new Map();
         await Promise.all(components.value.map(async (component) => {
             const chart = getComponentChartConfig(component);
             const interaction = getComponentInteractionConfig(component);
@@ -300,9 +391,7 @@ const reloadComponentData = async () => {
                         configJson: component.configJson,
                     });
                 const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], chart);
-                const nextMap = new Map(componentDataMap.value);
-                nextMap.set(component.id, materialized);
-                componentDataMap.value = nextMap;
+                nextDataMap.set(component.id, materialized);
                 if (isRenderableChart(component))
                     renderChart(component, materialized);
             }
@@ -310,6 +399,8 @@ const reloadComponentData = async () => {
                 // ignore individual chart failures to keep page usable
             }
         }));
+        componentDataMap.value = nextDataMap;
+        scheduleTableCarouselSync();
     }
     finally {
         chartLoading.value = false;
@@ -374,6 +465,11 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
     window.removeEventListener('resize', handleResize);
+    if (tableCarouselSyncFrame !== null) {
+        window.cancelAnimationFrame(tableCarouselSyncFrame);
+        tableCarouselSyncFrame = null;
+    }
+    stopAllTableCarousels();
     disposeCharts();
 });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
@@ -838,7 +934,7 @@ else {
             /** @type {[typeof __VLS_components.ElTable, typeof __VLS_components.elTable, typeof __VLS_components.ElTable, typeof __VLS_components.elTable, ]} */ ;
             // @ts-ignore
             const __VLS_73 = __VLS_asFunctionalComponent(__VLS_72, new __VLS_72({
-                data: (__VLS_ctx.getTableRows(component.id)),
+                data: (__VLS_ctx.getTableRows(component)),
                 size: "small",
                 border: true,
                 height: "100%",
@@ -856,7 +952,7 @@ else {
                 }),
             }));
             const __VLS_74 = __VLS_73({
-                data: (__VLS_ctx.getTableRows(component.id)),
+                data: (__VLS_ctx.getTableRows(component)),
                 size: "small",
                 border: true,
                 height: "100%",
@@ -894,18 +990,22 @@ else {
                 /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
                 // @ts-ignore
                 const __VLS_81 = __VLS_asFunctionalComponent(__VLS_80, new __VLS_80({
-                    key: (column),
-                    prop: (column),
-                    label: (column),
-                    minWidth: "120",
+                    key: (column.id),
+                    prop: (column.field),
+                    label: (column.label),
+                    width: (column.width),
+                    align: (column.align),
+                    headerAlign: (column.align),
                     showOverflowTooltip: true,
                     sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
                 }));
                 const __VLS_82 = __VLS_81({
-                    key: (column),
-                    prop: (column),
-                    label: (column),
-                    minWidth: "120",
+                    key: (column.id),
+                    prop: (column.field),
+                    label: (column.label),
+                    width: (column.width),
+                    align: (column.align),
+                    headerAlign: (column.align),
                     showOverflowTooltip: true,
                     sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
                 }, ...__VLS_functionalComponentArgsRest(__VLS_81));

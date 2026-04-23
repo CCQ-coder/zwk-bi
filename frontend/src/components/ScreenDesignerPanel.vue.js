@@ -9,7 +9,7 @@ import { addDashboardComponent, createDashboard, deleteDashboard, getDashboardCo
 import { createChart, getChartData, getChartList } from '../api/chart';
 import { createTemplate, getTemplateList } from '../api/chart-template';
 import { getDatasetList } from '../api/dataset';
-import { buildComponentAssetConfig, buildChartSnapshot, buildComponentConfig, buildComponentOption, chartTypeLabel, getConfiguredTableColumns, getMissingChartFields, isCanvasRenderableChartType, isDecorationChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentAssetConfig, normalizeComponentConfig, postProcessChartOption, } from '../utils/component-config';
+import { buildComponentAssetConfig, buildChartSnapshot, buildComponentConfig, buildComponentOption, chartTypeLabel, getConfiguredTableRows, getConfiguredTableStepCount, getMissingChartFields, isCanvasRenderableChartType, isDecorationChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentAssetConfig, normalizeComponentConfig, postProcessChartOption, resolveConfiguredTableColumns, } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 import { buildPublishedLink, buildReportConfig, normalizeCanvasConfig, normalizeCoverConfig, normalizePublishConfig, parseReportConfig, SCREEN_CANVAS_PRESETS, } from '../utils/report-config';
 import { uploadImage } from '../api/upload';
@@ -358,6 +358,11 @@ const localStaticTemplates = computed(() => BUILTIN_TEMPLATE_LIBRARY.map((item, 
             groupField: '',
             tableDimensionFields: [],
             tableMetricFields: [],
+            tableCustomColumns: [],
+            tableLoadLimit: 100,
+            tableVisibleRows: 10,
+            tableCarouselMode: 'single',
+            tableCarouselInterval: 20000,
         },
     }, item.layout),
     builtIn: true,
@@ -368,6 +373,7 @@ const localStaticTemplates = computed(() => BUILTIN_TEMPLATE_LIBRARY.map((item, 
 const templateAssets = computed(() => [...localStaticTemplates.value, ...templates.value]);
 const dashboardCounts = ref(new Map());
 const componentDataMap = shallowRef(new Map());
+const tableCarouselSteps = shallowRef(new Map());
 const leftPanelRef = ref(null);
 const canvasRef = ref(null);
 const stageScrollRef = ref(null);
@@ -932,21 +938,32 @@ const buildCounts = async () => {
     dashboardCounts.value = new Map(entries);
 };
 const yieldToMainThread = () => new Promise((resolve) => window.setTimeout(resolve, 0));
+let componentDataRefreshFrame = null;
+const flushComponentDataRefresh = () => {
+    componentDataRefreshFrame = null;
+    triggerRef(componentDataMap);
+    scheduleTableCarouselSync();
+};
+const scheduleComponentDataRefresh = () => {
+    if (componentDataRefreshFrame !== null)
+        return;
+    componentDataRefreshFrame = window.requestAnimationFrame(flushComponentDataRefresh);
+};
 const setComponentData = (componentId, data) => {
     componentDataMap.value.set(componentId, data);
-    triggerRef(componentDataMap);
+    scheduleComponentDataRefresh();
 };
 const deleteComponentData = (componentId) => {
     if (!componentDataMap.value.has(componentId))
         return;
     componentDataMap.value.delete(componentId);
-    triggerRef(componentDataMap);
+    scheduleComponentDataRefresh();
 };
 const clearComponentData = () => {
     if (!componentDataMap.value.size)
         return;
     componentDataMap.value.clear();
-    triggerRef(componentDataMap);
+    scheduleComponentDataRefresh();
 };
 const clearVisibleComponentIds = () => {
     if (!visibleComponentIds.value.size)
@@ -1238,8 +1255,97 @@ const showNoField = (component) => {
         return false;
     return getMissingChartFields(config).length > 0;
 };
-const getTableColumns = (component) => getConfiguredTableColumns(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.columns ?? []);
-const getTableRows = (componentId) => componentDataMap.value.get(componentId)?.rawRows ?? [];
+const tableCarouselTimers = new Map();
+const tableCarouselRuntimeSignatures = new Map();
+let tableCarouselSyncFrame = null;
+const scheduleTableCarouselSync = () => {
+    if (tableCarouselSyncFrame !== null)
+        return;
+    tableCarouselSyncFrame = window.requestAnimationFrame(() => {
+        tableCarouselSyncFrame = null;
+        syncTableCarousels();
+    });
+};
+const setTableCarouselStep = (componentId, step) => {
+    tableCarouselSteps.value.set(componentId, step);
+    triggerRef(tableCarouselSteps);
+};
+const clearTableCarouselStep = (componentId) => {
+    if (!tableCarouselSteps.value.delete(componentId))
+        return;
+    triggerRef(tableCarouselSteps);
+};
+const stopTableCarousel = (componentId) => {
+    const timerId = tableCarouselTimers.get(componentId);
+    if (timerId == null)
+        return;
+    window.clearInterval(timerId);
+    tableCarouselTimers.delete(componentId);
+};
+const stopAllTableCarousels = () => {
+    Array.from(tableCarouselTimers.keys()).forEach((componentId) => stopTableCarousel(componentId));
+    tableCarouselRuntimeSignatures.clear();
+    tableCarouselSteps.value.clear();
+    triggerRef(tableCarouselSteps);
+};
+const syncTableCarousels = () => {
+    const activeTableIds = new Set();
+    components.value.forEach((component) => {
+        if (!isTableChart(component))
+            return;
+        activeTableIds.add(component.id);
+        const chartConfig = getComponentConfig(component).chart;
+        const rawRows = componentDataMap.value.get(component.id)?.rawRows ?? [];
+        const stepCount = getConfiguredTableStepCount(chartConfig, rawRows);
+        const runtimeSignature = [
+            chartConfig.tableLoadLimit,
+            chartConfig.tableVisibleRows,
+            chartConfig.tableCarouselMode,
+            chartConfig.tableCarouselInterval,
+            rawRows.length,
+        ].join(':');
+        const previousSignature = tableCarouselRuntimeSignatures.get(component.id);
+        if (previousSignature === runtimeSignature && (stepCount <= 1 || tableCarouselTimers.has(component.id))) {
+            if (stepCount <= 1 && (tableCarouselSteps.value.get(component.id) ?? 0) !== 0) {
+                setTableCarouselStep(component.id, 0);
+            }
+            return;
+        }
+        tableCarouselRuntimeSignatures.set(component.id, runtimeSignature);
+        stopTableCarousel(component.id);
+        if (stepCount <= 1) {
+            setTableCarouselStep(component.id, 0);
+            return;
+        }
+        const currentStep = tableCarouselSteps.value.get(component.id) ?? 0;
+        setTableCarouselStep(component.id, currentStep >= stepCount ? 0 : currentStep);
+        tableCarouselTimers.set(component.id, window.setInterval(() => {
+            const nextStep = ((tableCarouselSteps.value.get(component.id) ?? 0) + 1) % stepCount;
+            setTableCarouselStep(component.id, nextStep);
+        }, Math.max(1000, chartConfig.tableCarouselInterval || 20000)));
+    });
+    Array.from(tableCarouselTimers.keys()).forEach((componentId) => {
+        if (!activeTableIds.has(componentId))
+            stopTableCarousel(componentId);
+    });
+    Array.from(tableCarouselRuntimeSignatures.keys()).forEach((componentId) => {
+        if (!activeTableIds.has(componentId))
+            tableCarouselRuntimeSignatures.delete(componentId);
+    });
+    Array.from(tableCarouselSteps.value.keys()).forEach((componentId) => {
+        if (!activeTableIds.has(componentId))
+            clearTableCarouselStep(componentId);
+    });
+};
+const tableCarouselComponentSignature = computed(() => components.value
+    .filter((component) => isTableChart(component))
+    .map((component) => `${component.id}:${component.chartId}:${component.configJson ?? ''}`)
+    .join('|'));
+watch(tableCarouselComponentSignature, () => {
+    scheduleTableCarouselSync();
+}, { immediate: true });
+const getTableColumns = (component) => resolveConfiguredTableColumns(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.columns ?? []);
+const getTableRows = (component) => getConfiguredTableRows(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.rawRows ?? [], tableCarouselSteps.value.get(component.id) ?? 0);
 const setStageCardRef = (el, componentId) => {
     const previous = stageCardRefs.get(componentId);
     if (previous && componentVisibilityObserver) {
@@ -2632,6 +2738,15 @@ onBeforeUnmount(() => {
     document.removeEventListener('mouseup', onPointerUp);
     cleanupInteractionFrame();
     window.removeEventListener('resize', handleWindowResize);
+    if (componentDataRefreshFrame !== null) {
+        window.cancelAnimationFrame(componentDataRefreshFrame);
+        componentDataRefreshFrame = null;
+    }
+    if (tableCarouselSyncFrame !== null) {
+        window.cancelAnimationFrame(tableCarouselSyncFrame);
+        tableCarouselSyncFrame = null;
+    }
+    stopAllTableCarousels();
     disposeCharts();
     if (sidebarHoverTimer !== null) {
         clearTimeout(sidebarHoverTimer);
@@ -4818,6 +4933,12 @@ else {
             /** @type {[typeof __VLS_components.ElTable, typeof __VLS_components.elTable, typeof __VLS_components.ElTable, typeof __VLS_components.elTable, ]} */ ;
             // @ts-ignore
             const __VLS_359 = __VLS_asFunctionalComponent(__VLS_358, new __VLS_358({
+                data: (__VLS_ctx.getTableRows(component)),
+                size: "small",
+                border: true,
+                height: "100%",
+                emptyText: "暂无数据",
+                stripe: (__VLS_ctx.getComponentConfig(component).style.tableStriped),
                 showHeader: (true),
                 headerCellStyle: ({
                     background: __VLS_ctx.getComponentConfig(component).style.tableHeaderBg,
@@ -4833,6 +4954,12 @@ else {
                 }),
             }));
             const __VLS_360 = __VLS_359({
+                data: (__VLS_ctx.getTableRows(component)),
+                size: "small",
+                border: true,
+                height: "100%",
+                emptyText: "暂无数据",
+                stripe: (__VLS_ctx.getComponentConfig(component).style.tableStriped),
                 showHeader: (true),
                 headerCellStyle: ({
                     background: __VLS_ctx.getComponentConfig(component).style.tableHeaderBg,
@@ -4868,17 +4995,23 @@ else {
                 /** @type {[typeof __VLS_components.ElTableColumn, typeof __VLS_components.elTableColumn, ]} */ ;
                 // @ts-ignore
                 const __VLS_367 = __VLS_asFunctionalComponent(__VLS_366, new __VLS_366({
-                    key: (column),
-                    prop: (column),
-                    label: (column),
-                    minWidth: "120",
+                    key: (column.id),
+                    prop: (column.field),
+                    label: (column.label),
+                    width: (column.width),
+                    align: (column.align),
+                    headerAlign: (column.align),
+                    showOverflowTooltip: true,
                     sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
                 }));
                 const __VLS_368 = __VLS_367({
-                    key: (column),
-                    prop: (column),
-                    label: (column),
-                    minWidth: "120",
+                    key: (column.id),
+                    prop: (column.field),
+                    label: (column.label),
+                    width: (column.width),
+                    align: (column.align),
+                    headerAlign: (column.align),
+                    showOverflowTooltip: true,
                     sortable: (__VLS_ctx.getComponentConfig(component).style.tableEnableSort ? 'custom' : false),
                 }, ...__VLS_functionalComponentArgsRest(__VLS_367));
             }
@@ -6525,6 +6658,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             isRenderableChart: isRenderableChart,
             showNoField: showNoField,
             getTableColumns: getTableColumns,
+            getTableRows: getTableRows,
             setStageCardRef: setStageCardRef,
             isComponentSelected: isComponentSelected,
             hideComponentContextMenu: hideComponentContextMenu,
