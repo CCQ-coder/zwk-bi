@@ -126,24 +126,14 @@
             </el-select>
           </div>
 
-          <div v-else-if="isTableChart(component)" class="table-wrapper">
+          <div v-else-if="isTableChart(component)" class="table-wrapper" :style="getTableWrapperStyle(component)">
             <el-table
               :data="getTableRows(component)"
+              :row-class-name="tableRowClassName"
               size="small"
               border
               height="100%"
               empty-text="暂无数据"
-              :stripe="getComponentConfig(component).style.tableStriped"
-              :header-cell-style="{
-                background: getComponentConfig(component).style.tableHeaderBg,
-                color: getComponentConfig(component).style.tableHeaderColor,
-                fontSize: getComponentConfig(component).style.tableHeaderFontSize + 'px',
-              }"
-              :cell-style="{
-                color: getComponentConfig(component).style.tableFontColor,
-                fontSize: getComponentConfig(component).style.tableFontSize + 'px',
-                height: getComponentConfig(component).style.tableRowHeight + 'px',
-              }"
             >
               <el-table-column
                 v-if="getComponentConfig(component).style.tableShowIndex"
@@ -218,8 +208,10 @@ import {
   getPublicDashboardComponents,
 } from '../api/report'
 import {
+  buildTableWrapperStyleVars,
   buildComponentOption,
   chartTypeLabel,
+  getComponentTableRowClassName,
   getConfiguredTableRows,
   getConfiguredTableStepCount,
   getMissingChartFields,
@@ -464,6 +456,24 @@ const isStaticWidget = (component: DashboardComponent) => {
   return isStaticWidgetChartType(type)
 }
 
+const componentRequiresPreviewData = (component: DashboardComponent) => {
+  const chart = getComponentChartConfig(component)
+  const chartType = chart.chartType ?? ''
+  if (showNoField(component)) return false
+  if (isStaticWidgetChartType(chartType)) {
+    return Boolean(
+      chart.datasetId
+      || chart.datasourceId
+      || chart.sqlText?.trim()
+      || chart.runtimeConfigText?.trim()
+      || chart.xField
+      || chart.yField
+      || chart.groupField
+    )
+  }
+  return true
+}
+
 const showNoField = (component: DashboardComponent) => {
   const type = getComponentChartConfig(component).chartType ?? ''
   if (isStaticWidgetChartType(type)) return false
@@ -473,6 +483,57 @@ const showNoField = (component: DashboardComponent) => {
 const isRenderableChart = (component: DashboardComponent) => {
   const type = getComponentChartConfig(component).chartType ?? ''
   return isCanvasRenderableChartType(type)
+}
+
+const componentRefreshTimers = new Map<number, number>()
+const componentRefreshRuntimeSignatures = new Map<number, string>()
+let componentRefreshSyncFrame: number | null = null
+
+const stopComponentRefresh = (componentId: number) => {
+  const timerId = componentRefreshTimers.get(componentId)
+  if (timerId == null) return
+  window.clearInterval(timerId)
+  componentRefreshTimers.delete(componentId)
+}
+
+const stopAllComponentRefreshes = () => {
+  Array.from(componentRefreshTimers.keys()).forEach((componentId) => stopComponentRefresh(componentId))
+  componentRefreshRuntimeSignatures.clear()
+}
+
+const syncComponentRefreshTimers = () => {
+  componentRefreshSyncFrame = null
+  const activeComponentIds = new Set<number>()
+
+  components.value.forEach((component) => {
+    if (!componentRequiresPreviewData(component)) return
+    const refreshInterval = Math.max(0, Number(getComponentChartConfig(component).dataRefreshInterval) || 0)
+    if (refreshInterval <= 0) return
+    activeComponentIds.add(component.id)
+    const runtimeSignature = `${refreshInterval}:${component.chartId}:${component.configJson ?? ''}`
+    if (componentRefreshRuntimeSignatures.get(component.id) === runtimeSignature && componentRefreshTimers.has(component.id)) {
+      return
+    }
+    componentRefreshRuntimeSignatures.set(component.id, runtimeSignature)
+    stopComponentRefresh(component.id)
+    componentRefreshTimers.set(component.id, window.setInterval(() => {
+      const current = components.value.find((item) => item.id === component.id)
+      if (!current || !componentRequiresPreviewData(current)) return
+      void reloadSingleComponentData(current)
+    }, refreshInterval * 1000))
+  })
+
+  Array.from(componentRefreshTimers.keys()).forEach((componentId) => {
+    if (!activeComponentIds.has(componentId)) stopComponentRefresh(componentId)
+  })
+  Array.from(componentRefreshRuntimeSignatures.keys()).forEach((componentId) => {
+    if (!activeComponentIds.has(componentId)) componentRefreshRuntimeSignatures.delete(componentId)
+  })
+}
+
+const scheduleComponentRefreshSync = () => {
+  if (componentRefreshSyncFrame !== null) return
+  componentRefreshSyncFrame = window.requestAnimationFrame(syncComponentRefreshTimers)
 }
 
 const tableCarouselTimers = new Map<number, number>()
@@ -564,20 +625,96 @@ const tableCarouselComponentSignature = computed(() => components.value
   .map((component) => `${component.id}:${component.chartId}:${component.configJson ?? ''}`)
   .join('|'))
 
+const componentRefreshSignature = computed(() => components.value
+  .map((component) => `${component.id}:${component.chartId}:${component.configJson ?? ''}`)
+  .join('|'))
+
 watch(tableCarouselComponentSignature, () => {
   scheduleTableCarouselSync()
 }, { immediate: true })
 
-const getTableColumns = (component: DashboardComponent) => resolveConfiguredTableColumns(
-  getComponentConfig(component).chart,
-  componentDataMap.value.get(component.id)?.columns ?? []
-)
+watch(componentRefreshSignature, () => {
+  scheduleComponentRefreshSync()
+}, { immediate: true })
 
-const getTableRows = (component: DashboardComponent) => getConfiguredTableRows(
-  getComponentConfig(component).chart,
-  componentDataMap.value.get(component.id)?.rawRows ?? [],
-  tableCarouselSteps.value.get(component.id) ?? 0,
-)
+const EMPTY_TABLE_COLUMNS: string[] = []
+const EMPTY_TABLE_ROWS: Record<string, unknown>[] = []
+type TableRenderStyle = Record<string, string>
+const tableRowClassName = getComponentTableRowClassName
+
+const tableColumnsCache = new Map<number, {
+  chartConfig: ReturnType<typeof normalizeComponentConfig>['chart']
+  availableColumns: string[]
+  value: ReturnType<typeof resolveConfiguredTableColumns>
+}>()
+
+const tableRowsCache = new Map<number, {
+  chartConfig: ReturnType<typeof normalizeComponentConfig>['chart']
+  rawRows: Record<string, unknown>[]
+  step: number
+  value: Record<string, unknown>[]
+}>()
+
+const tableWrapperStyleCache = new Map<number, {
+  styleConfig: ReturnType<typeof normalizeComponentConfig>['style']
+  scene: 'dashboard' | 'screen'
+  value: TableRenderStyle
+}>()
+
+const clearTableRenderCache = () => {
+  tableColumnsCache.clear()
+  tableRowsCache.clear()
+  tableWrapperStyleCache.clear()
+}
+
+const getTableColumns = (component: DashboardComponent) => {
+  const resolved = getComponentConfig(component)
+  const availableColumns = componentDataMap.value.get(component.id)?.columns ?? EMPTY_TABLE_COLUMNS
+  const cached = tableColumnsCache.get(component.id)
+  if (cached && cached.chartConfig === resolved.chart && cached.availableColumns === availableColumns) {
+    return cached.value
+  }
+  const value = resolveConfiguredTableColumns(resolved.chart, availableColumns)
+  tableColumnsCache.set(component.id, {
+    chartConfig: resolved.chart,
+    availableColumns,
+    value,
+  })
+  return value
+}
+
+const getTableRows = (component: DashboardComponent) => {
+  const resolved = getComponentConfig(component)
+  const rawRows = componentDataMap.value.get(component.id)?.rawRows ?? EMPTY_TABLE_ROWS
+  const step = tableCarouselSteps.value.get(component.id) ?? 0
+  const cached = tableRowsCache.get(component.id)
+  if (cached && cached.chartConfig === resolved.chart && cached.rawRows === rawRows && cached.step === step) {
+    return cached.value
+  }
+  const value = getConfiguredTableRows(resolved.chart, rawRows, step)
+  tableRowsCache.set(component.id, {
+    chartConfig: resolved.chart,
+    rawRows,
+    step,
+    value,
+  })
+  return value
+}
+
+const getTableWrapperStyle = (component: DashboardComponent) => {
+  const styleConfig = getComponentConfig(component).style
+  const cached = tableWrapperStyleCache.get(component.id)
+  if (cached && cached.styleConfig === styleConfig && cached.scene === props.scene) {
+    return cached.value
+  }
+  const value = buildTableWrapperStyleVars(styleConfig, props.scene)
+  tableWrapperStyleCache.set(component.id, {
+    styleConfig,
+    scene: props.scene,
+    value,
+  })
+  return value
+}
 
 const renderChart = (component: DashboardComponent, data: ChartDataResult) => {
   const el = chartRefs.get(component.id)
@@ -625,33 +762,60 @@ const disposeCharts = () => {
   chartRefs.clear()
 }
 
+const disposeChartInstance = (componentId: number) => {
+  chartInstances.get(componentId)?.dispose()
+  chartInstances.delete(componentId)
+  chartRefs.delete(componentId)
+}
+
+const reloadSingleComponentData = async (component: DashboardComponent, targetMap?: Map<number, ChartDataResult>) => {
+  const chart = getComponentChartConfig(component)
+  const interaction = getComponentInteractionConfig(component)
+  const nextMap = targetMap ?? new Map(componentDataMap.value)
+  if (showNoField(component)) {
+    nextMap.delete(component.id)
+    disposeChartInstance(component.id)
+    if (!targetMap) componentDataMap.value = nextMap
+    return
+  }
+  try {
+    const data = isPublicPreview.value
+      ? await getPublicComponentData(props.dashboardId, component.id, props.shareToken || '', mergeComponentRequestFilters(interaction.dataFilters, { ...activeFilters }))
+      : await getChartData(component.chartId, {
+        filters: mergeComponentRequestFilters(interaction.dataFilters, { ...activeFilters }),
+        configJson: component.configJson,
+      })
+    const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], chart)
+    nextMap.set(component.id, materialized)
+    if (isRenderableChart(component)) renderChart(component, materialized)
+    else disposeChartInstance(component.id)
+    if (!targetMap) {
+      componentDataMap.value = nextMap
+      scheduleTableCarouselSync()
+      scheduleComponentRefreshSync()
+    }
+  } catch {
+    if (!targetMap) {
+      scheduleComponentRefreshSync()
+    }
+  }
+}
+
 const reloadComponentData = async () => {
   chartLoading.value = true
+  clearTableRenderCache()
   componentDataMap.value = new Map()
+  stopAllComponentRefreshes()
   scheduleTableCarouselSync()
   try {
     await nextTick()
     const nextDataMap = new Map<number, ChartDataResult>()
     await Promise.all(components.value.map(async (component) => {
-      const chart = getComponentChartConfig(component)
-      const interaction = getComponentInteractionConfig(component)
-      if (showNoField(component)) return
-      try {
-        const data = isPublicPreview.value
-          ? await getPublicComponentData(props.dashboardId, component.id, props.shareToken || '', mergeComponentRequestFilters(interaction.dataFilters, { ...activeFilters }))
-          : await getChartData(component.chartId, {
-            filters: mergeComponentRequestFilters(interaction.dataFilters, { ...activeFilters }),
-            configJson: component.configJson,
-          })
-        const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], chart)
-        nextDataMap.set(component.id, materialized)
-        if (isRenderableChart(component)) renderChart(component, materialized)
-      } catch {
-        // ignore individual chart failures to keep page usable
-      }
+      await reloadSingleComponentData(component, nextDataMap)
     }))
     componentDataMap.value = nextDataMap
     scheduleTableCarouselSync()
+    scheduleComponentRefreshSync()
   } finally {
     chartLoading.value = false
   }
@@ -675,7 +839,9 @@ const clearSingleFilter = (field: string) => {
 
 const loadAll = async () => {
   loading.value = true
+  stopAllComponentRefreshes()
   disposeCharts()
+  clearTableRenderCache()
   componentDataMap.value = new Map()
   try {
     const [dashboardDetail, componentList, chartList] = await Promise.all(isPublicPreview.value
@@ -719,9 +885,14 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
+  stopAllComponentRefreshes()
   if (tableCarouselSyncFrame !== null) {
     window.cancelAnimationFrame(tableCarouselSyncFrame)
     tableCarouselSyncFrame = null
+  }
+  if (componentRefreshSyncFrame !== null) {
+    window.cancelAnimationFrame(componentRefreshSyncFrame)
+    componentRefreshSyncFrame = null
   }
   stopAllTableCarousels()
   disposeCharts()
@@ -904,22 +1075,70 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
-.table-wrapper :deep(.el-table) {
-  --el-table-bg-color: rgba(7, 22, 38, 0.72);
-  --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: rgba(16, 41, 68, 0.94);
-  --el-table-border-color: rgba(104, 148, 194, 0.22);
-  --el-table-text-color: #e6eef8;
-  --el-table-header-text-color: #d8e8fb;
+.table-wrapper {
+  --component-table-header-bg: rgba(16, 41, 68, 0.94);
+  --component-table-header-color: #d8e8fb;
+  --component-table-header-font-size: 13px;
+  --component-table-row-height: 36px;
+  --component-table-odd-row-bg: rgba(7, 22, 38, 0.72);
+  --component-table-even-row-bg: rgba(7, 22, 38, 0.72);
+  --component-table-row-hover-bg: rgba(64, 158, 255, 0.15);
+  --component-table-border-color: rgba(104, 148, 194, 0.22);
+  --component-table-border-width: 1px;
+  --component-table-font-color: #e6eef8;
+  --component-table-font-size: 12px;
 }
 
-.preview-stage--dashboard .table-wrapper :deep(.el-table) {
-  --el-table-bg-color: #ffffff;
-  --el-table-tr-bg-color: #ffffff;
-  --el-table-header-bg-color: #f6f9fd;
-  --el-table-border-color: #deebf7;
-  --el-table-text-color: #24384f;
-  --el-table-header-text-color: #3f5570;
+.table-wrapper :deep(.el-table) {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: var(--component-table-header-bg);
+  --el-table-border-color: var(--component-table-border-color);
+  --el-table-text-color: var(--component-table-font-color);
+  --el-table-header-text-color: var(--component-table-header-color);
+  --el-table-row-hover-bg-color: var(--component-table-row-hover-bg);
+}
+
+.table-wrapper :deep(.el-table th.el-table__cell) {
+  background: var(--component-table-header-bg);
+  color: var(--component-table-header-color);
+  font-size: var(--component-table-header-font-size);
+  border-bottom: var(--component-table-border-width) solid var(--component-table-border-color);
+}
+
+.table-wrapper :deep(.el-table td.el-table__cell) {
+  color: var(--component-table-font-color);
+  font-size: var(--component-table-font-size);
+  height: var(--component-table-row-height);
+  border-bottom: var(--component-table-border-width) solid var(--component-table-border-color);
+  background: transparent;
+  transition: background-color 0.18s ease;
+}
+
+.table-wrapper :deep(.el-table .cell) {
+  line-height: calc(var(--component-table-row-height) - 2px);
+}
+
+.table-wrapper :deep(.el-table__row.component-table-row--odd > td.el-table__cell) {
+  background: var(--component-table-odd-row-bg);
+}
+
+.table-wrapper :deep(.el-table__row.component-table-row--even > td.el-table__cell) {
+  background: var(--component-table-even-row-bg);
+}
+
+.table-wrapper :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: var(--component-table-row-hover-bg) !important;
+}
+
+.table-wrapper :deep(.el-table--border::before),
+.table-wrapper :deep(.el-table__inner-wrapper::before) {
+  background-color: var(--component-table-border-color);
+  height: var(--component-table-border-width);
+}
+
+.table-wrapper :deep(.el-table--border .el-table__cell) {
+  border-right: var(--component-table-border-width) solid var(--component-table-border-color);
 }
 
 .preview-placeholder {

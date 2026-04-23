@@ -4,7 +4,7 @@ import ComponentStaticPreview from './ComponentStaticPreview.vue';
 import { getChartData, getChartList } from '../api/chart';
 import { getDashboardById, getDashboardComponents } from '../api/dashboard';
 import { getPublicChartList, getPublicComponentData, getPublicDashboardById, getPublicDashboardComponents, } from '../api/report';
-import { buildComponentOption, getConfiguredTableRows, getConfiguredTableStepCount, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, resolveConfiguredTableColumns, } from '../utils/component-config';
+import { buildTableWrapperStyleVars, buildComponentOption, getComponentTableRowClassName, getConfiguredTableRows, getConfiguredTableStepCount, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, resolveConfiguredTableColumns, } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 import { normalizeCanvasConfig, parseReportConfig } from '../utils/report-config';
 const props = defineProps();
@@ -225,6 +225,22 @@ const isStaticWidget = (component) => {
     const type = getComponentChartConfig(component).chartType ?? '';
     return isStaticWidgetChartType(type);
 };
+const componentRequiresPreviewData = (component) => {
+    const chart = getComponentChartConfig(component);
+    const chartType = chart.chartType ?? '';
+    if (showNoField(component))
+        return false;
+    if (isStaticWidgetChartType(chartType)) {
+        return Boolean(chart.datasetId
+            || chart.datasourceId
+            || chart.sqlText?.trim()
+            || chart.runtimeConfigText?.trim()
+            || chart.xField
+            || chart.yField
+            || chart.groupField);
+    }
+    return true;
+};
 const showNoField = (component) => {
     const type = getComponentChartConfig(component).chartType ?? '';
     if (isStaticWidgetChartType(type))
@@ -234,6 +250,57 @@ const showNoField = (component) => {
 const isRenderableChart = (component) => {
     const type = getComponentChartConfig(component).chartType ?? '';
     return isCanvasRenderableChartType(type);
+};
+const componentRefreshTimers = new Map();
+const componentRefreshRuntimeSignatures = new Map();
+let componentRefreshSyncFrame = null;
+const stopComponentRefresh = (componentId) => {
+    const timerId = componentRefreshTimers.get(componentId);
+    if (timerId == null)
+        return;
+    window.clearInterval(timerId);
+    componentRefreshTimers.delete(componentId);
+};
+const stopAllComponentRefreshes = () => {
+    Array.from(componentRefreshTimers.keys()).forEach((componentId) => stopComponentRefresh(componentId));
+    componentRefreshRuntimeSignatures.clear();
+};
+const syncComponentRefreshTimers = () => {
+    componentRefreshSyncFrame = null;
+    const activeComponentIds = new Set();
+    components.value.forEach((component) => {
+        if (!componentRequiresPreviewData(component))
+            return;
+        const refreshInterval = Math.max(0, Number(getComponentChartConfig(component).dataRefreshInterval) || 0);
+        if (refreshInterval <= 0)
+            return;
+        activeComponentIds.add(component.id);
+        const runtimeSignature = `${refreshInterval}:${component.chartId}:${component.configJson ?? ''}`;
+        if (componentRefreshRuntimeSignatures.get(component.id) === runtimeSignature && componentRefreshTimers.has(component.id)) {
+            return;
+        }
+        componentRefreshRuntimeSignatures.set(component.id, runtimeSignature);
+        stopComponentRefresh(component.id);
+        componentRefreshTimers.set(component.id, window.setInterval(() => {
+            const current = components.value.find((item) => item.id === component.id);
+            if (!current || !componentRequiresPreviewData(current))
+                return;
+            void reloadSingleComponentData(current);
+        }, refreshInterval * 1000));
+    });
+    Array.from(componentRefreshTimers.keys()).forEach((componentId) => {
+        if (!activeComponentIds.has(componentId))
+            stopComponentRefresh(componentId);
+    });
+    Array.from(componentRefreshRuntimeSignatures.keys()).forEach((componentId) => {
+        if (!activeComponentIds.has(componentId))
+            componentRefreshRuntimeSignatures.delete(componentId);
+    });
+};
+const scheduleComponentRefreshSync = () => {
+    if (componentRefreshSyncFrame !== null)
+        return;
+    componentRefreshSyncFrame = window.requestAnimationFrame(syncComponentRefreshTimers);
 };
 const tableCarouselTimers = new Map();
 const tableCarouselRuntimeSignatures = new Map();
@@ -320,11 +387,72 @@ const tableCarouselComponentSignature = computed(() => components.value
     .filter((component) => isTableChart(component))
     .map((component) => `${component.id}:${component.chartId}:${component.configJson ?? ''}`)
     .join('|'));
+const componentRefreshSignature = computed(() => components.value
+    .map((component) => `${component.id}:${component.chartId}:${component.configJson ?? ''}`)
+    .join('|'));
 watch(tableCarouselComponentSignature, () => {
     scheduleTableCarouselSync();
 }, { immediate: true });
-const getTableColumns = (component) => resolveConfiguredTableColumns(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.columns ?? []);
-const getTableRows = (component) => getConfiguredTableRows(getComponentConfig(component).chart, componentDataMap.value.get(component.id)?.rawRows ?? [], tableCarouselSteps.value.get(component.id) ?? 0);
+watch(componentRefreshSignature, () => {
+    scheduleComponentRefreshSync();
+}, { immediate: true });
+const EMPTY_TABLE_COLUMNS = [];
+const EMPTY_TABLE_ROWS = [];
+const tableRowClassName = getComponentTableRowClassName;
+const tableColumnsCache = new Map();
+const tableRowsCache = new Map();
+const tableWrapperStyleCache = new Map();
+const clearTableRenderCache = () => {
+    tableColumnsCache.clear();
+    tableRowsCache.clear();
+    tableWrapperStyleCache.clear();
+};
+const getTableColumns = (component) => {
+    const resolved = getComponentConfig(component);
+    const availableColumns = componentDataMap.value.get(component.id)?.columns ?? EMPTY_TABLE_COLUMNS;
+    const cached = tableColumnsCache.get(component.id);
+    if (cached && cached.chartConfig === resolved.chart && cached.availableColumns === availableColumns) {
+        return cached.value;
+    }
+    const value = resolveConfiguredTableColumns(resolved.chart, availableColumns);
+    tableColumnsCache.set(component.id, {
+        chartConfig: resolved.chart,
+        availableColumns,
+        value,
+    });
+    return value;
+};
+const getTableRows = (component) => {
+    const resolved = getComponentConfig(component);
+    const rawRows = componentDataMap.value.get(component.id)?.rawRows ?? EMPTY_TABLE_ROWS;
+    const step = tableCarouselSteps.value.get(component.id) ?? 0;
+    const cached = tableRowsCache.get(component.id);
+    if (cached && cached.chartConfig === resolved.chart && cached.rawRows === rawRows && cached.step === step) {
+        return cached.value;
+    }
+    const value = getConfiguredTableRows(resolved.chart, rawRows, step);
+    tableRowsCache.set(component.id, {
+        chartConfig: resolved.chart,
+        rawRows,
+        step,
+        value,
+    });
+    return value;
+};
+const getTableWrapperStyle = (component) => {
+    const styleConfig = getComponentConfig(component).style;
+    const cached = tableWrapperStyleCache.get(component.id);
+    if (cached && cached.styleConfig === styleConfig && cached.scene === props.scene) {
+        return cached.value;
+    }
+    const value = buildTableWrapperStyleVars(styleConfig, props.scene);
+    tableWrapperStyleCache.set(component.id, {
+        styleConfig,
+        scene: props.scene,
+        value,
+    });
+    return value;
+};
 const renderChart = (component, data) => {
     const el = chartRefs.get(component.id);
     if (!el)
@@ -371,36 +499,62 @@ const disposeCharts = () => {
     chartInstances.clear();
     chartRefs.clear();
 };
+const disposeChartInstance = (componentId) => {
+    chartInstances.get(componentId)?.dispose();
+    chartInstances.delete(componentId);
+    chartRefs.delete(componentId);
+};
+const reloadSingleComponentData = async (component, targetMap) => {
+    const chart = getComponentChartConfig(component);
+    const interaction = getComponentInteractionConfig(component);
+    const nextMap = targetMap ?? new Map(componentDataMap.value);
+    if (showNoField(component)) {
+        nextMap.delete(component.id);
+        disposeChartInstance(component.id);
+        if (!targetMap)
+            componentDataMap.value = nextMap;
+        return;
+    }
+    try {
+        const data = isPublicPreview.value
+            ? await getPublicComponentData(props.dashboardId, component.id, props.shareToken || '', mergeComponentRequestFilters(interaction.dataFilters, { ...activeFilters }))
+            : await getChartData(component.chartId, {
+                filters: mergeComponentRequestFilters(interaction.dataFilters, { ...activeFilters }),
+                configJson: component.configJson,
+            });
+        const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], chart);
+        nextMap.set(component.id, materialized);
+        if (isRenderableChart(component))
+            renderChart(component, materialized);
+        else
+            disposeChartInstance(component.id);
+        if (!targetMap) {
+            componentDataMap.value = nextMap;
+            scheduleTableCarouselSync();
+            scheduleComponentRefreshSync();
+        }
+    }
+    catch {
+        if (!targetMap) {
+            scheduleComponentRefreshSync();
+        }
+    }
+};
 const reloadComponentData = async () => {
     chartLoading.value = true;
+    clearTableRenderCache();
     componentDataMap.value = new Map();
+    stopAllComponentRefreshes();
     scheduleTableCarouselSync();
     try {
         await nextTick();
         const nextDataMap = new Map();
         await Promise.all(components.value.map(async (component) => {
-            const chart = getComponentChartConfig(component);
-            const interaction = getComponentInteractionConfig(component);
-            if (showNoField(component))
-                return;
-            try {
-                const data = isPublicPreview.value
-                    ? await getPublicComponentData(props.dashboardId, component.id, props.shareToken || '', mergeComponentRequestFilters(interaction.dataFilters, { ...activeFilters }))
-                    : await getChartData(component.chartId, {
-                        filters: mergeComponentRequestFilters(interaction.dataFilters, { ...activeFilters }),
-                        configJson: component.configJson,
-                    });
-                const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], chart);
-                nextDataMap.set(component.id, materialized);
-                if (isRenderableChart(component))
-                    renderChart(component, materialized);
-            }
-            catch {
-                // ignore individual chart failures to keep page usable
-            }
+            await reloadSingleComponentData(component, nextDataMap);
         }));
         componentDataMap.value = nextDataMap;
         scheduleTableCarouselSync();
+        scheduleComponentRefreshSync();
     }
     finally {
         chartLoading.value = false;
@@ -423,7 +577,9 @@ const clearSingleFilter = (field) => {
 };
 const loadAll = async () => {
     loading.value = true;
+    stopAllComponentRefreshes();
     disposeCharts();
+    clearTableRenderCache();
     componentDataMap.value = new Map();
     try {
         const [dashboardDetail, componentList, chartList] = await Promise.all(isPublicPreview.value
@@ -465,9 +621,14 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
     window.removeEventListener('resize', handleResize);
+    stopAllComponentRefreshes();
     if (tableCarouselSyncFrame !== null) {
         window.cancelAnimationFrame(tableCarouselSyncFrame);
         tableCarouselSyncFrame = null;
+    }
+    if (componentRefreshSyncFrame !== null) {
+        window.cancelAnimationFrame(componentRefreshSyncFrame);
+        componentRefreshSyncFrame = null;
     }
     stopAllTableCarousels();
     disposeCharts();
@@ -486,9 +647,26 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['preview-stage--screen']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
-/** @type {__VLS_StyleScopedClasses['preview-stage--dashboard']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
 /** @type {__VLS_StyleScopedClasses['el-table']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table__cell']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table__cell']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table__row']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table__cell']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table__cell']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['table-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table--border']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table__cell']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-stage--dashboard']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-placeholder']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-stage--screen']} */ ;
@@ -929,45 +1107,26 @@ else {
         else if (__VLS_ctx.isTableChart(component)) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ class: "table-wrapper" },
+                ...{ style: (__VLS_ctx.getTableWrapperStyle(component)) },
             });
             const __VLS_72 = {}.ElTable;
             /** @type {[typeof __VLS_components.ElTable, typeof __VLS_components.elTable, typeof __VLS_components.ElTable, typeof __VLS_components.elTable, ]} */ ;
             // @ts-ignore
             const __VLS_73 = __VLS_asFunctionalComponent(__VLS_72, new __VLS_72({
                 data: (__VLS_ctx.getTableRows(component)),
+                rowClassName: (__VLS_ctx.tableRowClassName),
                 size: "small",
                 border: true,
                 height: "100%",
                 emptyText: "暂无数据",
-                stripe: (__VLS_ctx.getComponentConfig(component).style.tableStriped),
-                headerCellStyle: ({
-                    background: __VLS_ctx.getComponentConfig(component).style.tableHeaderBg,
-                    color: __VLS_ctx.getComponentConfig(component).style.tableHeaderColor,
-                    fontSize: __VLS_ctx.getComponentConfig(component).style.tableHeaderFontSize + 'px',
-                }),
-                cellStyle: ({
-                    color: __VLS_ctx.getComponentConfig(component).style.tableFontColor,
-                    fontSize: __VLS_ctx.getComponentConfig(component).style.tableFontSize + 'px',
-                    height: __VLS_ctx.getComponentConfig(component).style.tableRowHeight + 'px',
-                }),
             }));
             const __VLS_74 = __VLS_73({
                 data: (__VLS_ctx.getTableRows(component)),
+                rowClassName: (__VLS_ctx.tableRowClassName),
                 size: "small",
                 border: true,
                 height: "100%",
                 emptyText: "暂无数据",
-                stripe: (__VLS_ctx.getComponentConfig(component).style.tableStriped),
-                headerCellStyle: ({
-                    background: __VLS_ctx.getComponentConfig(component).style.tableHeaderBg,
-                    color: __VLS_ctx.getComponentConfig(component).style.tableHeaderColor,
-                    fontSize: __VLS_ctx.getComponentConfig(component).style.tableHeaderFontSize + 'px',
-                }),
-                cellStyle: ({
-                    color: __VLS_ctx.getComponentConfig(component).style.tableFontColor,
-                    fontSize: __VLS_ctx.getComponentConfig(component).style.tableFontSize + 'px',
-                    height: __VLS_ctx.getComponentConfig(component).style.tableRowHeight + 'px',
-                }),
             }, ...__VLS_functionalComponentArgsRest(__VLS_73));
             __VLS_75.slots.default;
             if (__VLS_ctx.getComponentConfig(component).style.tableShowIndex) {
@@ -1139,8 +1298,10 @@ const __VLS_self = (await import('vue')).defineComponent({
             isStaticWidget: isStaticWidget,
             showNoField: showNoField,
             isRenderableChart: isRenderableChart,
+            tableRowClassName: tableRowClassName,
             getTableColumns: getTableColumns,
             getTableRows: getTableRows,
+            getTableWrapperStyle: getTableWrapperStyle,
             updateFilter: updateFilter,
             clearFilters: clearFilters,
             clearSingleFilter: clearSingleFilter,

@@ -303,6 +303,10 @@
                 </div>
                 <div class="suggestion-body">{{ suggestionSummary.join(' · ') }}</div>
               </div>
+              <el-form-item label="刷新数据时间（秒）">
+                <el-input-number v-model="configForm.chart.dataRefreshInterval" :min="0" :max="86400" controls-position="right" style="width: 100%" />
+                <div class="helper-text">0 表示不自动刷新；设置后当前组件会按间隔重新取数。</div>
+              </el-form-item>
               <div v-if="isTableComponentType" class="table-column-editor">
                 <div class="table-column-editor__head">
                   <span>自定义列</span>
@@ -354,17 +358,17 @@
                 </div>
               </div>
               <el-form-item v-if="currentChartMeta.requiresDimension || currentChartMeta.allowsOptionalDimension || isFilterComponentType || isMetricComponentType" :label="dimensionFieldLabel">
-                <el-select v-model="configForm.chart.xField" placeholder="选择维度字段" clearable filterable style="width: 100%">
+                <el-select v-model="configForm.chart.xField" :placeholder="`选择${dimensionFieldLabel}`" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
               </el-form-item>
               <el-form-item v-if="currentChartMeta.requiresMetric || isMetricComponentType" :label="metricFieldLabel">
-                <el-select v-model="configForm.chart.yField" placeholder="选择度量字段" clearable filterable style="width: 100%">
+                <el-select v-model="configForm.chart.yField" :placeholder="`选择${metricFieldLabel}`" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
               </el-form-item>
               <el-form-item v-if="currentChartMeta.allowsGroup || isMetricComponentType" :label="groupFieldLabel">
-                <el-select v-model="configForm.chart.groupField" placeholder="可选" clearable filterable style="width: 100%">
+                <el-select v-model="configForm.chart.groupField" :placeholder="currentChartMeta.requiresGroup ? `选择${groupFieldLabel}` : '可选'" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
               </el-form-item>
@@ -1005,8 +1009,10 @@ import {
   DEFAULT_COMPONENT_INTERACTION,
   DEFAULT_COMPONENT_STYLE,
   buildPresetChartConfig,
+  getChartFieldLabels,
   getChartTypeMeta,
   getMissingChartFields,
+  isBarFamilyChartType,
   isDecorationChartType,
   isStaticWidgetChartType,
   normalizeComponentDataFilters,
@@ -1453,8 +1459,8 @@ const onTableColumnDrop = (targetIndex: number) => {
 
 const suggestionSummary = computed(() => {
   const entries = [
-    suggestedFields.value.xField ? `维度 ${suggestedFields.value.xField}` : '',
-    suggestedFields.value.yField ? `度量 ${suggestedFields.value.yField}` : '',
+    suggestedFields.value.xField ? `${chartFieldLabels.value.x} ${suggestedFields.value.xField}` : '',
+    suggestedFields.value.yField ? `${chartFieldLabels.value.y} ${suggestedFields.value.yField}` : '',
     suggestedFields.value.groupField ? `分组 ${suggestedFields.value.groupField}` : '',
   ]
   return entries.filter(Boolean)
@@ -1470,7 +1476,9 @@ const dataModeTitle = computed(() => {
     case 'control':
       return '筛选控件只需要绑定筛选字段，页面运行时会自动接管联动逻辑。'
     default:
-      return '图表型组件支持完整数据接入链路，可按维度、度量、分组逐步映射。'
+      return isBarFamilyComponentType.value
+        ? '图表型组件支持完整数据接入链路，可按 X 轴、Y 轴、分组逐步映射。'
+        : '图表型组件支持完整数据接入链路，可按维度、度量、分组逐步映射。'
   }
 })
 const dataModeDescription = computed(() => {
@@ -1486,28 +1494,30 @@ const dataCapabilityTags = computed(() => {
     return tags.slice(0, 4)
   }
   if (currentChartMeta.value.requiresDimension || isFilterComponentType.value || isMetricComponentType.value) {
-    tags.push('维度角色')
+    tags.push(isBarFamilyComponentType.value ? 'X轴映射' : '维度角色')
   }
   if (currentChartMeta.value.requiresMetric || isMetricComponentType.value) {
-    tags.push('指标角色')
+    tags.push(isBarFamilyComponentType.value ? 'Y轴映射' : '指标角色')
   }
   if (currentChartMeta.value.allowsGroup || isMetricComponentType.value) {
     tags.push('分组扩展')
   }
   return tags.slice(0, 4)
 })
+const chartFieldLabels = computed(() => getChartFieldLabels(configForm.chart.chartType))
+const isBarFamilyComponentType = computed(() => isBarFamilyChartType(configForm.chart.chartType))
 const dimensionFieldLabel = computed(() => {
   if (isFilterComponentType.value) return '筛选字段'
   if (isMetricComponentType.value) return currentChartMeta.value.requiresDimension ? '标签字段' : '标签字段（可选）'
-  return currentChartMeta.value.requiresDimension ? '维度字段' : '维度字段（可选）'
+  return currentChartMeta.value.requiresDimension ? chartFieldLabels.value.x : `${chartFieldLabels.value.x}（可选）`
 })
 const metricFieldLabel = computed(() => {
   if (isMetricComponentType.value) return '数值字段'
-  return '度量字段'
+  return chartFieldLabels.value.y
 })
 const groupFieldLabel = computed(() => {
   if (isMetricComponentType.value) return '对比字段'
-  return '分组字段'
+  return chartFieldLabels.value.group
 })
 const healthReadyText = computed(() => {
   switch (componentKind.value) {
@@ -1560,6 +1570,7 @@ const schemaPreview = computed(() => {
       pageSourceKind: configForm.chart.pageSourceKind,
       sqlText: configForm.chart.sqlText,
       runtimeConfigText: configForm.chart.runtimeConfigText,
+      refreshInterval: configForm.chart.dataRefreshInterval,
       chartId: props.component.chartId,
       dimensions: isTableComponentType.value ? [] : (configForm.chart.xField ? [configForm.chart.xField] : []),
       metrics: isTableComponentType.value ? [] : (configForm.chart.yField ? [configForm.chart.yField] : []),

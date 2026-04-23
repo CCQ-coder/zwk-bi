@@ -86,12 +86,12 @@
             </el-select>
             <div style="font-size:12px;color:#909399;margin-top:6px">{{ isStaticAssetType ? '静态资产可不绑定数据集。' : '数据驱动资产需要绑定数据集。' }}</div>
           </el-form-item>
-          <el-form-item label="维度字段">
+          <el-form-item :label="fieldLabels.x">
             <el-select v-model="form.xField" clearable filterable style="width: 100%">
               <el-option v-for="field in datasetFields" :key="field.fieldName" :label="field.fieldName" :value="field.fieldName" />
             </el-select>
           </el-form-item>
-          <el-form-item label="度量字段">
+          <el-form-item :label="fieldLabels.y">
             <el-select v-model="form.yField" clearable filterable style="width: 100%">
               <el-option v-for="field in datasetFields" :key="field.fieldName" :label="field.fieldName" :value="field.fieldName" />
             </el-select>
@@ -152,7 +152,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { createTemplate, deleteTemplate, getTemplateList, updateTemplate, type ChartTemplate } from '../api/chart-template'
 import { getChartList, type Chart } from '../api/chart'
 import { getDatasetFields, getDatasetList, getDatasetPreviewData, type Dataset, type DatasetField } from '../api/dataset'
-import { buildComponentOption, COLOR_THEMES, chartTypeLabel, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config'
+import { buildComponentOption, COLOR_THEMES, chartTypeLabel, getChartFieldLabels, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config'
 import { echarts, type ECharts } from '../utils/echarts'
 
 interface TemplateFormState {
@@ -188,6 +188,7 @@ const editingId = ref<number | null>(null)
 const currentTemplate = ref<ChartTemplate | null>(null)
 const formRef = ref<FormInstance>()
 const themeOptions = Object.keys(COLOR_THEMES)
+const fieldLabels = computed(() => getChartFieldLabels(form.chartType))
 const staticChartTypeValues = [
   'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
   'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',

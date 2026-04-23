@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus';
 import { createTemplate, deleteTemplate, getTemplateList, updateTemplate } from '../api/chart-template';
 import { getChartList } from '../api/chart';
 import { getDatasetFields, getDatasetList, getDatasetPreviewData } from '../api/dataset';
-import { buildComponentOption, COLOR_THEMES, chartTypeLabel, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config';
+import { buildComponentOption, COLOR_THEMES, chartTypeLabel, getChartFieldLabels, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 const loading = ref(false);
 const saving = ref(false);
@@ -18,6 +18,7 @@ const editingId = ref(null);
 const currentTemplate = ref(null);
 const formRef = ref();
 const themeOptions = Object.keys(COLOR_THEMES);
+const fieldLabels = computed(() => getChartFieldLabels(form.chartType));
 const staticChartTypeValues = [
     'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
     'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',
@@ -936,10 +937,10 @@ const __VLS_170 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
 const __VLS_171 = __VLS_asFunctionalComponent(__VLS_170, new __VLS_170({
-    label: "维度字段",
+    label: (__VLS_ctx.fieldLabels.x),
 }));
 const __VLS_172 = __VLS_171({
-    label: "维度字段",
+    label: (__VLS_ctx.fieldLabels.x),
 }, ...__VLS_functionalComponentArgsRest(__VLS_171));
 __VLS_173.slots.default;
 const __VLS_174 = {}.ElSelect;
@@ -979,10 +980,10 @@ const __VLS_182 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
 const __VLS_183 = __VLS_asFunctionalComponent(__VLS_182, new __VLS_182({
-    label: "度量字段",
+    label: (__VLS_ctx.fieldLabels.y),
 }));
 const __VLS_184 = __VLS_183({
-    label: "度量字段",
+    label: (__VLS_ctx.fieldLabels.y),
 }, ...__VLS_functionalComponentArgsRest(__VLS_183));
 __VLS_185.slots.default;
 const __VLS_186 = {}.ElSelect;
@@ -1372,6 +1373,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             editingId: editingId,
             formRef: formRef,
             themeOptions: themeOptions,
+            fieldLabels: fieldLabels,
             chartTypeOptions: chartTypeOptions,
             form: form,
             isStaticAssetType: isStaticAssetType,

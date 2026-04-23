@@ -27,6 +27,7 @@ export interface ComponentChartConfig {
   tableVisibleRows: number
   tableCarouselMode: 'single' | 'page'
   tableCarouselInterval: number
+  dataRefreshInterval: number
 }
 
 export interface ComponentStyleConfig {
@@ -144,6 +145,7 @@ export interface ChartTypeMeta {
   allowsOptionalDimension: boolean
   requiresMetric: boolean
   allowsGroup: boolean
+  requiresGroup?: boolean
   supportsLegend: boolean
   supportsAxisNames: boolean
   supportsGrid: boolean
@@ -311,10 +313,34 @@ const STATIC_DIMENSION_METRIC_META: ChartTypeMeta = {
   requiresMetric: true,
 }
 
+const buildXYGroupDescription = (
+  chartLabel: string,
+  options: {
+    requiresGroup?: boolean
+    allowsGroup?: boolean
+    detail?: string
+  } = {},
+) => {
+  const fieldDescription = options.requiresGroup
+    ? '需要 X 轴、Y 轴和分组字段'
+    : options.allowsGroup
+      ? '至少需要 X 轴和 Y 轴字段，分组字段可选'
+      : '只需要 X 轴和 Y 轴字段'
+  return `${chartLabel}：${fieldDescription}${options.detail ? `，${options.detail}` : ''}。`
+}
+
+export const isBarFamilyChartType = (chartType: string) => chartType.startsWith('bar')
+
+export const getChartFieldLabels = (chartType: string) => ({
+  x: isBarFamilyChartType(chartType) ? 'X轴字段' : '维度字段',
+  y: isBarFamilyChartType(chartType) ? 'Y轴字段' : '度量字段',
+  group: '分组字段',
+})
+
 export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   bar: {
     label: '柱状图',
-    description: '适合做分类对比，可选系列分组。',
+    description: buildXYGroupDescription('基础柱状图', { detail: '适合单系列分类对比' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -329,7 +355,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_horizontal: {
     label: '条形图',
-    description: '适合排行和长文本类别展示，可选系列分组。',
+    description: buildXYGroupDescription('基础条形图', { detail: '适合排行和长文本类别展示' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -494,7 +520,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_stack: {
     label: '堆叠柱状图',
-    description: '多系列柱状图，数值堆叠展示结构累积。',
+    description: buildXYGroupDescription('堆叠柱状图', { allowsGroup: true, detail: '适合累计结构对比' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -509,7 +535,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_percent: {
     label: '百分比柱状图',
-    description: '多系列柱状图，显示各系列百分比占比。',
+    description: buildXYGroupDescription('百分比柱状图', { allowsGroup: true, detail: '适合多系列占比分析' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -524,11 +550,12 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_group: {
     label: '分组柱状图',
-    description: '强调分组对比，每个组别并排展示多系列。',
+    description: buildXYGroupDescription('分组柱状图', { requiresGroup: true, detail: '同一类目下按分组并排对比' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
     allowsGroup: true,
+    requiresGroup: true,
     supportsLegend: true,
     supportsAxisNames: true,
     supportsGrid: true,
@@ -539,7 +566,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_horizontal_stack: {
     label: '堆叠条形图',
-    description: '水平方向堆叠，适合展示部分与整体的关系。',
+    description: buildXYGroupDescription('堆叠条形图', { allowsGroup: true, detail: '适合展示部分与整体的关系' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -614,11 +641,12 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_group_stack: {
     label: '分组堆叠柱状图',
-    description: '在每组内进行堆叠，同时展示分组对比。',
+    description: buildXYGroupDescription('分组堆叠柱状图', { requiresGroup: true, detail: '每个分组内再做堆叠对比' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
     allowsGroup: true,
+    requiresGroup: true,
     supportsLegend: true,
     supportsAxisNames: true,
     supportsGrid: true,
@@ -629,7 +657,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_waterfall: {
     label: '瀑布图',
-    description: '展示数值的累计增减变化，适合财务分析。',
+    description: buildXYGroupDescription('瀑布图', { detail: '适合累计增减变化分析' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -644,7 +672,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_horizontal_percent: {
     label: '百分比条形图',
-    description: '水平方向百分比堆叠，多系列占比分析。',
+    description: buildXYGroupDescription('百分比条形图', { allowsGroup: true, detail: '适合横向多系列占比分析' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -659,7 +687,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_horizontal_range: {
     label: '区间条形图',
-    description: '展示数值起终区间，适合甘特图类场景。',
+    description: buildXYGroupDescription('区间条形图', { detail: '适合展示数值起止区间' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -674,7 +702,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_horizontal_symmetric: {
     label: '对称条形图',
-    description: '双向条形图，适合正负对比分析。',
+    description: buildXYGroupDescription('对称条形图', { allowsGroup: true, detail: '适合正负或双向对比分析' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -689,7 +717,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_progress: {
     label: '进度条',
-    description: '以条形展示进度或完成率。',
+    description: buildXYGroupDescription('进度条', { detail: '适合展示进度或完成率' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -704,7 +732,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_combo: {
     label: '柱线组合图',
-    description: '柱状图和折线图组合，适合双指标对比。',
+    description: buildXYGroupDescription('柱线组合图', { allowsGroup: true, detail: '适合柱形与折线的双指标对比' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -719,11 +747,12 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_combo_group: {
     label: '分组柱线组合图',
-    description: '分组柱状图与折线图组合。',
+    description: buildXYGroupDescription('分组柱线组合图', { requiresGroup: true, detail: '同一类目下按分组展示柱线组合' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
     allowsGroup: true,
+    requiresGroup: true,
     supportsLegend: true,
     supportsAxisNames: true,
     supportsGrid: true,
@@ -734,7 +763,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   bar_combo_stack: {
     label: '堆叠柱线组合图',
-    description: '堆叠柱状图与折线图组合，展示累积趋势。',
+    description: buildXYGroupDescription('堆叠柱线组合图', { allowsGroup: true, detail: '适合展示累计趋势' }),
     requiresDimension: true,
     allowsOptionalDimension: false,
     requiresMetric: true,
@@ -1028,9 +1057,11 @@ export const canRenderStaticWithoutFields = (type: string) => PURE_STATIC_CHART_
 
 export const getMissingChartFields = (chartConfig: ComponentChartConfig) => {
   const meta = getChartTypeMeta(chartConfig.chartType)
+  const fieldLabels = getChartFieldLabels(chartConfig.chartType)
   const issues: string[] = []
-  if (meta.requiresDimension && !chartConfig.xField) issues.push('维度字段')
-  if (meta.requiresMetric && !chartConfig.yField) issues.push('度量字段')
+  if (meta.requiresDimension && !chartConfig.xField) issues.push(fieldLabels.x)
+  if (meta.requiresMetric && !chartConfig.yField) issues.push(fieldLabels.y)
+  if (meta.requiresGroup && !chartConfig.groupField) issues.push(fieldLabels.group)
   return issues
 }
 
@@ -1093,6 +1124,7 @@ const normalizeTableChartFields = (chart: ComponentChartConfig): ComponentChartC
   const tableVisibleRows = clampInteger(chart.tableVisibleRows, 10, 1, 200)
   const tableCarouselMode = chart.tableCarouselMode === 'page' ? 'page' : 'single'
   const tableCarouselInterval = clampInteger(chart.tableCarouselInterval, 20000, 1000, 120000)
+  const dataRefreshInterval = clampInteger(chart.dataRefreshInterval, 0, 0, 86400)
 
   if (!TABLE_LIKE_CHART_TYPES.has(chart.chartType)) {
     return {
@@ -1104,6 +1136,7 @@ const normalizeTableChartFields = (chart: ComponentChartConfig): ComponentChartC
       tableVisibleRows,
       tableCarouselMode,
       tableCarouselInterval,
+      dataRefreshInterval,
     }
   }
 
@@ -1129,6 +1162,7 @@ const normalizeTableChartFields = (chart: ComponentChartConfig): ComponentChartC
     tableVisibleRows,
     tableCarouselMode,
     tableCarouselInterval,
+    dataRefreshInterval,
   }
 }
 
@@ -1174,6 +1208,64 @@ export const getConfiguredTableStepCount = (chartConfig: ComponentChartConfig, r
   const stepSize = chartConfig.tableCarouselMode === 'page' ? visibleRows : 1
   return Math.ceil((limitedLength - visibleRows) / stepSize) + 1
 }
+
+const DASHBOARD_TABLE_STYLE_BASE = Object.freeze({
+  tableHeaderBg: '#f6f9fd',
+  tableHeaderColor: '#3f5570',
+  tableHeaderFontSize: 13,
+  tableRowHeight: 36,
+  tableOddRowBg: '#ffffff',
+  tableEvenRowBg: '#ffffff',
+  tableRowHoverBg: 'rgba(64,158,255,0.08)',
+  tableBorderColor: '#deebf7',
+  tableBorderWidth: 1,
+  tableFontColor: '#24384f',
+  tableFontSize: 12,
+  tableStriped: true,
+})
+
+type TableStyleField = keyof typeof DASHBOARD_TABLE_STYLE_BASE
+
+const resolveTableStyleValue = <T extends TableStyleField>(
+  styleConfig: ComponentStyleConfig,
+  scene: 'screen' | 'dashboard',
+  field: T,
+): ComponentStyleConfig[T] => {
+  if (scene === 'dashboard' && styleConfig[field] === DEFAULT_COMPONENT_STYLE[field]) {
+    return DASHBOARD_TABLE_STYLE_BASE[field] as ComponentStyleConfig[T]
+  }
+  return styleConfig[field]
+}
+
+export const buildTableWrapperStyleVars = (
+  styleConfig: ComponentStyleConfig,
+  scene: 'screen' | 'dashboard' = 'screen',
+): Record<string, string> => {
+  const striped = Boolean(resolveTableStyleValue(styleConfig, scene, 'tableStriped'))
+  const oddRowBg = String(resolveTableStyleValue(styleConfig, scene, 'tableOddRowBg') || 'transparent')
+  const evenRowBg = striped
+    ? String(resolveTableStyleValue(styleConfig, scene, 'tableEvenRowBg') || oddRowBg)
+    : oddRowBg
+  const rowHoverBg = String(resolveTableStyleValue(styleConfig, scene, 'tableRowHoverBg') || oddRowBg)
+  const borderWidth = Math.max(0, Number(resolveTableStyleValue(styleConfig, scene, 'tableBorderWidth')) || 0)
+  return {
+    '--component-table-header-bg': String(resolveTableStyleValue(styleConfig, scene, 'tableHeaderBg') || 'transparent'),
+    '--component-table-header-color': String(resolveTableStyleValue(styleConfig, scene, 'tableHeaderColor') || 'inherit'),
+    '--component-table-header-font-size': `${Math.max(10, Number(resolveTableStyleValue(styleConfig, scene, 'tableHeaderFontSize')) || 13)}px`,
+    '--component-table-row-height': `${Math.max(24, Number(resolveTableStyleValue(styleConfig, scene, 'tableRowHeight')) || 36)}px`,
+    '--component-table-odd-row-bg': oddRowBg,
+    '--component-table-even-row-bg': evenRowBg,
+    '--component-table-row-hover-bg': rowHoverBg,
+    '--component-table-border-color': String(resolveTableStyleValue(styleConfig, scene, 'tableBorderColor') || 'transparent'),
+    '--component-table-border-width': `${borderWidth}px`,
+    '--component-table-font-color': String(resolveTableStyleValue(styleConfig, scene, 'tableFontColor') || 'inherit'),
+    '--component-table-font-size': `${Math.max(10, Number(resolveTableStyleValue(styleConfig, scene, 'tableFontSize')) || 12)}px`,
+  }
+}
+
+export const getComponentTableRowClassName = ({ rowIndex }: { rowIndex: number }) => (
+  rowIndex % 2 === 0 ? 'component-table-row--odd' : 'component-table-row--even'
+)
 
 const scoreColumn = (column: string, keywords: string[]) => {
   const normalized = column.toLowerCase()
@@ -1249,6 +1341,7 @@ export const buildChartSnapshot = (chart?: Chart | null): ComponentChartConfig =
   tableVisibleRows: 10,
   tableCarouselMode: 'single',
   tableCarouselInterval: 20000,
+  dataRefreshInterval: 0,
 })
 
 const parseRawComponentConfig = (configJson?: string | null): Record<string, any> => {
@@ -1294,6 +1387,7 @@ export const parseComponentConfig = (configJson?: string | null): Partial<Compon
   chartPatch.tableVisibleRows = clampInteger(parsed.tableVisibleRows, 10, 1, 200)
   chartPatch.tableCarouselMode = parsed.tableCarouselMode === 'page' ? 'page' : 'single'
   chartPatch.tableCarouselInterval = clampInteger(parsed.tableCarouselInterval, 20000, 1000, 120000)
+  chartPatch.dataRefreshInterval = clampInteger(parsed.dataRefreshInterval, 0, 0, 86400)
   if (typeof parsed.theme === 'string') stylePatch.theme = parsed.theme
   if (typeof parsed.bgColor === 'string') stylePatch.bgColor = parsed.bgColor
   if (typeof parsed.showLegend === 'boolean') stylePatch.showLegend = parsed.showLegend
@@ -1542,7 +1636,7 @@ export const materializeChartData = (
     }
   }
 
-  if ((meta.requiresDimension && !chartConfig.xField) || (meta.requiresMetric && !chartConfig.yField)) {
+  if ((meta.requiresDimension && !chartConfig.xField) || (meta.requiresMetric && !chartConfig.yField) || (meta.requiresGroup && !chartConfig.groupField)) {
     return {
       chartType: chartConfig.chartType,
       columns: nextColumns,

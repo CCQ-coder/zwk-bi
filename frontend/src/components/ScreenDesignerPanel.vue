@@ -458,6 +458,7 @@
               <div
                 v-for="component in components"
                 :key="component.id"
+                v-memo="getStageCardMemo(component)"
                 :ref="(el) => setStageCardRef(el as HTMLElement | null, component.id)"
                 class="stage-card"
                 :class="{
@@ -501,45 +502,11 @@
                     加载中
                   </div>
                   <div v-else-if="isTableChart(component)" class="table-wrapper">
-                    <el-table
-                      :data="getTableRows(component)"
-                      size="small"
-                      border
-                      height="100%"
-                      empty-text="暂无数据"
-                      :stripe="getComponentConfig(component).style.tableStriped"
-                      :show-header="true"
-                      :header-cell-style="{
-                        background: getComponentConfig(component).style.tableHeaderBg,
-                        color: getComponentConfig(component).style.tableHeaderColor,
-                        fontSize: getComponentConfig(component).style.tableHeaderFontSize + 'px',
-                        borderBottom: `${getComponentConfig(component).style.tableBorderWidth}px solid ${getComponentConfig(component).style.tableBorderColor}`,
-                      }"
-                      :cell-style="{
-                        color: getComponentConfig(component).style.tableFontColor,
-                        fontSize: getComponentConfig(component).style.tableFontSize + 'px',
-                        height: getComponentConfig(component).style.tableRowHeight + 'px',
-                        borderBottom: `${getComponentConfig(component).style.tableBorderWidth}px solid ${getComponentConfig(component).style.tableBorderColor}`,
-                      }"
-                    >
-                      <el-table-column
-                        v-if="getComponentConfig(component).style.tableShowIndex"
-                        type="index"
-                        width="50"
-                        label="#"
-                      />
-                      <el-table-column
-                        v-for="column in getTableColumns(component)"
-                        :key="column.id"
-                        :prop="column.field"
-                        :label="column.label"
-                        :width="column.width"
-                        :align="column.align"
-                        :header-align="column.align"
-                        show-overflow-tooltip
-                        :sortable="getComponentConfig(component).style.tableEnableSort ? 'custom' : false"
-                      />
-                    </el-table>
+                    <DesignerTablePreview
+                      :rows="getTableRows(component)"
+                      :columns="getTableColumns(component)"
+                      :style-config="getComponentConfig(component).style"
+                    />
                   </div>
                   <ComponentStaticPreview
                     v-else-if="isStaticWidget(component)"
@@ -806,6 +773,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowR
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Grid, Operation, PictureFilled, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import ComponentDataFallback from './ComponentDataFallback.vue'
+import DesignerTablePreview from './DesignerTablePreview.vue'
 import ComponentStaticPreview from './ComponentStaticPreview.vue'
 import ComponentTemplatePreview from './ComponentTemplatePreview.vue'
 import EditorComponentInspector from './EditorComponentInspector.vue'
@@ -830,6 +798,7 @@ import {
   buildComponentConfig,
   buildComponentOption,
   chartTypeLabel,
+  getChartFieldLabels,
   getConfiguredTableRows,
   getConfiguredTableStepCount,
   getMissingChartFields,
@@ -1230,6 +1199,7 @@ const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LI
       tableVisibleRows: 10,
       tableCarouselMode: 'single',
       tableCarouselInterval: 20000,
+      dataRefreshInterval: 0,
     },
   }, item.layout),
   builtIn: true,
@@ -1850,7 +1820,6 @@ const getCardStyle = (component: DashboardComponent) => {
   const shadow = style.shadowShow
     ? `0 4px ${style.shadowBlur ?? 12}px ${style.shadowColor ?? 'rgba(0,0,0,0.4)'}`
     : undefined
-  const preview = interactionPreview.value?.compId === component.id ? interactionPreview.value : null
   return {
     left: `${component.posX}px`,
     top: `${component.posY}px`,
@@ -1862,8 +1831,6 @@ const getCardStyle = (component: DashboardComponent) => {
     opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
     boxShadow: shadow,
     padding: getEditorCardPadding(component) > 0 ? `${getEditorCardPadding(component)}px` : undefined,
-    transform: preview?.transform,
-    transformOrigin: preview?.transformOrigin,
   }
 }
 
@@ -1892,6 +1859,7 @@ const scheduleComponentDataRefresh = () => {
 const setComponentData = (componentId: number, data: ChartDataResult) => {
   componentDataMap.value.set(componentId, data)
   scheduleComponentDataRefresh()
+  scheduleComponentRefreshSync()
 }
 
 const deleteComponentData = (componentId: number) => {
@@ -1901,6 +1869,7 @@ const deleteComponentData = (componentId: number) => {
 }
 
 const clearComponentData = () => {
+  clearTableRenderCache()
   if (!componentDataMap.value.size) return
   componentDataMap.value.clear()
   scheduleComponentDataRefresh()
@@ -2018,6 +1987,7 @@ const handleComponentVisibilityChange = (componentId: number, visible: boolean) 
   if (!component) return
   if (visible) {
     if (componentRequiresPreviewData(component) && !componentDataMap.value.has(componentId)) {
+      scheduleComponentRefreshSync()
       void loadComponentData(component)
       return
     }
@@ -2026,9 +1996,11 @@ const handleComponentVisibilityChange = (componentId: number, visible: boolean) 
       renderChart(component, cachedData)
       chartInstances.get(componentId)?.resize()
     }
+    scheduleComponentRefreshSync()
     return
   }
   disposeChartInstance(componentId)
+  scheduleComponentRefreshSync()
 }
 
 const setupComponentVisibilityObserver = () => {
@@ -2119,6 +2091,7 @@ const loadComponents = async () => {
   if (!currentDashboard.value) return
   const loadToken = ++componentDataLoadToken
   compLoading.value = true
+  stopAllComponentRefreshes()
   disposeComponentVisibilityObserver()
   disposeCharts()
   clearComponentData()
@@ -2203,6 +2176,63 @@ const isDecorationComponent = (component: DashboardComponent) => {
 const isRenderableChart = (component: DashboardComponent) => {
   const type = getComponentChartConfig(component).chartType ?? ''
   return isCanvasRenderableChartType(type)
+}
+
+const componentRefreshTimers = new Map<number, number>()
+const componentRefreshRuntimeSignatures = new Map<number, string>()
+let componentRefreshSyncFrame: number | null = null
+
+const canAutoRefreshComponent = (component: DashboardComponent) => {
+  if (!componentRequiresPreviewData(component) || showNoField(component)) return false
+  if (!componentVisibilityObserver) return true
+  return isComponentVisible(component.id)
+}
+
+const stopComponentRefresh = (componentId: number) => {
+  const timerId = componentRefreshTimers.get(componentId)
+  if (timerId == null) return
+  window.clearInterval(timerId)
+  componentRefreshTimers.delete(componentId)
+}
+
+const stopAllComponentRefreshes = () => {
+  Array.from(componentRefreshTimers.keys()).forEach((componentId) => stopComponentRefresh(componentId))
+  componentRefreshRuntimeSignatures.clear()
+}
+
+const syncComponentRefreshTimers = () => {
+  componentRefreshSyncFrame = null
+  const activeComponentIds = new Set<number>()
+
+  components.value.forEach((component) => {
+    if (!canAutoRefreshComponent(component)) return
+    const refreshInterval = Math.max(0, Number(getComponentConfig(component).chart.dataRefreshInterval) || 0)
+    if (refreshInterval <= 0) return
+    activeComponentIds.add(component.id)
+    const runtimeSignature = `${refreshInterval}:${component.chartId}:${component.configJson ?? ''}`
+    if (componentRefreshRuntimeSignatures.get(component.id) === runtimeSignature && componentRefreshTimers.has(component.id)) {
+      return
+    }
+    componentRefreshRuntimeSignatures.set(component.id, runtimeSignature)
+    stopComponentRefresh(component.id)
+    componentRefreshTimers.set(component.id, window.setInterval(() => {
+      const current = findComponent(component.id)
+      if (!current || !canAutoRefreshComponent(current)) return
+      void loadComponentData(current)
+    }, refreshInterval * 1000))
+  })
+
+  Array.from(componentRefreshTimers.keys()).forEach((componentId) => {
+    if (!activeComponentIds.has(componentId)) stopComponentRefresh(componentId)
+  })
+  Array.from(componentRefreshRuntimeSignatures.keys()).forEach((componentId) => {
+    if (!activeComponentIds.has(componentId)) componentRefreshRuntimeSignatures.delete(componentId)
+  })
+}
+
+const scheduleComponentRefreshSync = () => {
+  if (componentRefreshSyncFrame !== null) return
+  componentRefreshSyncFrame = window.requestAnimationFrame(syncComponentRefreshTimers)
 }
 
 const showNoField = (component: DashboardComponent) => {
@@ -2302,20 +2332,81 @@ const tableCarouselComponentSignature = computed(() => components.value
   .map((component) => `${component.id}:${component.chartId}:${component.configJson ?? ''}`)
   .join('|'))
 
+const componentRefreshSignature = computed(() => {
+  const visibleIds = componentVisibilityObserver
+    ? Array.from(visibleComponentIds.value).sort((left, right) => left - right).join(',')
+    : 'all-visible'
+  const componentSignature = components.value.map((component) => `${component.id}:${component.chartId}:${component.configJson ?? ''}`).join('|')
+  return `${visibleIds}::${componentSignature}`
+})
+
 watch(tableCarouselComponentSignature, () => {
   scheduleTableCarouselSync()
 }, { immediate: true })
 
-const getTableColumns = (component: DashboardComponent) => resolveConfiguredTableColumns(
-  getComponentConfig(component).chart,
-  componentDataMap.value.get(component.id)?.columns ?? []
-)
+watch(componentRefreshSignature, () => {
+  scheduleComponentRefreshSync()
+}, { immediate: true })
 
-const getTableRows = (component: DashboardComponent) => getConfiguredTableRows(
-  getComponentConfig(component).chart,
-  componentDataMap.value.get(component.id)?.rawRows ?? [],
-  tableCarouselSteps.value.get(component.id) ?? 0,
-)
+const EMPTY_TABLE_COLUMNS: string[] = []
+const EMPTY_TABLE_ROWS: Record<string, unknown>[] = []
+
+const tableColumnsCache = new Map<number, {
+  chartConfig: ReturnType<typeof normalizeComponentConfig>['chart']
+  availableColumns: string[]
+  value: ReturnType<typeof resolveConfiguredTableColumns>
+}>()
+
+const tableRowsCache = new Map<number, {
+  chartConfig: ReturnType<typeof normalizeComponentConfig>['chart']
+  rawRows: Record<string, unknown>[]
+  step: number
+  value: Record<string, unknown>[]
+}>()
+
+const clearTableRenderCache = (componentId?: number) => {
+  if (typeof componentId === 'number') {
+    tableColumnsCache.delete(componentId)
+    tableRowsCache.delete(componentId)
+    return
+  }
+  tableColumnsCache.clear()
+  tableRowsCache.clear()
+}
+
+const getTableColumns = (component: DashboardComponent) => {
+  const resolved = getComponentConfig(component)
+  const availableColumns = componentDataMap.value.get(component.id)?.columns ?? EMPTY_TABLE_COLUMNS
+  const cached = tableColumnsCache.get(component.id)
+  if (cached && cached.chartConfig === resolved.chart && cached.availableColumns === availableColumns) {
+    return cached.value
+  }
+  const value = resolveConfiguredTableColumns(resolved.chart, availableColumns)
+  tableColumnsCache.set(component.id, {
+    chartConfig: resolved.chart,
+    availableColumns,
+    value,
+  })
+  return value
+}
+
+const getTableRows = (component: DashboardComponent) => {
+  const resolved = getComponentConfig(component)
+  const rawRows = componentDataMap.value.get(component.id)?.rawRows ?? EMPTY_TABLE_ROWS
+  const step = tableCarouselSteps.value.get(component.id) ?? 0
+  const cached = tableRowsCache.get(component.id)
+  if (cached && cached.chartConfig === resolved.chart && cached.rawRows === rawRows && cached.step === step) {
+    return cached.value
+  }
+  const value = getConfiguredTableRows(resolved.chart, rawRows, step)
+  tableRowsCache.set(component.id, {
+    chartConfig: resolved.chart,
+    rawRows,
+    step,
+    value,
+  })
+  return value
+}
 
 const setStageCardRef = (el: HTMLElement | null, componentId: number) => {
   const previous = stageCardRefs.get(componentId)
@@ -2329,6 +2420,9 @@ const setStageCardRef = (el: HTMLElement | null, componentId: number) => {
   }
   el.dataset.componentId = String(componentId)
   stageCardRefs.set(componentId, el)
+  if (interactionPreviewSnapshot?.compId === componentId) {
+    applyInteractionPreviewToCard(interactionPreviewSnapshot)
+  }
   componentVisibilityObserver?.observe(el)
 }
 
@@ -2358,6 +2452,24 @@ const clearComponentSelection = () => {
 
 const hideComponentContextMenu = () => {
   componentContextMenu.visible = false
+}
+
+const getStageCardMemo = (component: DashboardComponent) => {
+  return [
+    component.posX,
+    component.posY,
+    component.width,
+    component.height,
+    component.zIndex ?? 0,
+    component.chartId,
+    component.configJson ?? '',
+    activeCompId.value === component.id,
+    isComponentSelected(component.id),
+    shouldDeferComponentPreview(component),
+    isComponentPreviewLoading(component),
+    componentDataMap.value.get(component.id) ?? null,
+    tableCarouselSteps.value.get(component.id) ?? 0,
+  ]
 }
 
 const resetMarqueeSelection = () => {
@@ -2737,7 +2849,8 @@ interface SnapMatch {
 }
 
 let interaction: InteractionState | null = null
-const interactionPreview = shallowRef<InteractionPreview | null>(null)
+let interactionPreviewSnapshot: InteractionPreview | null = null
+const interactionGuideLines = shallowRef({ vertical: [] as number[], horizontal: [] as number[] })
 const resizeHandles: ResizeHandle[] = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw']
 const SNAP_TOLERANCE = 6
 
@@ -2809,16 +2922,22 @@ const buildInteractionGuideLines = (
   ),
 })
 
-const interactionGuideLines = computed(() => {
-  const preview = interactionPreview.value
-  if (!preview) {
-    return { vertical: [] as number[], horizontal: [] as number[] }
-  }
-  return {
-    vertical: preview.guideVertical,
-    horizontal: preview.guideHorizontal,
-  }
-})
+const applyInteractionPreviewToCard = (preview: InteractionPreview | null) => {
+  if (!preview) return
+  const card = stageCardRefs.get(preview.compId)
+  if (!card) return
+  card.style.transform = preview.transform
+  card.style.transformOrigin = preview.transformOrigin
+}
+
+const clearInteractionPreviewFromCard = (componentId?: number) => {
+  const targetId = componentId ?? interactionPreviewSnapshot?.compId
+  if (!targetId) return
+  const card = stageCardRefs.get(targetId)
+  if (!card) return
+  card.style.transform = ''
+  card.style.transformOrigin = ''
+}
 
 const applyInteractionFrame = () => {
   interactionFrame = null
@@ -2867,7 +2986,7 @@ const applyInteractionFrame = () => {
       verticalMatch ? [verticalMatch.line] : undefined,
       horizontalMatch ? [horizontalMatch.line] : undefined,
     )
-    interactionPreview.value = {
+    const preview = {
       compId: component.id,
       nextX: roundedX,
       nextY: roundedY,
@@ -2878,6 +2997,12 @@ const applyInteractionFrame = () => {
       guideVertical: guideLines.vertical,
       guideHorizontal: guideLines.horizontal,
     }
+    interactionPreviewSnapshot = preview
+    interactionGuideLines.value = {
+      vertical: guideLines.vertical,
+      horizontal: guideLines.horizontal,
+    }
+    applyInteractionPreviewToCard(preview)
   } else {
     const handle = interaction.handle ?? 'se'
     let nextX = interaction.startX
@@ -2955,7 +3080,7 @@ const applyInteractionFrame = () => {
       snapHorizontalLine,
     )
 
-    interactionPreview.value = {
+    const preview = {
       compId: component.id,
       nextX: roundedX,
       nextY: roundedY,
@@ -2966,6 +3091,12 @@ const applyInteractionFrame = () => {
       guideVertical: guideLines.vertical,
       guideHorizontal: guideLines.horizontal,
     }
+    interactionPreviewSnapshot = preview
+    interactionGuideLines.value = {
+      vertical: guideLines.vertical,
+      horizontal: guideLines.horizontal,
+    }
+    applyInteractionPreviewToCard(preview)
   }
 }
 
@@ -2974,13 +3105,17 @@ const scheduleInteractionFrame = () => {
   interactionFrame = window.requestAnimationFrame(applyInteractionFrame)
 }
 
-const cleanupInteractionFrame = () => {
+const cleanupInteractionFrame = (clearCardPreview = true) => {
   if (interactionFrame !== null) {
     window.cancelAnimationFrame(interactionFrame)
     interactionFrame = null
   }
   pendingPointer = null
-  interactionPreview.value = null
+  interactionGuideLines.value = { vertical: [], horizontal: [] }
+  if (clearCardPreview) {
+    clearInteractionPreviewFromCard()
+    interactionPreviewSnapshot = null
+  }
   document.body.classList.remove('canvas-interacting')
 }
 
@@ -3042,11 +3177,11 @@ const onPointerUp = async () => {
   if (pendingPointer) {
     applyInteractionFrame()
   }
-  const preview = interactionPreview.value?.compId === finalizedInteraction.compId ? { ...interactionPreview.value } : null
+  const preview = interactionPreviewSnapshot?.compId === finalizedInteraction.compId ? { ...interactionPreviewSnapshot } : null
   interaction = null
   document.removeEventListener('mousemove', onPointerMove)
   document.removeEventListener('mouseup', onPointerUp)
-  cleanupInteractionFrame()
+  cleanupInteractionFrame(false)
   if (component) {
     const before: ComponentLayoutSnapshot = {
       posX: finalizedInteraction.startX,
@@ -3066,11 +3201,16 @@ const onPointerUp = async () => {
       : cloneComponentLayout(component)
     applyComponentLayoutSnapshot(component, next)
     await nextTick()
+    clearInteractionPreviewFromCard(component.id)
+    interactionPreviewSnapshot = null
     resizeInteractionChart(component.id)
     const persisted = await persistLayout(component, next)
     if (persisted && !layoutSnapshotsEqual(before, next)) {
       pushUndoEntry({ type: 'layout', componentId: component.id, before, after: next })
     }
+  } else {
+    clearInteractionPreviewFromCard(finalizedInteraction.compId)
+    interactionPreviewSnapshot = null
   }
 }
 
@@ -3612,8 +3752,11 @@ const removeComponent = async (componentId: number, options: { trackUndo?: boole
   if (!currentDashboard.value) return
   const snapshot = components.value.find((item) => item.id === componentId)
   await removeDashboardComponent(currentDashboard.value.id, componentId)
+  stopComponentRefresh(componentId)
+  componentRefreshRuntimeSignatures.delete(componentId)
   disposeChartInstance(componentId)
   deleteComponentData(componentId)
+  clearTableRenderCache(componentId)
   components.value = components.value.filter((item) => item.id !== componentId)
   selectedComponentIds.value = selectedComponentIds.value.filter((id) => id !== componentId)
   if (activeCompId.value === componentId) {
@@ -3789,9 +3932,10 @@ const onLayerDragEnd = () => {
 
 const summarizeTemplateConfig = (configJson: string) => {
   const asset = normalizeComponentAssetConfig(configJson)
+  const fieldLabels = getChartFieldLabels(asset.chart.chartType)
   const segments = [
-    asset.chart.xField ? `维度 ${asset.chart.xField}` : '',
-    asset.chart.yField ? `度量 ${asset.chart.yField}` : '',
+    asset.chart.xField ? `${fieldLabels.x} ${asset.chart.xField}` : '',
+    asset.chart.yField ? `${fieldLabels.y} ${asset.chart.yField}` : '',
     asset.chart.groupField ? `分组 ${asset.chart.groupField}` : '',
     asset.style.theme ? `主题 ${asset.style.theme}` : '',
   ]
@@ -3815,6 +3959,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   componentDataLoadToken += 1
+  stopAllComponentRefreshes()
   disposeComponentVisibilityObserver()
   document.removeEventListener('mousedown', hideComponentContextMenu)
   document.removeEventListener('mousemove', onPointerMove)
@@ -3828,6 +3973,10 @@ onBeforeUnmount(() => {
   if (tableCarouselSyncFrame !== null) {
     window.cancelAnimationFrame(tableCarouselSyncFrame)
     tableCarouselSyncFrame = null
+  }
+  if (componentRefreshSyncFrame !== null) {
+    window.cancelAnimationFrame(componentRefreshSyncFrame)
+    componentRefreshSyncFrame = null
   }
   stopAllTableCarousels()
   disposeCharts()
@@ -4672,13 +4821,70 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
+.table-wrapper {
+  --component-table-header-bg: transparent;
+  --component-table-header-color: #d8e8fb;
+  --component-table-header-font-size: 13px;
+  --component-table-row-height: 36px;
+  --component-table-odd-row-bg: transparent;
+  --component-table-even-row-bg: transparent;
+  --component-table-row-hover-bg: rgba(64, 158, 255, 0.15);
+  --component-table-border-color: rgba(104, 148, 194, 0.22);
+  --component-table-border-width: 1px;
+  --component-table-font-color: #e6eef8;
+  --component-table-font-size: 12px;
+}
+
 .table-wrapper :deep(.el-table) {
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: transparent;
-  --el-table-border-color: rgba(104, 148, 194, 0.22);
-  --el-table-text-color: #e6eef8;
-  --el-table-header-text-color: #d8e8fb;
+  --el-table-header-bg-color: var(--component-table-header-bg);
+  --el-table-border-color: var(--component-table-border-color);
+  --el-table-text-color: var(--component-table-font-color);
+  --el-table-header-text-color: var(--component-table-header-color);
+  --el-table-row-hover-bg-color: var(--component-table-row-hover-bg);
+}
+
+.table-wrapper :deep(.el-table th.el-table__cell) {
+  background: var(--component-table-header-bg);
+  color: var(--component-table-header-color);
+  font-size: var(--component-table-header-font-size);
+  border-bottom: var(--component-table-border-width) solid var(--component-table-border-color);
+}
+
+.table-wrapper :deep(.el-table td.el-table__cell) {
+  color: var(--component-table-font-color);
+  font-size: var(--component-table-font-size);
+  height: var(--component-table-row-height);
+  border-bottom: var(--component-table-border-width) solid var(--component-table-border-color);
+  background: transparent;
+  transition: background-color 0.18s ease;
+}
+
+.table-wrapper :deep(.el-table .cell) {
+  line-height: calc(var(--component-table-row-height) - 2px);
+}
+
+.table-wrapper :deep(.el-table__row.component-table-row--odd > td.el-table__cell) {
+  background: var(--component-table-odd-row-bg);
+}
+
+.table-wrapper :deep(.el-table__row.component-table-row--even > td.el-table__cell) {
+  background: var(--component-table-even-row-bg);
+}
+
+.table-wrapper :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: var(--component-table-row-hover-bg) !important;
+}
+
+.table-wrapper :deep(.el-table--border::before),
+.table-wrapper :deep(.el-table__inner-wrapper::before) {
+  background-color: var(--component-table-border-color);
+  height: var(--component-table-border-width);
+}
+
+.table-wrapper :deep(.el-table--border .el-table__cell) {
+  border-right: var(--component-table-border-width) solid var(--component-table-border-color);
 }
 
 .chart-placeholder {
