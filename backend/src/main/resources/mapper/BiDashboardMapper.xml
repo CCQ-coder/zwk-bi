@@ -7,32 +7,51 @@
         <id column="id" property="id"/>
         <result column="name"        property="name"/>
         <result column="configJson"  property="configJson"/>
+        <result column="component_count" property="componentCount"/>
         <result column="created_at"  property="createdAt"/>
     </resultMap>
 
     <select id="listAll" resultMap="BiDashboardMap">
-        SELECT id, name,
-               layout_json AS configJson,
-               created_at
-        FROM bi_dashboard
+        SELECT d.id,
+               d.name,
+               d.layout_json AS configJson,
+               (
+                   SELECT COUNT(1)
+                   FROM bi_dashboard_component dc
+                   WHERE dc.dashboard_id = d.id
+               ) AS component_count,
+               d.created_at
+        FROM bi_dashboard d
         ORDER BY id DESC
     </select>
 
     <select id="findLatest" resultMap="BiDashboardMap">
-        SELECT id, name,
-               layout_json AS configJson,
-               created_at
-        FROM bi_dashboard
+        SELECT d.id,
+               d.name,
+               d.layout_json AS configJson,
+               (
+                   SELECT COUNT(1)
+                   FROM bi_dashboard_component dc
+                   WHERE dc.dashboard_id = d.id
+               ) AS component_count,
+               d.created_at
+        FROM bi_dashboard d
         ORDER BY id DESC
         LIMIT 1
     </select>
 
     <select id="findById" resultMap="BiDashboardMap" parameterType="long">
-        SELECT id, name,
-               layout_json AS configJson,
-               created_at
-        FROM bi_dashboard
-        WHERE id = #{id}
+        SELECT d.id,
+               d.name,
+               d.layout_json AS configJson,
+               (
+                   SELECT COUNT(1)
+                   FROM bi_dashboard_component dc
+                   WHERE dc.dashboard_id = d.id
+               ) AS component_count,
+               d.created_at
+        FROM bi_dashboard d
+        WHERE d.id = #{id}
     </select>
 
     <insert id="insert" parameterType="com.aibi.bi.domain.BiDashboard"

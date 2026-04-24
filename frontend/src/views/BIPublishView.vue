@@ -31,10 +31,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { getCurrentMenus } from '../api/menu'
 import TopNavBar from '../components/TopNavBar.vue'
-import { flattenAuthMenus, getAuthMenus } from '../utils/auth-session'
+import { flattenAuthMenus, getAuthMenus, hasAuthSession, saveAuthMenus, type AuthMenuItem } from '../utils/auth-session'
 
 const PublishGroupManager = defineAsyncComponent(() => import('../components/PublishGroupManager.vue'))
 const PublishPanelDisplay = defineAsyncComponent(() => import('../components/PublishPanelDisplay.vue'))
@@ -42,6 +43,7 @@ const PublishPanelDisplay = defineAsyncComponent(() => import('../components/Pub
 const route = useRoute()
 const router = useRouter()
 const activeTab = ref('panels')
+const menus = ref<AuthMenuItem[]>(getAuthMenus())
 
 const tabs = [
   { name: 'groups', path: '/home/publish/groups' },
@@ -58,11 +60,25 @@ const tabRouteMap: Record<'groups' | 'panels', string> = {
   panels: '/home/publish/panels',
 }
 
-const authPaths = computed(() => new Set(flattenAuthMenus(getAuthMenus()).map((item) => item.path).filter(Boolean)))
+const authPaths = computed(() => new Set(flattenAuthMenus(menus.value).map((item) => item.path).filter(Boolean)))
 const visibleTabs = computed(() => tabs.filter((tab) => authPaths.value.has(tab.path)))
 const fallbackTab = computed(() => visibleTabs.value[0]?.name ?? 'panels')
 
 const hasTab = (tabName: 'groups' | 'panels') => visibleTabs.value.some((tab) => tab.name === tabName)
+
+const loadMenus = async () => {
+  if (!hasAuthSession()) {
+    menus.value = []
+    return
+  }
+  try {
+    const latestMenus = await getCurrentMenus()
+    menus.value = latestMenus
+    saveAuthMenus(latestMenus)
+  } catch {
+    menus.value = getAuthMenus()
+  }
+}
 
 watch(
   () => route.path,
@@ -91,6 +107,8 @@ watch(activeTab, (tab) => {
     router.push(targetPath)
   }
 })
+
+onMounted(loadMenus)
 </script>
 
 <style scoped>

@@ -6,6 +6,7 @@ public class BiDashboard {
     private Long id;
     private String name;
     private String configJson;
+    private Integer componentCount;
     private LocalDateTime createdAt;
 
     public Long getId() {
@@ -30,6 +31,14 @@ public class BiDashboard {
 
     public void setConfigJson(String configJson) {
         this.configJson = configJson;
+    }
+
+    public Integer getComponentCount() {
+        return componentCount;
+    }
+
+    public void setComponentCount(Integer componentCount) {
+        this.componentCount = componentCount;
     }
 
     public LocalDateTime getCreatedAt() {

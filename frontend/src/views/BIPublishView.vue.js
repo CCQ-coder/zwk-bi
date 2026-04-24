@@ -1,12 +1,14 @@
-import { computed, defineAsyncComponent, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { getCurrentMenus } from '../api/menu';
 import TopNavBar from '../components/TopNavBar.vue';
-import { flattenAuthMenus, getAuthMenus } from '../utils/auth-session';
+import { flattenAuthMenus, getAuthMenus, hasAuthSession, saveAuthMenus } from '../utils/auth-session';
 const PublishGroupManager = defineAsyncComponent(() => import('../components/PublishGroupManager.vue'));
 const PublishPanelDisplay = defineAsyncComponent(() => import('../components/PublishPanelDisplay.vue'));
 const route = useRoute();
 const router = useRouter();
 const activeTab = ref('panels');
+const menus = ref(getAuthMenus());
 const tabs = [
     { name: 'groups', path: '/home/publish/groups' },
     { name: 'panels', path: '/home/publish/panels' },
@@ -19,10 +21,24 @@ const tabRouteMap = {
     groups: '/home/publish/groups',
     panels: '/home/publish/panels',
 };
-const authPaths = computed(() => new Set(flattenAuthMenus(getAuthMenus()).map((item) => item.path).filter(Boolean)));
+const authPaths = computed(() => new Set(flattenAuthMenus(menus.value).map((item) => item.path).filter(Boolean)));
 const visibleTabs = computed(() => tabs.filter((tab) => authPaths.value.has(tab.path)));
 const fallbackTab = computed(() => visibleTabs.value[0]?.name ?? 'panels');
 const hasTab = (tabName) => visibleTabs.value.some((tab) => tab.name === tabName);
+const loadMenus = async () => {
+    if (!hasAuthSession()) {
+        menus.value = [];
+        return;
+    }
+    try {
+        const latestMenus = await getCurrentMenus();
+        menus.value = latestMenus;
+        saveAuthMenus(latestMenus);
+    }
+    catch {
+        menus.value = getAuthMenus();
+    }
+};
 watch(() => route.path, (path) => {
     activeTab.value = routeTabMap[path] ?? fallbackTab.value;
 }, { immediate: true });
@@ -40,6 +56,7 @@ watch(activeTab, (tab) => {
         router.push(targetPath);
     }
 });
+onMounted(loadMenus);
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
