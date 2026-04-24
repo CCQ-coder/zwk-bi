@@ -88,7 +88,7 @@ const goBack = () => {
     if (window.history.length > 1)
         router.back();
     else
-        router.push(scene.value === 'screen' ? '/home/screen' : '/home/dashboard');
+        router.push('/home/screen');
 };
 onMounted(() => {
     loadDashboard();

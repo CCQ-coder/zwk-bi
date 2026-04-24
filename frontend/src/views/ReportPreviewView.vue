@@ -3,7 +3,7 @@
     <template v-if="scene !== 'screen'">
       <header class="preview-toolbar">
         <div>
-          <div class="toolbar-title">仪表板预览</div>
+          <div class="toolbar-title">报告预览</div>
           <div class="toolbar-subtitle">只读查看、分享、查询联动与导出</div>
         </div>
         <div class="toolbar-actions">
@@ -157,7 +157,7 @@ const printReport = () => {
 
 const goBack = () => {
   if (window.history.length > 1) router.back()
-  else router.push(scene.value === 'screen' ? '/home/screen' : '/home/dashboard')
+  else router.push('/home/screen')
 }
 
 onMounted(() => {

@@ -8,7 +8,7 @@
           <span class="hero-eyebrow">分析工作台</span>
           <h1 class="hero-title">{{ displayName }}，继续推进你的数据产品</h1>
           <p class="hero-description">
-            把数据接入、加工、组件设计、仪表板和大屏发布放到一条可执行链路里，不再依赖首页假入口和弹窗式模块切换。
+            把数据接入、加工、组件设计和大屏发布放到一条可执行链路里，不再依赖首页假入口和弹窗式模块切换。
           </p>
           <div class="hero-actions">
             <el-button type="primary" size="large" @click="goTo(primaryAction.path)">{{ primaryAction.label }}</el-button>
@@ -20,7 +20,7 @@
         <div class="hero-highlight">
           <div class="highlight-label">发布完成度</div>
           <div class="highlight-value">{{ publishedReportCount }}</div>
-          <div class="highlight-meta">已发布报告 / 共 {{ reportList.length }} 个分析资产</div>
+          <div class="highlight-meta">已发布数据大屏 / 共 {{ screens.length }} 个数据大屏</div>
           <el-progress :percentage="publishProgress" :stroke-width="10" :show-text="false" color="#2f7cf6" />
 
           <div class="highlight-user">
@@ -171,36 +171,6 @@
             </div>
             <el-empty v-else description="还没有数据大屏，先创建一个新的大屏" />
           </el-card>
-
-          <el-card class="surface-card" shadow="never">
-            <template #header>
-              <div class="section-head">
-                <div>
-                  <div class="section-title">仪表板概览</div>
-                  <div class="section-subtitle">最近更新的仪表板和发布状态</div>
-                </div>
-                <el-button link @click="goTo('/home/dashboard')">进入仪表板</el-button>
-              </div>
-            </template>
-
-            <div v-if="recentDashboards.length" class="dashboard-list">
-              <button
-                v-for="dashboard in recentDashboards"
-                :key="dashboard.id"
-                class="dashboard-item"
-                @click="openDashboard(dashboard.id)"
-              >
-                <div>
-                  <div class="dashboard-name">{{ dashboard.name }}</div>
-                  <div class="dashboard-meta">{{ getComponentCount(dashboard.id) }} 个组件 · {{ formatDate(dashboard.createdAt) }}</div>
-                </div>
-                <el-tag size="small" :type="getPublishStatus(dashboard) === 'PUBLISHED' ? 'success' : 'info'">
-                  {{ getPublishStatus(dashboard) === 'PUBLISHED' ? '已发布' : '草稿' }}
-                </el-tag>
-              </button>
-            </div>
-            <el-empty v-else description="还没有仪表板，先去添加图表组件" />
-          </el-card>
         </div>
       </section>
     </main>
@@ -305,12 +275,11 @@ const sortByCreatedAt = <T extends { createdAt: string }>(list: T[]) => [...list
   return rightTime - leftTime
 })
 
-const dashboards = computed(() => sortByCreatedAt(reportList.value.filter((item) => getReportScene(item) === 'dashboard')))
 const screens = computed(() => sortByCreatedAt(reportList.value.filter((item) => getReportScene(item) === 'screen')))
-const publishedReportCount = computed(() => reportList.value.filter((item) => getPublishStatus(item) === 'PUBLISHED').length)
+const publishedReportCount = computed(() => screens.value.filter((item) => getPublishStatus(item) === 'PUBLISHED').length)
 const publishProgress = computed(() => {
-  if (!reportList.value.length) return 0
-  return Math.round((publishedReportCount.value / reportList.value.length) * 100)
+  if (!screens.value.length) return 0
+  return Math.round((publishedReportCount.value / screens.value.length) * 100)
 })
 
 const primaryAction = computed(() => {
@@ -324,7 +293,7 @@ const primaryAction = computed(() => {
   if (latestDraftScreen) {
     return { label: '继续编辑最近大屏', path: `/home/screen/edit/${latestDraftScreen.id}` }
   }
-  return { label: '进入仪表板工作区', path: '/home/dashboard' }
+  return { label: '进入数据大屏工作区', path: '/home/screen' }
 })
 
 const summaryMetrics = computed(() => [
@@ -347,16 +316,10 @@ const summaryMetrics = computed(() => [
     note: chartList.value.length ? '图表模板已可复用' : '还没有完成图表设计',
   },
   {
-    label: '仪表板',
-    kicker: '业务视图',
-    value: dashboards.value.length,
-    note: dashboards.value.length ? `${dashboards.value.filter((item) => getPublishStatus(item) === 'PUBLISHED').length} 个已发布` : '尚未形成分析看板',
-  },
-  {
     label: '数据大屏',
     kicker: '展示层',
     value: screens.value.length,
-    note: screens.value.length ? `${screens.value.filter((item) => Boolean(getCoverUrl(item))).length} 个已生成封面` : '尚未搭建展示大屏',
+    note: screens.value.length ? `${publishedReportCount.value} 个已发布` : '尚未搭建展示大屏',
   },
 ])
 
@@ -375,15 +338,15 @@ const onboardingSteps = computed(() => [
   },
   {
     label: '完成图表设计与组件装配',
-    tip: chartList.value.length ? `${chartList.value.length} 个图表组件已创建` : '先设计图表组件，再进入仪表板或大屏',
+    tip: chartList.value.length ? `${chartList.value.length} 个图表组件已创建` : '先设计图表组件，再进入数据大屏',
     done: chartList.value.length > 0,
     path: '/home/prepare/components',
   },
   {
     label: '发布至少一个报告',
-    tip: publishedReportCount.value ? `${publishedReportCount.value} 个报告已发布` : '让仪表板或大屏真正进入可分享状态',
+    tip: publishedReportCount.value ? `${publishedReportCount.value} 个数据大屏已发布` : '让数据大屏真正进入可分享状态',
     done: publishedReportCount.value > 0,
-    path: screens.value.length ? '/home/screen' : '/home/dashboard',
+    path: '/home/screen',
   },
 ])
 
@@ -411,13 +374,6 @@ const quickActions = computed<QuickAction[]>(() => ([
     description: '进入组件设计页面，沉淀图表资产供后续复用',
     stat: `${chartList.value.length} 个图表`,
     path: '/home/prepare/components',
-  },
-  {
-    key: 'dashboard',
-    title: '管理仪表板',
-    description: '查看仪表板布局、发布状态和组件构成',
-    stat: `${dashboards.value.length} 个仪表板`,
-    path: '/home/dashboard',
   },
   {
     key: 'screen',
@@ -451,22 +407,23 @@ const recentAssets = computed<WorkspaceAsset[]>(() => {
     path: '/home/prepare/dataset',
   }))
 
-  const reportAssets: WorkspaceAsset[] = reportList.value.map((item) => ({
-    id: `${getReportScene(item)}-${item.id}`,
-    name: item.name,
-    typeLabel: getReportScene(item) === 'screen' ? '数据大屏' : '仪表板',
-    secondary: `${getComponentCount(item.id)} 个组件 · ${getCanvasLabel(item)}`,
-    createdAt: item.createdAt,
-    statusLabel: getPublishStatus(item) === 'PUBLISHED' ? '已发布' : '草稿',
-    statusType: getPublishStatus(item) === 'PUBLISHED' ? 'success' : 'warning',
-    path: getReportScene(item) === 'screen' ? `/home/screen/edit/${item.id}` : `/home/dashboard/edit/${item.id}`,
-  }))
+  const reportAssets: WorkspaceAsset[] = reportList.value
+    .filter((item) => getReportScene(item) === 'screen')
+    .map((item) => ({
+      id: `screen-${item.id}`,
+      name: item.name,
+      typeLabel: '数据大屏',
+      secondary: `${getComponentCount(item.id)} 个组件 · ${getCanvasLabel(item)}`,
+      createdAt: item.createdAt,
+      statusLabel: getPublishStatus(item) === 'PUBLISHED' ? '已发布' : '草稿',
+      statusType: getPublishStatus(item) === 'PUBLISHED' ? 'success' : 'warning',
+      path: `/home/screen/edit/${item.id}`,
+    }))
 
   return sortByCreatedAt([...datasourceAssets, ...datasetAssets, ...reportAssets]).slice(0, 8)
 })
 
 const recentScreens = computed(() => screens.value.slice(0, 3))
-const recentDashboards = computed(() => dashboards.value.slice(0, 5))
 
 const formatDate = (value?: string) => {
   if (!value) return '刚刚'
@@ -482,10 +439,6 @@ const formatDate = (value?: string) => {
 
 const goTo = (path: string) => {
   router.push(path)
-}
-
-const openDashboard = (id: number) => {
-  router.push(`/home/dashboard/edit/${id}`)
 }
 
 const openScreen = (id: number) => {
@@ -881,8 +834,7 @@ onMounted(loadData)
   color: #7790ac;
 }
 
-.spotlight-list,
-.dashboard-list {
+.spotlight-list {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -933,32 +885,16 @@ onMounted(loadData)
   gap: 12px;
 }
 
-.spotlight-name,
-.dashboard-name {
+.spotlight-name {
   font-size: 16px;
   font-weight: 600;
   color: #173255;
 }
 
 .spotlight-meta,
-.spotlight-time,
-.dashboard-meta {
+.spotlight-time {
   font-size: 13px;
   color: #6f86a3;
-}
-
-.dashboard-item {
-  width: 100%;
-  padding: 15px 16px;
-  border-radius: 18px;
-  border: 1px solid #dde7f2;
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  cursor: pointer;
-  text-align: left;
 }
 
 @media (max-width: 1280px) {
@@ -1001,7 +937,6 @@ onMounted(loadData)
 
   .hero-actions,
   .asset-item,
-  .dashboard-item,
   .spotlight-head,
   .section-head {
     flex-direction: column;

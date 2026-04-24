@@ -5,8 +5,6 @@ import { flattenAuthMenus, getAuthMenus, getAuthRole, hasAuthSession, saveAuthMe
 
 const LoginView = () => import('../views/LoginView.vue')
 const HomeView = () => import('../views/HomeView.vue')
-const DashboardView = () => import('../views/DashboardView.vue')
-const DashboardEditorView = () => import('../views/DashboardEditorView.vue')
 const DataScreenView = () => import('../views/DataScreenView.vue')
 const ScreenEditorView = () => import('../views/ScreenEditorView.vue')
 const BIPublishView = () => import('../views/BIPublishView.vue')
@@ -21,8 +19,6 @@ const router = createRouter({
     { path: '/', redirect: '/login' },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/home', name: 'home', component: HomeView, meta: { requiresAuth: true } },
-    { path: '/home/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true } },
-    { path: '/home/dashboard/edit/:id', name: 'dashboard-edit', component: DashboardEditorView, meta: { requiresAuth: true } },
     { path: '/home/screen', name: 'screen', component: DataScreenView, meta: { requiresAuth: true } },
     { path: '/home/screen/edit/:id', name: 'screen-edit', component: ScreenEditorView, meta: { requiresAuth: true } },
     { path: '/home/publish/groups', name: 'publish-groups', component: BIPublishView, meta: { requiresAuth: true } },

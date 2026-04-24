@@ -262,7 +262,6 @@ VALUES ('茶饮经营分析', '{"scene":"dashboard","publish":{"status":"DRAFT",
 INSERT INTO sys_menu(name, path, component, parent_id, type, permission, icon, sort, visible, dashboard_id)
 VALUES
 ('工作台', '/home', 'HomeView', NULL, 'menu', 'workbench:view', 'House', 10, 1, NULL),
-('仪表板', '/home/dashboard', 'DashboardView', NULL, 'menu', 'dashboard:view', 'DataBoard', 20, 1, 1),
 ('数据大屏', '/home/screen', 'DataScreenView', NULL, 'menu', 'screen:view', 'Monitor', 30, 1, 1),
 ('BI发布平台', '', 'BIPublishView', NULL, 'catalog', 'publish:view', 'Promotion', 35, 1, NULL),
 ('数据准备', '/home/prepare', 'DataPrepareView', NULL, 'menu', 'dataset:view', 'Collection', 40, 1, NULL),
@@ -343,7 +342,7 @@ WHERE r.name = 'ADMIN';
 INSERT INTO sys_role_menu(role_id, menu_id)
 SELECT r.id, m.id
 FROM sys_role r
-INNER JOIN sys_menu m ON m.path IN ('/home', '/home/dashboard', '/home/screen', '/home/prepare', '/home/modeling')
+INNER JOIN sys_menu m ON m.path IN ('/home', '/home/screen', '/home/prepare', '/home/modeling')
 WHERE r.name = 'ANALYST';
 
 INSERT INTO sys_role_menu(role_id, menu_id)
@@ -361,7 +360,7 @@ WHERE r.name = 'ANALYST';
 INSERT INTO sys_role_menu(role_id, menu_id)
 SELECT r.id, m.id
 FROM sys_role r
-INNER JOIN sys_menu m ON m.path IN ('/home', '/home/dashboard', '/home/screen')
+INNER JOIN sys_menu m ON m.path IN ('/home', '/home/screen')
 WHERE r.name = 'VIEWER';
 
 INSERT INTO sys_role_menu(role_id, menu_id)

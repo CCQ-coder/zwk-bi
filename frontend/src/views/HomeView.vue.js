@@ -51,13 +51,12 @@ const sortByCreatedAt = (list) => [...list].sort((left, right) => {
     const rightTime = new Date(right.createdAt || 0).getTime();
     return rightTime - leftTime;
 });
-const dashboards = computed(() => sortByCreatedAt(reportList.value.filter((item) => getReportScene(item) === 'dashboard')));
 const screens = computed(() => sortByCreatedAt(reportList.value.filter((item) => getReportScene(item) === 'screen')));
-const publishedReportCount = computed(() => reportList.value.filter((item) => getPublishStatus(item) === 'PUBLISHED').length);
+const publishedReportCount = computed(() => screens.value.filter((item) => getPublishStatus(item) === 'PUBLISHED').length);
 const publishProgress = computed(() => {
-    if (!reportList.value.length)
+    if (!screens.value.length)
         return 0;
-    return Math.round((publishedReportCount.value / reportList.value.length) * 100);
+    return Math.round((publishedReportCount.value / screens.value.length) * 100);
 });
 const primaryAction = computed(() => {
     if (!datasourceList.value.length) {
@@ -70,7 +69,7 @@ const primaryAction = computed(() => {
     if (latestDraftScreen) {
         return { label: '继续编辑最近大屏', path: `/home/screen/edit/${latestDraftScreen.id}` };
     }
-    return { label: '进入仪表板工作区', path: '/home/dashboard' };
+    return { label: '进入数据大屏工作区', path: '/home/screen' };
 });
 const summaryMetrics = computed(() => [
     {
@@ -92,16 +91,10 @@ const summaryMetrics = computed(() => [
         note: chartList.value.length ? '图表模板已可复用' : '还没有完成图表设计',
     },
     {
-        label: '仪表板',
-        kicker: '业务视图',
-        value: dashboards.value.length,
-        note: dashboards.value.length ? `${dashboards.value.filter((item) => getPublishStatus(item) === 'PUBLISHED').length} 个已发布` : '尚未形成分析看板',
-    },
-    {
         label: '数据大屏',
         kicker: '展示层',
         value: screens.value.length,
-        note: screens.value.length ? `${screens.value.filter((item) => Boolean(getCoverUrl(item))).length} 个已生成封面` : '尚未搭建展示大屏',
+        note: screens.value.length ? `${publishedReportCount.value} 个已发布` : '尚未搭建展示大屏',
     },
 ]);
 const onboardingSteps = computed(() => [
@@ -119,15 +112,15 @@ const onboardingSteps = computed(() => [
     },
     {
         label: '完成图表设计与组件装配',
-        tip: chartList.value.length ? `${chartList.value.length} 个图表组件已创建` : '先设计图表组件，再进入仪表板或大屏',
+        tip: chartList.value.length ? `${chartList.value.length} 个图表组件已创建` : '先设计图表组件，再进入数据大屏',
         done: chartList.value.length > 0,
         path: '/home/prepare/components',
     },
     {
         label: '发布至少一个报告',
-        tip: publishedReportCount.value ? `${publishedReportCount.value} 个报告已发布` : '让仪表板或大屏真正进入可分享状态',
+        tip: publishedReportCount.value ? `${publishedReportCount.value} 个数据大屏已发布` : '让数据大屏真正进入可分享状态',
         done: publishedReportCount.value > 0,
-        path: screens.value.length ? '/home/screen' : '/home/dashboard',
+        path: '/home/screen',
     },
 ]);
 const completedOnboardingCount = computed(() => onboardingSteps.value.filter((item) => item.done).length);
@@ -153,13 +146,6 @@ const quickActions = computed(() => ([
         description: '进入组件设计页面，沉淀图表资产供后续复用',
         stat: `${chartList.value.length} 个图表`,
         path: '/home/prepare/components',
-    },
-    {
-        key: 'dashboard',
-        title: '管理仪表板',
-        description: '查看仪表板布局、发布状态和组件构成',
-        stat: `${dashboards.value.length} 个仪表板`,
-        path: '/home/dashboard',
     },
     {
         key: 'screen',
@@ -190,20 +176,21 @@ const recentAssets = computed(() => {
         statusType: 'success',
         path: '/home/prepare/dataset',
     }));
-    const reportAssets = reportList.value.map((item) => ({
-        id: `${getReportScene(item)}-${item.id}`,
+    const reportAssets = reportList.value
+        .filter((item) => getReportScene(item) === 'screen')
+        .map((item) => ({
+        id: `screen-${item.id}`,
         name: item.name,
-        typeLabel: getReportScene(item) === 'screen' ? '数据大屏' : '仪表板',
+        typeLabel: '数据大屏',
         secondary: `${getComponentCount(item.id)} 个组件 · ${getCanvasLabel(item)}`,
         createdAt: item.createdAt,
         statusLabel: getPublishStatus(item) === 'PUBLISHED' ? '已发布' : '草稿',
         statusType: getPublishStatus(item) === 'PUBLISHED' ? 'success' : 'warning',
-        path: getReportScene(item) === 'screen' ? `/home/screen/edit/${item.id}` : `/home/dashboard/edit/${item.id}`,
+        path: `/home/screen/edit/${item.id}`,
     }));
     return sortByCreatedAt([...datasourceAssets, ...datasetAssets, ...reportAssets]).slice(0, 8);
 });
 const recentScreens = computed(() => screens.value.slice(0, 3));
-const recentDashboards = computed(() => dashboards.value.slice(0, 5));
 const formatDate = (value) => {
     if (!value)
         return '刚刚';
@@ -219,9 +206,6 @@ const formatDate = (value) => {
 };
 const goTo = (path) => {
     router.push(path);
-};
-const openDashboard = (id) => {
-    router.push(`/home/dashboard/edit/${id}`);
 };
 const openScreen = (id) => {
     router.push(`/home/screen/edit/${id}`);
@@ -262,7 +246,6 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['metric-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['asset-item']} */ ;
-/** @type {__VLS_StyleScopedClasses['dashboard-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['spotlight-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['asset-meta']} */ ;
@@ -382,7 +365,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "highlight-meta" },
 });
-(__VLS_ctx.reportList.length);
+(__VLS_ctx.screens.length);
 const __VLS_27 = {}.ElProgress;
 /** @type {[typeof __VLS_components.ElProgress, typeof __VLS_components.elProgress, ]} */ ;
 // @ts-ignore
@@ -795,104 +778,6 @@ else {
     }, ...__VLS_functionalComponentArgsRest(__VLS_76));
 }
 var __VLS_62;
-const __VLS_79 = {}.ElCard;
-/** @type {[typeof __VLS_components.ElCard, typeof __VLS_components.elCard, typeof __VLS_components.ElCard, typeof __VLS_components.elCard, ]} */ ;
-// @ts-ignore
-const __VLS_80 = __VLS_asFunctionalComponent(__VLS_79, new __VLS_79({
-    ...{ class: "surface-card" },
-    shadow: "never",
-}));
-const __VLS_81 = __VLS_80({
-    ...{ class: "surface-card" },
-    shadow: "never",
-}, ...__VLS_functionalComponentArgsRest(__VLS_80));
-__VLS_82.slots.default;
-{
-    const { header: __VLS_thisSlot } = __VLS_82.slots;
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-head" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-title" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-subtitle" },
-    });
-    const __VLS_83 = {}.ElButton;
-    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-    // @ts-ignore
-    const __VLS_84 = __VLS_asFunctionalComponent(__VLS_83, new __VLS_83({
-        ...{ 'onClick': {} },
-        link: true,
-    }));
-    const __VLS_85 = __VLS_84({
-        ...{ 'onClick': {} },
-        link: true,
-    }, ...__VLS_functionalComponentArgsRest(__VLS_84));
-    let __VLS_87;
-    let __VLS_88;
-    let __VLS_89;
-    const __VLS_90 = {
-        onClick: (...[$event]) => {
-            __VLS_ctx.goTo('/home/dashboard');
-        }
-    };
-    __VLS_86.slots.default;
-    var __VLS_86;
-}
-if (__VLS_ctx.recentDashboards.length) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "dashboard-list" },
-    });
-    for (const [dashboard] of __VLS_getVForSourceType((__VLS_ctx.recentDashboards))) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-            ...{ onClick: (...[$event]) => {
-                    if (!(__VLS_ctx.recentDashboards.length))
-                        return;
-                    __VLS_ctx.openDashboard(dashboard.id);
-                } },
-            key: (dashboard.id),
-            ...{ class: "dashboard-item" },
-        });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "dashboard-name" },
-        });
-        (dashboard.name);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "dashboard-meta" },
-        });
-        (__VLS_ctx.getComponentCount(dashboard.id));
-        (__VLS_ctx.formatDate(dashboard.createdAt));
-        const __VLS_91 = {}.ElTag;
-        /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
-        // @ts-ignore
-        const __VLS_92 = __VLS_asFunctionalComponent(__VLS_91, new __VLS_91({
-            size: "small",
-            type: (__VLS_ctx.getPublishStatus(dashboard) === 'PUBLISHED' ? 'success' : 'info'),
-        }));
-        const __VLS_93 = __VLS_92({
-            size: "small",
-            type: (__VLS_ctx.getPublishStatus(dashboard) === 'PUBLISHED' ? 'success' : 'info'),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_92));
-        __VLS_94.slots.default;
-        (__VLS_ctx.getPublishStatus(dashboard) === 'PUBLISHED' ? '已发布' : '草稿');
-        var __VLS_94;
-    }
-}
-else {
-    const __VLS_95 = {}.ElEmpty;
-    /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
-    // @ts-ignore
-    const __VLS_96 = __VLS_asFunctionalComponent(__VLS_95, new __VLS_95({
-        description: "还没有仪表板，先去添加图表组件",
-    }));
-    const __VLS_97 = __VLS_96({
-        description: "还没有仪表板，先去添加图表组件",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_96));
-}
-var __VLS_82;
 /** @type {__VLS_StyleScopedClasses['workbench-page']} */ ;
 /** @type {__VLS_StyleScopedClasses['workbench-main']} */ ;
 /** @type {__VLS_StyleScopedClasses['hero-card']} */ ;
@@ -964,21 +849,12 @@ var __VLS_82;
 /** @type {__VLS_StyleScopedClasses['spotlight-name']} */ ;
 /** @type {__VLS_StyleScopedClasses['spotlight-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['spotlight-time']} */ ;
-/** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-subtitle']} */ ;
-/** @type {__VLS_StyleScopedClasses['dashboard-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['dashboard-item']} */ ;
-/** @type {__VLS_StyleScopedClasses['dashboard-name']} */ ;
-/** @type {__VLS_StyleScopedClasses['dashboard-meta']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             TopNavBar: TopNavBar,
             loading: loading,
-            reportList: reportList,
             displayName: displayName,
             userId: userId,
             avatarText: avatarText,
@@ -986,6 +862,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             getCoverUrl: getCoverUrl,
             getCanvasLabel: getCanvasLabel,
             getComponentCount: getComponentCount,
+            screens: screens,
             publishedReportCount: publishedReportCount,
             publishProgress: publishProgress,
             primaryAction: primaryAction,
@@ -996,10 +873,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             quickActions: quickActions,
             recentAssets: recentAssets,
             recentScreens: recentScreens,
-            recentDashboards: recentDashboards,
             formatDate: formatDate,
             goTo: goTo,
-            openDashboard: openDashboard,
             openScreen: openScreen,
         };
     },
