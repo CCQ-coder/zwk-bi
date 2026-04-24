@@ -331,11 +331,21 @@ const buildXYGroupDescription = (
 
 export const isBarFamilyChartType = (chartType: string) => chartType.startsWith('bar')
 
-export const getChartFieldLabels = (chartType: string) => ({
-  x: isBarFamilyChartType(chartType) ? 'X轴字段' : '维度字段',
-  y: isBarFamilyChartType(chartType) ? 'Y轴字段' : '度量字段',
-  group: '分组字段',
-})
+export const getChartFieldLabels = (chartType: string) => {
+  if (chartType === 'iframe_single') {
+    return {
+      x: 'src字段',
+      y: '度量字段',
+      group: '分组字段',
+    }
+  }
+
+  return {
+    x: isBarFamilyChartType(chartType) ? 'X轴字段' : '维度字段',
+    y: isBarFamilyChartType(chartType) ? 'Y轴字段' : '度量字段',
+    group: '分组字段',
+  }
+}
 
 export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   bar: {
@@ -823,43 +833,48 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   },
   decor_border_frame: {
     ...STATIC_NO_FIELD_META,
-    label: '边框装饰',
+    label: '边框1',
     description: '基础外框装饰，适合承载标题区和模块边界。',
   },
   decor_border_corner: {
     ...STATIC_NO_FIELD_META,
-    label: '角标边框',
+    label: '边框2',
     description: '带角标强调的边框装饰，适合重点模块。',
   },
   decor_border_glow: {
     ...STATIC_NO_FIELD_META,
-    label: '霓虹边框',
+    label: '边框3',
     description: '带发光效果的边框装饰，适合深色大屏。',
   },
   decor_border_grid: {
     ...STATIC_NO_FIELD_META,
-    label: '网格边框',
+    label: '边框4',
     description: '包含刻度与网格肌理的装饰边框。',
   },
   decor_border_stream: {
     ...STATIC_NO_FIELD_META,
-    label: '流光边框',
+    label: '边框5',
     description: '带流光扫过效果的边框装饰。',
   },
   decor_border_pulse: {
     ...STATIC_NO_FIELD_META,
-    label: '脉冲边框',
+    label: '边框6',
     description: '带节奏脉冲效果的高亮边框。',
   },
   decor_border_bracket: {
     ...STATIC_NO_FIELD_META,
-    label: '支架边框',
+    label: '边框7',
     description: '强调结构边界的支架式边框装饰。',
   },
   decor_border_circuit: {
     ...STATIC_NO_FIELD_META,
-    label: '电路边框',
+    label: '边框8',
     description: '适合科技主题大屏的链路式边框装饰。',
+  },
+  decor_border_panel: {
+    ...STATIC_NO_FIELD_META,
+    label: '边框9',
+    description: '适合信息卡片与面板容器的折角边框装饰。',
   },
   decor_title_plate: {
     ...STATIC_NO_FIELD_META,
@@ -909,7 +924,8 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   iframe_single: {
     ...STATIC_NO_FIELD_META,
     label: 'iframe窗口',
-    description: '嵌入单个外部页面或业务系统窗口。',
+    description: '嵌入单个外部页面或业务系统窗口，可选绑定 src 字段动态读取 URL。',
+    allowsOptionalDimension: true,
   },
   iframe_tabs: {
     ...STATIC_NO_FIELD_META,
@@ -959,7 +975,7 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
   icon_arrow_trend: {
     ...STATIC_NO_FIELD_META,
     label: '趋势箭头',
-    description: '用于表达上涨、增长和方向趋势的矢量图标。',
+    description: '用于表达上涨、增长和方向趋势的小装饰图标。',
   },
   icon_warning_badge: {
     ...STATIC_NO_FIELD_META,
@@ -985,6 +1001,86 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
     ...STATIC_NO_FIELD_META,
     label: '图表标识',
     description: '用于概括图表、指标和分析模块。',
+  },
+  icon_plus: {
+    ...STATIC_NO_FIELD_META,
+    label: '加号',
+    description: '用于新增入口和正向叠加提示。',
+  },
+  icon_minus: {
+    ...STATIC_NO_FIELD_META,
+    label: '减号',
+    description: '用于折叠、收起和减弱提示。',
+  },
+  icon_search: {
+    ...STATIC_NO_FIELD_META,
+    label: '搜索',
+    description: '用于检索、放大和定位内容。',
+  },
+  icon_focus_frame: {
+    ...STATIC_NO_FIELD_META,
+    label: '聚焦框',
+    description: '用于强调选中区域和聚焦边界。',
+  },
+  icon_home_badge: {
+    ...STATIC_NO_FIELD_META,
+    label: '主页',
+    description: '用于门户入口和首页标识。',
+  },
+  icon_share_nodes: {
+    ...STATIC_NO_FIELD_META,
+    label: '分享',
+    description: '用于分享传播和节点连接提示。',
+  },
+  icon_link_chain: {
+    ...STATIC_NO_FIELD_META,
+    label: '链接',
+    description: '用于链接跳转和链路关系提示。',
+  },
+  icon_message_chat: {
+    ...STATIC_NO_FIELD_META,
+    label: '消息',
+    description: '用于评论、沟通和消息提醒。',
+  },
+  icon_eye_watch: {
+    ...STATIC_NO_FIELD_META,
+    label: '可视',
+    description: '用于查看状态和内容可见提示。',
+  },
+  icon_lock_safe: {
+    ...STATIC_NO_FIELD_META,
+    label: '锁定',
+    description: '用于权限、安全和锁定态提示。',
+  },
+  icon_bell_notice: {
+    ...STATIC_NO_FIELD_META,
+    label: '铃铛',
+    description: '用于通知、提醒和告警入口。',
+  },
+  icon_user_profile: {
+    ...STATIC_NO_FIELD_META,
+    label: '用户',
+    description: '用于成员、账号和身份提示。',
+  },
+  icon_check_mark: {
+    ...STATIC_NO_FIELD_META,
+    label: '勾选',
+    description: '用于通过、完成和确认状态。',
+  },
+  icon_alert_mark: {
+    ...STATIC_NO_FIELD_META,
+    label: '提醒',
+    description: '用于异常、注意和提示状态。',
+  },
+  icon_close_mark: {
+    ...STATIC_NO_FIELD_META,
+    label: '关闭',
+    description: '用于关闭、移除和取消动作。',
+  },
+  icon_settings_gear: {
+    ...STATIC_NO_FIELD_META,
+    label: '设置',
+    description: '用于系统设置和参数配置入口。',
   },
 }
 
@@ -1013,7 +1109,7 @@ export const TABLE_LIKE_CHART_TYPES = new Set(['table', 'table_summary', 'table_
 
 export const DECORATION_CHART_TYPES = new Set([
   'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
-  'decor_border_stream', 'decor_border_pulse', 'decor_border_bracket', 'decor_border_circuit',
+  'decor_border_stream', 'decor_border_pulse', 'decor_border_bracket', 'decor_border_circuit', 'decor_border_panel',
   'decor_title_plate', 'decor_divider_glow', 'decor_target_ring', 'decor_scan_panel', 'decor_hex_badge',
 ])
 
@@ -1025,6 +1121,9 @@ export const TEXT_WIDGET_CHART_TYPES = new Set([
 
 export const VECTOR_ICON_CHART_TYPES = new Set([
   'icon_arrow_trend', 'icon_warning_badge', 'icon_location_pin', 'icon_data_signal', 'icon_user_badge', 'icon_chart_mark',
+  'icon_plus', 'icon_minus', 'icon_search', 'icon_focus_frame', 'icon_home_badge', 'icon_share_nodes',
+  'icon_link_chain', 'icon_message_chat', 'icon_eye_watch', 'icon_lock_safe', 'icon_bell_notice', 'icon_user_profile',
+  'icon_check_mark', 'icon_alert_mark', 'icon_close_mark', 'icon_settings_gear',
 ])
 
 export const PURE_STATIC_CHART_TYPES = new Set([
@@ -1525,14 +1624,15 @@ export const chartTypeLabel = (type: string) => ({
   heatmap: '热力图',
   map: '地图',
   filter_button: '筛选按钮',
-  decor_border_frame: '边框装饰',
-  decor_border_corner: '角标边框',
-  decor_border_glow: '霓虹边框',
-  decor_border_grid: '网格边框',
-  decor_border_stream: '流光边框',
-  decor_border_pulse: '脉冲边框',
-  decor_border_bracket: '支架边框',
-  decor_border_circuit: '电路边框',
+  decor_border_frame: '边框1',
+  decor_border_corner: '边框2',
+  decor_border_glow: '边框3',
+  decor_border_grid: '边框4',
+  decor_border_stream: '边框5',
+  decor_border_pulse: '边框6',
+  decor_border_bracket: '边框7',
+  decor_border_circuit: '边框8',
+  decor_border_panel: '边框9',
   decor_title_plate: '标题牌',
   decor_divider_glow: '发光分隔条',
   decor_target_ring: '目标环',
@@ -1558,6 +1658,22 @@ export const chartTypeLabel = (type: string) => ({
   icon_data_signal: '数据信号',
   icon_user_badge: '用户徽标',
   icon_chart_mark: '图表标识',
+  icon_plus: '加号',
+  icon_minus: '减号',
+  icon_search: '搜索',
+  icon_focus_frame: '聚焦框',
+  icon_home_badge: '主页',
+  icon_share_nodes: '分享',
+  icon_link_chain: '链接',
+  icon_message_chat: '消息',
+  icon_eye_watch: '可视',
+  icon_lock_safe: '锁定',
+  icon_bell_notice: '铃铛',
+  icon_user_profile: '用户',
+  icon_check_mark: '勾选',
+  icon_alert_mark: '提醒',
+  icon_close_mark: '关闭',
+  icon_settings_gear: '设置',
 }[type] ?? (type || '未知类型'))
 
 const sumValues = (left: unknown, right: unknown) => {

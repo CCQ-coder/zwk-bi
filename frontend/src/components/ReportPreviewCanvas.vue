@@ -400,10 +400,16 @@ const showFilterPanelOutside = computed(() => !isImmersiveScreen.value && filter
 const showFilterPanelInside = computed(() => isImmersiveScreen.value && filterDefinitions.value.length && !hasFilterButtons.value)
 
 const normalizeLayout = (component: DashboardComponent) => {
-  if (component.width <= 24) component.width = Math.max(MIN_CARD_WIDTH, component.width * LEGACY_GRID_COL_PX)
-  if (component.height <= 12) component.height = Math.max(MIN_CARD_HEIGHT, component.height * LEGACY_GRID_ROW_PX)
-  if (component.posX <= 24 && component.width > 24) component.posX = component.posX * LEGACY_GRID_COL_PX
-  if (component.posY <= 24 && component.height > 12) component.posY = component.posY * LEGACY_GRID_ROW_PX
+  const rawWidth = Number(component.width) || 0
+  const rawHeight = Number(component.height) || 0
+  const isLegacyGridLayout = rawWidth > 0 && rawHeight > 0 && (rawWidth <= 24 || rawHeight <= 12)
+
+  if (isLegacyGridLayout) {
+    if (rawWidth <= 24) component.width = Math.max(MIN_CARD_WIDTH, rawWidth * LEGACY_GRID_COL_PX)
+    if (rawHeight <= 12) component.height = Math.max(MIN_CARD_HEIGHT, rawHeight * LEGACY_GRID_ROW_PX)
+    if ((Number(component.posX) || 0) <= 24) component.posX = (Number(component.posX) || 0) * LEGACY_GRID_COL_PX
+    if ((Number(component.posY) || 0) <= 24) component.posY = (Number(component.posY) || 0) * LEGACY_GRID_ROW_PX
+  }
 
   component.posX = Math.max(0, Number(component.posX) || 0)
   component.posY = Math.max(0, Number(component.posY) || 0)

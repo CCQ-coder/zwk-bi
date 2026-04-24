@@ -46,14 +46,15 @@ const chartTypeGroups = [
     {
         label: '装饰组件',
         items: [
-            { label: '边框装饰', value: 'decor_border_frame' },
-            { label: '角标边框', value: 'decor_border_corner' },
-            { label: '霓虹边框', value: 'decor_border_glow' },
-            { label: '网格边框', value: 'decor_border_grid' },
-            { label: '流光边框', value: 'decor_border_stream' },
-            { label: '脉冲边框', value: 'decor_border_pulse' },
-            { label: '支架边框', value: 'decor_border_bracket' },
-            { label: '电路边框', value: 'decor_border_circuit' },
+            { label: '边框1', value: 'decor_border_frame' },
+            { label: '边框2', value: 'decor_border_corner' },
+            { label: '边框3', value: 'decor_border_glow' },
+            { label: '边框4', value: 'decor_border_grid' },
+            { label: '边框5', value: 'decor_border_stream' },
+            { label: '边框6', value: 'decor_border_pulse' },
+            { label: '边框7', value: 'decor_border_bracket' },
+            { label: '边框8', value: 'decor_border_circuit' },
+            { label: '边框9', value: 'decor_border_panel' },
             { label: '标题牌', value: 'decor_title_plate' },
             { label: '发光分隔条', value: 'decor_divider_glow' },
             { label: '目标环', value: 'decor_target_ring' },
@@ -81,7 +82,7 @@ const chartTypeGroups = [
         ],
     },
     {
-        label: '矢量图标组件',
+        label: '小装饰',
         items: [
             { label: '趋势箭头图标', value: 'icon_arrow_trend' },
             { label: '预警图标', value: 'icon_warning_badge' },
@@ -89,6 +90,22 @@ const chartTypeGroups = [
             { label: '数据信号图标', value: 'icon_data_signal' },
             { label: '用户徽章图标', value: 'icon_user_badge' },
             { label: '图表标记图标', value: 'icon_chart_mark' },
+            { label: '加号', value: 'icon_plus' },
+            { label: '减号', value: 'icon_minus' },
+            { label: '搜索', value: 'icon_search' },
+            { label: '聚焦框', value: 'icon_focus_frame' },
+            { label: '主页', value: 'icon_home_badge' },
+            { label: '分享', value: 'icon_share_nodes' },
+            { label: '链接', value: 'icon_link_chain' },
+            { label: '消息', value: 'icon_message_chat' },
+            { label: '可视', value: 'icon_eye_watch' },
+            { label: '锁定', value: 'icon_lock_safe' },
+            { label: '铃铛', value: 'icon_bell_notice' },
+            { label: '用户', value: 'icon_user_profile' },
+            { label: '勾选', value: 'icon_check_mark' },
+            { label: '提醒', value: 'icon_alert_mark' },
+            { label: '关闭', value: 'icon_close_mark' },
+            { label: '设置', value: 'icon_settings_gear' },
         ],
     },
 ];
@@ -190,7 +207,7 @@ const componentKindLabel = computed(() => ({
     metric: '指标组件',
     content: '信息组件',
     decoration: '装饰组件',
-    icon: '矢量图标',
+    icon: '小装饰',
     control: '筛选控件',
 }[componentKind.value]));
 const componentKindDescription = computed(() => {
@@ -204,7 +221,7 @@ const componentKindDescription = computed(() => {
         case 'decoration':
             return '装饰组件不参与取数，主要通过主题、边框、阴影与透明度塑造画面氛围。';
         case 'icon':
-            return '矢量图标不参与取数，只保留适合符号类组件的轮廓与光效设置。';
+            return '小装饰不参与取数，只保留适合符号类组件的轮廓与光效设置。';
         case 'control':
             return '筛选控件只保留筛选字段与默认值绑定，交互逻辑由全局筛选系统接管。';
         default:
@@ -425,6 +442,8 @@ const isBarFamilyComponentType = computed(() => isBarFamilyChartType(configForm.
 const dimensionFieldLabel = computed(() => {
     if (isFilterComponentType.value)
         return '筛选字段';
+    if (isIframeType.value)
+        return 'src字段';
     if (isMetricComponentType.value)
         return currentChartMeta.value.requiresDimension ? '标签字段' : '标签字段（可选）';
     return currentChartMeta.value.requiresDimension ? chartFieldLabels.value.x : `${chartFieldLabels.value.x}（可选）`;

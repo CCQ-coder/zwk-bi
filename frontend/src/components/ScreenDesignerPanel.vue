@@ -46,7 +46,7 @@
         <div class="lp-pane lp-pane--components">
           <div class="lp-pane-head">
             <div class="lp-pane-title">组件</div>
-            <div class="lp-pane-subtitle">图表组件、装饰组件、文字组件和矢量图标组件都在这里</div>
+            <div class="lp-pane-subtitle">图表组件、装饰组件、文字组件和小装饰都在这里</div>
           </div>
 
           <!-- 搜索栏 -->
@@ -79,7 +79,22 @@
                   @dragstart="onTypeChipDragStart($event, item.type)"
                   @dragend="onTypeChipDragEnd"
                 >
-                  <span class="lp-type-icon" v-html="item.svgIcon" />
+                  <span
+                    v-if="shouldUseTypeVisualPreview(item.type)"
+                    class="lp-type-visual"
+                    :class="{
+                      'lp-type-visual--decoration': isDecorationChartType(item.type),
+                      'lp-type-visual--icon': isVectorIconChartType(item.type),
+                    }"
+                  >
+                    <ComponentStaticPreview
+                      :chart-type="item.type"
+                      :chart-config="getTypeChipPreviewChartConfig(item.type)"
+                      :show-title="false"
+                      dark
+                    />
+                  </span>
+                  <span v-else class="lp-type-icon" v-html="item.svgIcon" />
                   <span class="lp-type-label">{{ item.label }}</span>
                 </div>
               </div>
@@ -805,6 +820,7 @@ import {
   isCanvasRenderableChartType,
   isDecorationChartType,
   isStaticWidgetChartType,
+  isVectorIconChartType,
   materializeChartData,
   mergeComponentRequestFilters,
   normalizeComponentAssetConfig,
@@ -872,6 +888,7 @@ const makeDecorDividerIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w
 const makeDecorTargetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".68"/><circle cx="20" cy="16" r="5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".4"/><path d="M20 4V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M20 22V28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 16H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M26 16H32" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
 const makeDecorScanIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="currentColor" opacity=".08" stroke="currentColor" stroke-width="1.4"/><path d="M9 12H31" stroke="currentColor" stroke-width="2" opacity=".72"/><path d="M9 18H31" stroke="currentColor" stroke-width="1" opacity=".32"/><path d="M9 24H23" stroke="currentColor" stroke-width="1" opacity=".22"/></svg>`
 const makeDecorHexIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M15 5H25L32 16L25 27H15L8 16Z" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="1.4"/><path d="M18 11H22L25 16L22 21H18L15 16Z" fill="currentColor" opacity=".55"/></svg>`
+const makeDecorPanelIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/><path d="M9 9H18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M24 9H31V16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M29 20V23H25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 const makeDecorStreamIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"/><path d="M8 10H24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 22H32" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".75"/></svg>`
 const makeDecorPulseIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="7" width="26" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".35"/><rect x="11" y="11" width="18" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".7"/></svg>`
 const makeDecorBracketIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M7 11V6H14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M33 11V6H26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M7 21V26H14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M33 21V26H26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`
@@ -974,6 +991,7 @@ const DECORATION_COMPONENT_ITEMS: ChartTypeItem[] = [
   createTypeItem('decor_border_pulse', makeDecorPulseIcon()),
   createTypeItem('decor_border_bracket', makeDecorBracketIcon()),
   createTypeItem('decor_border_circuit', makeDecorCircuitIcon()),
+  createTypeItem('decor_border_panel', makeDecorPanelIcon()),
   createTypeItem('decor_title_plate', makeDecorTitlePlateIcon()),
   createTypeItem('decor_divider_glow', makeDecorDividerIcon()),
   createTypeItem('decor_target_ring', makeDecorTargetIcon()),
@@ -1009,6 +1027,22 @@ const VECTOR_ICON_COMPONENT_ITEMS: ChartTypeItem[] = [
   createTypeItem('icon_data_signal', makeVectorGlyphIcon()),
   createTypeItem('icon_user_badge', makeVectorGlyphIcon()),
   createTypeItem('icon_chart_mark', makeVectorGlyphIcon()),
+  createTypeItem('icon_plus', makeVectorGlyphIcon()),
+  createTypeItem('icon_minus', makeVectorGlyphIcon()),
+  createTypeItem('icon_search', makeVectorGlyphIcon()),
+  createTypeItem('icon_focus_frame', makeVectorGlyphIcon()),
+  createTypeItem('icon_home_badge', makeVectorGlyphIcon()),
+  createTypeItem('icon_share_nodes', makeVectorGlyphIcon()),
+  createTypeItem('icon_link_chain', makeVectorGlyphIcon()),
+  createTypeItem('icon_message_chat', makeVectorGlyphIcon()),
+  createTypeItem('icon_eye_watch', makeVectorGlyphIcon()),
+  createTypeItem('icon_lock_safe', makeVectorGlyphIcon()),
+  createTypeItem('icon_bell_notice', makeVectorGlyphIcon()),
+  createTypeItem('icon_user_profile', makeVectorGlyphIcon()),
+  createTypeItem('icon_check_mark', makeVectorGlyphIcon()),
+  createTypeItem('icon_alert_mark', makeVectorGlyphIcon()),
+  createTypeItem('icon_close_mark', makeVectorGlyphIcon()),
+  createTypeItem('icon_settings_gear', makeVectorGlyphIcon()),
 ]
 
 const CHART_CATEGORIES: ChartCategory[] = [
@@ -1023,7 +1057,7 @@ const CHART_CATEGORIES: ChartCategory[] = [
   { label: '文字组件', types: TEXT_COMPONENT_ITEMS },
   { label: '媒体组件', types: MEDIA_COMPONENT_ITEMS },
   { label: '装饰组件', types: DECORATION_COMPONENT_ITEMS },
-  { label: '矢量图标组件', types: VECTOR_ICON_COMPONENT_ITEMS },
+  { label: '小装饰', types: VECTOR_ICON_COMPONENT_ITEMS },
 ]
 
 const CHART_TYPE_ICON_MAP = new Map(
@@ -1041,6 +1075,16 @@ const getAssetBadgeText = (type: string) => {
   if (isStaticWidgetChartType(type)) return '免数据'
   return '数据'
 }
+const shouldUseTypeVisualPreview = (type: string) => isDecorationChartType(type) || isVectorIconChartType(type)
+const _typeChipPreviewConfigCache = new Map<string, ReturnType<typeof buildChartSnapshot>>()
+const getTypeChipPreviewChartConfig = (type: string) => {
+  let cached = _typeChipPreviewConfigCache.get(type)
+  if (!cached) {
+    cached = buildChartSnapshot({ name: chartTypeLabel(type), chartType: type } as Chart)
+    _typeChipPreviewConfigCache.set(type, cached)
+  }
+  return cached
+}
 
 // 缓存模板/组件配置解析结果，避免 v-for 内多次 JSON.parse
 const _templateConfigCache = new WeakMap<ChartTemplate, ReturnType<typeof normalizeComponentAssetConfig>>()
@@ -1052,14 +1096,15 @@ const getTemplateAssetConfig = (template: ChartTemplate) => {
 const isTemplateStaticAsset = (template: ChartTemplate) => isStaticWidgetChartType(getTemplateAssetConfig(template).chart.chartType || template.chartType)
 
 const STATIC_TEMPLATE_LIBRARY: StaticAssetSeed[] = [
-  { type: 'decor_border_frame', name: '默认边框装饰', description: '适合用作区块包裹和背景版强调。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_corner', name: '角标边框', description: '四角强调型装饰边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_glow', name: '霓虹边框', description: '适合高亮核心指标区。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_grid', name: '网格边框', description: '适合信息密集型区域背景。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_stream', name: '流光边框', description: '适合做顶部主图和核心看板的动效边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_pulse', name: '脉冲边框', description: '适合做告警、重点指标和状态变化区域。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_bracket', name: '支架边框', description: '适合做模块边界与结构化布局。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_circuit', name: '电路边框', description: '适合做科技感数据区域和链路说明。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_frame', name: '边框1', description: '基础外框边界，适合做模块包裹。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_corner', name: '边框2', description: '四角强调型边框。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_glow', name: '边框3', description: '带发光效果的高亮边框。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_grid', name: '边框4', description: '带网格和刻度肌理的科技边框。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_stream', name: '边框5', description: '带流光扫过效果的动效边框。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_pulse', name: '边框6', description: '带脉冲感的提示边框。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_bracket', name: '边框7', description: '结构支架感边框。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_circuit', name: '边框8', description: '链路电路风格边框。', layout: { width: 520, height: 220 } },
+  { type: 'decor_border_panel', name: '边框9', description: '折角面板风格边框。', layout: { width: 520, height: 220 } },
   { type: 'decor_title_plate', name: '标题牌', description: '适合章节标题、指标模块抬头和栏位标识。', layout: { width: 420, height: 96 } },
   { type: 'decor_divider_glow', name: '发光分隔条', description: '适合区块之间的节奏分隔和视觉导向。', layout: { width: 520, height: 64 } },
   { type: 'decor_target_ring', name: '目标环', description: '适合重点指标、地图落点和雷达锁定效果。', layout: { width: 220, height: 220 } },
@@ -1085,6 +1130,22 @@ const STATIC_TEMPLATE_LIBRARY: StaticAssetSeed[] = [
   { type: 'icon_data_signal', name: '数据信号图标', description: '适合状态和联通性提示。', layout: { width: 220, height: 220 } },
   { type: 'icon_user_badge', name: '用户徽章图标', description: '适合人物、角色和身份展示。', layout: { width: 220, height: 220 } },
   { type: 'icon_chart_mark', name: '图表标记图标', description: '适合图例和图表注记。', layout: { width: 220, height: 220 } },
+  { type: 'icon_plus', name: '加号', description: '用于新增和叠加提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_minus', name: '减号', description: '用于收起和减弱提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_search', name: '搜索', description: '用于检索和放大提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_focus_frame', name: '聚焦框', description: '用于聚焦和框选区域提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_home_badge', name: '主页', description: '用于门户和首页标识。', layout: { width: 140, height: 140 } },
+  { type: 'icon_share_nodes', name: '分享', description: '用于分享传播和连接提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_link_chain', name: '链接', description: '用于链路与跳转提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_message_chat', name: '消息', description: '用于评论和消息提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_eye_watch', name: '可视', description: '用于可见状态和查看提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_lock_safe', name: '锁定', description: '用于权限和安全提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_bell_notice', name: '铃铛', description: '用于通知和提醒入口。', layout: { width: 140, height: 140 } },
+  { type: 'icon_user_profile', name: '用户', description: '用于用户身份标识。', layout: { width: 140, height: 140 } },
+  { type: 'icon_check_mark', name: '勾选', description: '用于通过和完成状态。', layout: { width: 140, height: 140 } },
+  { type: 'icon_alert_mark', name: '提醒', description: '用于警示和注意提示。', layout: { width: 140, height: 140 } },
+  { type: 'icon_close_mark', name: '关闭', description: '用于关闭和移除动作。', layout: { width: 140, height: 140 } },
+  { type: 'icon_settings_gear', name: '设置', description: '用于参数与系统设置入口。', layout: { width: 140, height: 140 } },
 ]
 
 const defaultChartTemplateLayout = (chartType: string) => {
@@ -1720,10 +1781,16 @@ const getDashboardComponentCount = (dashboardId: number) => dashboardCounts.valu
 const getDashboardCoverUrl = (dashboard: Dashboard) => normalizeCoverConfig(parseReportConfig(dashboard.configJson).cover).url
 
 const normalizeLayout = (component: DashboardComponent) => {
-  if (component.width <= 24) component.width = Math.max(MIN_CARD_WIDTH, component.width * LEGACY_GRID_COL_PX)
-  if (component.height <= 12) component.height = Math.max(MIN_CARD_HEIGHT, component.height * LEGACY_GRID_ROW_PX)
-  if (component.posX <= 24 && component.width > 24) component.posX = component.posX * LEGACY_GRID_COL_PX
-  if (component.posY <= 24 && component.height > 12) component.posY = component.posY * LEGACY_GRID_ROW_PX
+  const rawWidth = Number(component.width) || 0
+  const rawHeight = Number(component.height) || 0
+  const isLegacyGridLayout = rawWidth > 0 && rawHeight > 0 && (rawWidth <= 24 || rawHeight <= 12)
+
+  if (isLegacyGridLayout) {
+    if (rawWidth <= 24) component.width = Math.max(MIN_CARD_WIDTH, rawWidth * LEGACY_GRID_COL_PX)
+    if (rawHeight <= 12) component.height = Math.max(MIN_CARD_HEIGHT, rawHeight * LEGACY_GRID_ROW_PX)
+    if ((Number(component.posX) || 0) <= 24) component.posX = (Number(component.posX) || 0) * LEGACY_GRID_COL_PX
+    if ((Number(component.posY) || 0) <= 24) component.posY = (Number(component.posY) || 0) * LEGACY_GRID_ROW_PX
+  }
 
   component.posX = Math.max(0, Number(component.posX) || 0)
   component.posY = Math.max(0, Number(component.posY) || 0)
@@ -5604,39 +5671,86 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 8px 5px 7px;
+  gap: 5px;
+  padding: 7px 5px 6px;
   border-radius: 10px;
   cursor: pointer;
   border: 1px solid rgba(255,255,255,0.03);
   background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-  transition: all 0.15s;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   min-width: 0;
 }
 
 .lp-type-chip:hover {
+  transform: translateY(-1px);
   background: rgba(77,179,255,0.12);
   border-color: rgba(77,179,255,0.28);
+  box-shadow: 0 8px 18px rgba(17, 49, 82, 0.28);
 }
 
 .lp-type-chip--active {
   background: rgba(77,179,255,0.2);
   border-color: rgba(77,179,255,0.55);
+  box-shadow: inset 0 0 0 1px rgba(148, 220, 255, 0.16), 0 10px 24px rgba(19, 54, 88, 0.32);
 }
 
-.lp-type-icon {
+.lp-type-icon,
+.lp-type-visual {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 22px;
+  width: 100%;
+  height: 42px;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(115, 189, 255, 0.1);
+  background: linear-gradient(180deg, rgba(7, 22, 40, 0.92), rgba(10, 28, 48, 0.42));
   color: #4db3ff;
   flex-shrink: 0;
+}
+
+.lp-type-icon {
+  padding: 7px 12px;
 }
 
 .lp-type-icon :deep(svg) {
   width: 100%;
   height: 100%;
+  max-width: 44px;
+}
+
+.lp-type-visual {
+  pointer-events: none;
+}
+
+.lp-type-visual :deep(*) {
+  pointer-events: none;
+}
+
+.lp-type-visual :deep(.static-widget) {
+  color: #eaf4ff;
+}
+
+.lp-type-visual--icon {
+  height: 46px;
+}
+
+.lp-type-visual--icon :deep(.icon-shell) {
+  padding: 0;
+}
+
+.lp-type-visual--icon :deep(.icon-shell__stage) {
+  width: 42px;
+  height: 42px;
+}
+
+.lp-type-visual--decoration :deep(.decor-shell) {
+  border-radius: 10px;
+}
+
+.lp-type-visual--decoration :deep(.decor-corner) {
+  width: 16px;
+  height: 16px;
 }
 
 .lp-type-label {

@@ -258,6 +258,7 @@ const rawRows = computed(() => props.data?.rawRows ?? [])
 
 // ─── iframe ───────────────────────────────────────────────────────────
 const activeIframeTab = ref(0)
+const IFRAME_URL_FIELDS = ['url', 'URL', 'href', 'link', '链接', '地址', '网址', 'iframeUrl', 'iframe_url']
 
 const sanitizeUrl = (url: string): string => {
   const trimmed = (url ?? '').trim()
@@ -269,7 +270,31 @@ const sanitizeUrl = (url: string): string => {
   return ''
 }
 
-const iframeSingleUrl = computed(() => sanitizeUrl(props.styleConfig?.iframeUrl ?? ''))
+const resolveIframeDataUrl = () => {
+  const firstRow = rawRows.value[0]
+  if (!firstRow) return ''
+
+  const columns = props.data?.columns ?? Object.keys(firstRow)
+  const preferredFields = Array.from(new Set([
+    props.chartConfig.xField,
+    ...IFRAME_URL_FIELDS,
+  ].filter(Boolean)))
+
+  for (const field of preferredFields) {
+    const value = firstRow[field]
+    if (value == null) continue
+    const sanitized = sanitizeUrl(String(value))
+    if (sanitized) return sanitized
+  }
+
+  const urlValues = columns
+    .map((field) => sanitizeUrl(String(firstRow[field] ?? '')))
+    .filter(Boolean)
+
+  return urlValues[0] ?? ''
+}
+
+const iframeSingleUrl = computed(() => resolveIframeDataUrl() || sanitizeUrl(props.styleConfig?.iframeUrl ?? ''))
 
 const iframeTabList = computed(() => {
   const tabs = props.styleConfig?.iframeTabs ?? []
@@ -391,6 +416,22 @@ const iconMarkup = computed(() => ({
   icon_data_signal: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M18 72C30 72 30 48 42 48C54 48 54 84 66 84C78 84 78 36 90 36C98 36 102 48 102 48" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><rect x="18" y="88" width="84" height="10" rx="5" fill="currentColor" opacity="0.25"/></svg>',
   icon_user_badge: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="42" r="18" fill="none" stroke="currentColor" stroke-width="10"/><path d="M30 96C34 78 46 68 60 68C74 68 86 78 90 96" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/><path d="M92 24L100 32L112 20" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   icon_chart_mark: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><rect x="18" y="64" width="14" height="30" rx="4" fill="currentColor"/><rect x="42" y="48" width="14" height="46" rx="4" fill="currentColor" opacity="0.8"/><rect x="66" y="34" width="14" height="60" rx="4" fill="currentColor" opacity="0.65"/><path d="M18 28H100" stroke="currentColor" stroke-width="10" stroke-linecap="round" opacity="0.22"/></svg>',
+  icon_plus: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M60 30V90" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/><path d="M30 60H90" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>',
+  icon_minus: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M30 60H90" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>',
+  icon_search: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="52" cy="52" r="24" fill="none" stroke="currentColor" stroke-width="10"/><path d="M70 70L92 92" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>',
+  icon_focus_frame: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M26 42V26H42" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M94 42V26H78" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M26 78V94H42" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M94 78V94H78" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  icon_home_badge: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M24 54L60 26L96 54" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 50V92H86V50" fill="none" stroke="currentColor" stroke-width="10" stroke-linejoin="round"/><path d="M50 92V68H70V92" fill="none" stroke="currentColor" stroke-width="10" stroke-linejoin="round"/></svg>',
+  icon_share_nodes: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="34" cy="60" r="10" fill="none" stroke="currentColor" stroke-width="8"/><circle cx="84" cy="34" r="10" fill="none" stroke="currentColor" stroke-width="8"/><circle cx="86" cy="86" r="10" fill="none" stroke="currentColor" stroke-width="8"/><path d="M43 55L75 39" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M44 66L76 81" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
+  icon_link_chain: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M42 72L32 82C24 90 24 102 32 110C40 118 52 118 60 110L70 100" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M78 48L88 38C96 30 96 18 88 10C80 2 68 2 60 10L50 20" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M46 74L74 46" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
+  icon_message_chat: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M26 30H94V78H54L36 94V78H26Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><path d="M42 48H78" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" opacity="0.8"/><path d="M42 62H68" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" opacity="0.5"/></svg>',
+  icon_eye_watch: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M14 60C24 42 40 30 60 30C80 30 96 42 106 60C96 78 80 90 60 90C40 90 24 78 14 60Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><circle cx="60" cy="60" r="12" fill="none" stroke="currentColor" stroke-width="8"/></svg>',
+  icon_lock_safe: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><rect x="28" y="52" width="64" height="48" rx="8" fill="none" stroke="currentColor" stroke-width="8"/><path d="M42 52V38C42 28 50 20 60 20C70 20 78 28 78 38V52" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><circle cx="60" cy="74" r="6" fill="currentColor"/></svg>',
+  icon_bell_notice: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M36 84H84L78 74V52C78 40 70 30 60 30C50 30 42 40 42 52V74L36 84Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><path d="M52 92C54 98 58 102 60 102C62 102 66 98 68 92" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M60 18V26" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
+  icon_user_profile: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="40" r="18" fill="none" stroke="currentColor" stroke-width="8"/><path d="M28 94C34 78 46 68 60 68C74 68 86 78 92 94" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
+  icon_check_mark: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M26 64L48 86L94 34" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  icon_alert_mark: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="60" r="34" fill="none" stroke="currentColor" stroke-width="8"/><path d="M60 42V66" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><circle cx="60" cy="80" r="5" fill="currentColor"/></svg>',
+  icon_close_mark: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M34 34L86 86" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/><path d="M86 34L34 86" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>',
+  icon_settings_gear: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="60" r="18" fill="none" stroke="currentColor" stroke-width="8"/><path d="M60 18V30" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M60 90V102" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M18 60H30" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M90 60H102" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M31 31L40 40" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M80 80L89 89" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M89 31L80 40" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M40 80L31 89" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
 }[props.chartType] ?? '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="60" r="28" fill="none" stroke="currentColor" stroke-width="10"/></svg>'))
 
 const themeName = computed(() => {
@@ -439,9 +480,12 @@ const themeName = computed(() => {
   border-radius: 18px;
   border: 1px solid rgba(102, 183, 255, 0.24);
   background:
-    linear-gradient(180deg, rgba(8, 24, 43, 0.45), rgba(8, 24, 43, 0.1)),
-    radial-gradient(circle at 50% 0%, rgba(77, 179, 255, 0.14), transparent 58%);
+    linear-gradient(180deg, rgba(6, 19, 35, 0.88), rgba(8, 24, 43, 0.36)),
+    radial-gradient(circle at 18% 0%, rgba(77, 179, 255, 0.2), transparent 42%),
+    radial-gradient(circle at 82% 100%, rgba(62, 228, 255, 0.12), transparent 44%);
+  box-shadow: inset 0 0 34px rgba(77, 179, 255, 0.08), 0 0 18px rgba(77, 179, 255, 0.08);
   overflow: hidden;
+  isolation: isolate;
 }
 
 .decor-shell::before {
@@ -450,9 +494,12 @@ const themeName = computed(() => {
   inset: 0;
   background-image:
     linear-gradient(rgba(123, 194, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(123, 194, 255, 0.05) 1px, transparent 1px);
-  background-size: 22px 22px;
-  opacity: 0.28;
+    linear-gradient(90deg, rgba(123, 194, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(115deg, transparent 24%, rgba(136, 232, 255, 0.24) 48%, transparent 72%);
+  background-size: 22px 22px, 22px 22px, 180% 180%;
+  background-position: 0 0, 0 0, -140% 0;
+  opacity: 0.36;
+  animation: decorGridFloat 14s linear infinite;
   pointer-events: none;
 }
 
@@ -461,6 +508,8 @@ const themeName = computed(() => {
   width: 28px;
   height: 28px;
   border-color: #4db3ff;
+  filter: drop-shadow(0 0 10px rgba(77, 179, 255, 0.34));
+  animation: decorCornerPulse 3s ease-in-out infinite;
 }
 
 .decor-corner--tl { top: 10px; left: 10px; border-top: 3px solid; border-left: 3px solid; }
@@ -468,8 +517,20 @@ const themeName = computed(() => {
 .decor-corner--bl { bottom: 10px; left: 10px; border-bottom: 3px solid; border-left: 3px solid; }
 .decor-corner--br { bottom: 10px; right: 10px; border-bottom: 3px solid; border-right: 3px solid; }
 
+.decor-corner--tr {
+  animation-delay: 0.45s;
+}
+
+.decor-corner--bl {
+  animation-delay: 0.9s;
+}
+
+.decor-corner--br {
+  animation-delay: 1.35s;
+}
+
 .decor-shell--decor_border_glow {
-  box-shadow: inset 0 0 20px rgba(77, 179, 255, 0.14), 0 0 20px rgba(77, 179, 255, 0.1);
+  box-shadow: inset 0 0 24px rgba(77, 179, 255, 0.2), 0 0 24px rgba(77, 179, 255, 0.14);
 }
 
 .decor-shell--decor_border_frame::after,
@@ -479,6 +540,27 @@ const themeName = computed(() => {
   inset: 14px;
   border-radius: 12px;
   border: 1px solid rgba(121, 198, 255, 0.12);
+  background:
+    linear-gradient(90deg, rgba(136, 232, 255, 0.7), transparent) left top / 88px 1px no-repeat,
+    linear-gradient(90deg, transparent, rgba(136, 232, 255, 0.7)) right bottom / 88px 1px no-repeat,
+    linear-gradient(180deg, rgba(136, 232, 255, 0.55), transparent) left top / 1px 72px no-repeat,
+    linear-gradient(180deg, transparent, rgba(136, 232, 255, 0.55)) right bottom / 1px 72px no-repeat;
+  box-shadow: inset 0 0 18px rgba(77, 179, 255, 0.1);
+  animation: decorFrameInset 5.4s linear infinite;
+  pointer-events: none;
+}
+
+.decor-shell--decor_border_glow::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(140, 228, 255, 0.24);
+  background:
+    linear-gradient(90deg, transparent, rgba(155, 238, 255, 0.82), transparent) left center / 220% 2px no-repeat,
+    linear-gradient(180deg, transparent, rgba(155, 238, 255, 0.82), transparent) center top / 2px 220% no-repeat;
+  mix-blend-mode: screen;
+  animation: decorGlowTrace 4.6s linear infinite;
   pointer-events: none;
 }
 
@@ -486,6 +568,7 @@ const themeName = computed(() => {
   width: 34px;
   height: 34px;
   border-color: #7ad5ff;
+  animation-duration: 2.2s;
 }
 
 .decor-shell--decor_border_grid::after {
@@ -493,13 +576,18 @@ const themeName = computed(() => {
   position: absolute;
   inset: 18px;
   border: 1px dashed rgba(77, 179, 255, 0.22);
-  background-image: linear-gradient(rgba(77, 179, 255, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(77, 179, 255, 0.08) 1px, transparent 1px);
-  background-size: 18px 18px;
+  background-image:
+    linear-gradient(rgba(77, 179, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(77, 179, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, transparent, rgba(149, 238, 255, 0.74), transparent);
+  background-size: 18px 18px, 18px 18px, 220% 100%;
+  background-position: 0 0, 0 0, -150% 0;
+  animation: decorGridScan 4.8s linear infinite;
   pointer-events: none;
 }
 
 .decor-shell--decor_border_stream {
-  box-shadow: inset 0 0 24px rgba(77, 179, 255, 0.12), 0 0 22px rgba(77, 179, 255, 0.08);
+  box-shadow: inset 0 0 28px rgba(77, 179, 255, 0.16), 0 0 24px rgba(77, 179, 255, 0.1);
 }
 
 .decor-shell--decor_border_stream::after {
@@ -507,8 +595,10 @@ const themeName = computed(() => {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(115deg, transparent 18%, rgba(130, 233, 255, 0.02) 34%, rgba(130, 233, 255, 0.32) 50%, rgba(130, 233, 255, 0.02) 66%, transparent 82%);
-  animation: decorBorderStream 3s linear infinite;
+  background:
+    linear-gradient(112deg, transparent 14%, rgba(130, 233, 255, 0.04) 32%, rgba(130, 233, 255, 0.46) 48%, rgba(130, 233, 255, 0.04) 64%, transparent 82%),
+    linear-gradient(0deg, rgba(115, 206, 255, 0.24), transparent 24%, transparent 76%, rgba(115, 206, 255, 0.18));
+  animation: decorBorderStream 2.7s linear infinite;
   pointer-events: none;
 }
 
@@ -522,7 +612,8 @@ const themeName = computed(() => {
   inset: 12px;
   border-radius: 14px;
   border: 1px solid rgba(123, 220, 255, 0.38);
-  box-shadow: inset 0 0 18px rgba(77, 179, 255, 0.12), 0 0 10px rgba(77, 179, 255, 0.12);
+  background: radial-gradient(circle at 50% 50%, rgba(135, 233, 255, 0.18), transparent 72%);
+  box-shadow: inset 0 0 22px rgba(77, 179, 255, 0.16), 0 0 12px rgba(77, 179, 255, 0.14);
   animation: decorBorderPulse 2.4s ease-out infinite;
   pointer-events: none;
 }
@@ -544,12 +635,45 @@ const themeName = computed(() => {
     linear-gradient(90deg, transparent, rgba(123, 220, 255, 0.6), transparent) center bottom / 92px 1px no-repeat,
     linear-gradient(180deg, transparent, rgba(123, 220, 255, 0.6), transparent) left center / 1px 58px no-repeat,
     linear-gradient(180deg, transparent, rgba(123, 220, 255, 0.6), transparent) right center / 1px 58px no-repeat;
+  animation: decorBracketRail 3.8s linear infinite;
   pointer-events: none;
 }
 
 .decor-shell--decor_border_circuit {
   border-style: dashed;
-  border-color: rgba(123, 220, 255, 0.22);
+  border-color: rgba(123, 220, 255, 0.3);
+  box-shadow: inset 0 0 20px rgba(77, 179, 255, 0.12);
+}
+
+.decor-shell--decor_border_panel {
+  border-color: rgba(104, 194, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(7, 20, 36, 0.92), rgba(7, 20, 36, 0.48)),
+    radial-gradient(circle at 100% 0%, rgba(132, 231, 255, 0.22), transparent 42%);
+  box-shadow: inset 0 0 22px rgba(77, 179, 255, 0.1), 0 0 18px rgba(77, 179, 255, 0.08);
+}
+
+.decor-shell--decor_border_panel::after {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  clip-path: polygon(0 0, 72% 0, 80% 10%, 100% 10%, 100% 100%, 0 100%);
+  border: 1px solid rgba(122, 214, 255, 0.34);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(122, 214, 255, 0.82), transparent) left 16px top 0 / 92px 1px no-repeat,
+    linear-gradient(180deg, rgba(122, 214, 255, 0.82), transparent) right 0 top 14px / 1px 72px no-repeat,
+    linear-gradient(90deg, rgba(122, 214, 255, 0.58), transparent) right 18px bottom 0 / 70px 1px no-repeat,
+    linear-gradient(112deg, transparent 20%, rgba(154, 241, 255, 0.56) 46%, transparent 72%) center / 260% 100% no-repeat;
+  animation: decorPanelSweep 4.8s linear infinite;
+  pointer-events: none;
+}
+
+.decor-shell--decor_border_panel .decor-corner {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+  border-color: rgba(142, 228, 255, 0.88);
 }
 
 .decor-shell--decor_border_circuit::after {
@@ -844,17 +968,44 @@ const themeName = computed(() => {
 }
 
 .icon-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
+  overflow: hidden;
+}
+
+.icon-shell::before {
+  content: '';
+  position: absolute;
+  inset: 18% 22%;
+  border-radius: 28px;
+  background: radial-gradient(circle, rgba(77, 179, 255, 0.22), transparent 68%);
+  filter: blur(8px);
+}
+
+.icon-shell::after {
+  content: '';
+  position: absolute;
+  inset: 14% 18%;
+  border-radius: 24px;
+  border: 1px solid rgba(126, 214, 255, 0.18);
+  background:
+    linear-gradient(90deg, transparent, rgba(136, 232, 255, 0.5), transparent) center / 220% 1px no-repeat,
+    linear-gradient(180deg, transparent, rgba(136, 232, 255, 0.45), transparent) center / 1px 220% no-repeat;
+  animation: iconHaloFlow 7.2s linear infinite;
 }
 
 .icon-shell__stage {
+  position: relative;
+  z-index: 1;
   width: 90px;
   height: 90px;
   color: #4db3ff;
+  filter: drop-shadow(0 0 18px rgba(77, 179, 255, 0.26));
+  animation: iconStageFloat 3.6s ease-in-out infinite;
 }
 
 .icon-shell__stage :deep(svg) {
@@ -1170,16 +1321,50 @@ const themeName = computed(() => {
   100% { top: 100%; }
 }
 
+@keyframes decorGridFloat {
+  0% { background-position: 0 0, 0 0, -140% 0; opacity: 0.26; }
+  50% { background-position: 28px 18px, -28px -18px, 140% 0; opacity: 0.48; }
+  100% { background-position: 56px 36px, -56px -36px, -140% 0; opacity: 0.26; }
+}
+
+@keyframes decorCornerPulse {
+  0%, 100% { opacity: 0.56; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes decorFrameInset {
+  0%, 100% { opacity: 0.56; box-shadow: inset 0 0 14px rgba(77, 179, 255, 0.08); }
+  50% { opacity: 1; box-shadow: inset 0 0 26px rgba(77, 179, 255, 0.16), 0 0 12px rgba(77, 179, 255, 0.08); }
+}
+
+@keyframes decorGlowTrace {
+  0% { background-position: -180% 0, 50% -180%; opacity: 0.32; }
+  45% { opacity: 0.95; }
+  100% { background-position: 180% 0, 50% 180%; opacity: 0.32; }
+}
+
+@keyframes decorGridScan {
+  0% { background-position: 0 0, 0 0, -150% 0; opacity: 0.5; }
+  50% { opacity: 0.92; }
+  100% { background-position: 0 0, 0 0, 150% 0; opacity: 0.5; }
+}
+
 @keyframes decorBorderStream {
-  0% { transform: translateX(-42%); opacity: 0.35; }
+  0% { transform: translateX(-56%); opacity: 0.28; }
   50% { opacity: 0.95; }
-  100% { transform: translateX(42%); opacity: 0.35; }
+  100% { transform: translateX(56%); opacity: 0.28; }
 }
 
 @keyframes decorBorderPulse {
   0% { transform: scale(0.98); opacity: 0.28; }
   50% { transform: scale(1); opacity: 0.9; }
   100% { transform: scale(1.02); opacity: 0.22; }
+}
+
+@keyframes decorBracketRail {
+  0% { background-position: -110% 0, 210% 100%, 0 -110%, 100% 210%; opacity: 0.54; }
+  50% { opacity: 1; }
+  100% { background-position: 210% 0, -110% 100%, 0 210%, 100% -110%; opacity: 0.54; }
 }
 
 @keyframes decorBracketBlink {
@@ -1190,5 +1375,22 @@ const themeName = computed(() => {
 @keyframes decorCircuitShift {
   0% { background-position: 0 0, 0 0, 0 0, 0 0, -10% 0, 0 -10%; }
   100% { background-position: 0 0, 0 0, 0 0, 0 0, 110% 0, 0 110%; }
+}
+
+@keyframes decorPanelSweep {
+  0% { background-position: left 16px top 0, right 0 top 14px, right 18px bottom 0, -130% 0; }
+  50% { opacity: 1; }
+  100% { background-position: left 16px top 0, right 0 top 14px, right 18px bottom 0, 130% 0; }
+}
+
+@keyframes iconStageFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-3px) scale(1.02); }
+}
+
+@keyframes iconHaloFlow {
+  0% { background-position: -180% 50%, 50% -180%; opacity: 0.3; }
+  50% { opacity: 0.8; }
+  100% { background-position: 180% 50%, 50% 180%; opacity: 0.3; }
 }
 </style>

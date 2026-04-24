@@ -27,6 +27,7 @@ const shouldShowTitle = computed(() => false);
 const rawRows = computed(() => props.data?.rawRows ?? []);
 // ─── iframe ───────────────────────────────────────────────────────────
 const activeIframeTab = ref(0);
+const IFRAME_URL_FIELDS = ['url', 'URL', 'href', 'link', '链接', '地址', '网址', 'iframeUrl', 'iframe_url'];
 const sanitizeUrl = (url) => {
     const trimmed = (url ?? '').trim();
     if (!trimmed)
@@ -39,7 +40,29 @@ const sanitizeUrl = (url) => {
     catch { /* invalid URL */ }
     return '';
 };
-const iframeSingleUrl = computed(() => sanitizeUrl(props.styleConfig?.iframeUrl ?? ''));
+const resolveIframeDataUrl = () => {
+    const firstRow = rawRows.value[0];
+    if (!firstRow)
+        return '';
+    const columns = props.data?.columns ?? Object.keys(firstRow);
+    const preferredFields = Array.from(new Set([
+        props.chartConfig.xField,
+        ...IFRAME_URL_FIELDS,
+    ].filter(Boolean)));
+    for (const field of preferredFields) {
+        const value = firstRow[field];
+        if (value == null)
+            continue;
+        const sanitized = sanitizeUrl(String(value));
+        if (sanitized)
+            return sanitized;
+    }
+    const urlValues = columns
+        .map((field) => sanitizeUrl(String(firstRow[field] ?? '')))
+        .filter(Boolean);
+    return urlValues[0] ?? '';
+};
+const iframeSingleUrl = computed(() => resolveIframeDataUrl() || sanitizeUrl(props.styleConfig?.iframeUrl ?? ''));
 const iframeTabList = computed(() => {
     const tabs = props.styleConfig?.iframeTabs ?? [];
     return tabs.length ? tabs : [];
@@ -153,6 +176,22 @@ const iconMarkup = computed(() => ({
     icon_data_signal: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M18 72C30 72 30 48 42 48C54 48 54 84 66 84C78 84 78 36 90 36C98 36 102 48 102 48" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><rect x="18" y="88" width="84" height="10" rx="5" fill="currentColor" opacity="0.25"/></svg>',
     icon_user_badge: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="42" r="18" fill="none" stroke="currentColor" stroke-width="10"/><path d="M30 96C34 78 46 68 60 68C74 68 86 78 90 96" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/><path d="M92 24L100 32L112 20" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     icon_chart_mark: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><rect x="18" y="64" width="14" height="30" rx="4" fill="currentColor"/><rect x="42" y="48" width="14" height="46" rx="4" fill="currentColor" opacity="0.8"/><rect x="66" y="34" width="14" height="60" rx="4" fill="currentColor" opacity="0.65"/><path d="M18 28H100" stroke="currentColor" stroke-width="10" stroke-linecap="round" opacity="0.22"/></svg>',
+    icon_plus: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M60 30V90" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/><path d="M30 60H90" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>',
+    icon_minus: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M30 60H90" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>',
+    icon_search: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="52" cy="52" r="24" fill="none" stroke="currentColor" stroke-width="10"/><path d="M70 70L92 92" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>',
+    icon_focus_frame: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M26 42V26H42" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M94 42V26H78" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M26 78V94H42" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M94 78V94H78" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    icon_home_badge: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M24 54L60 26L96 54" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 50V92H86V50" fill="none" stroke="currentColor" stroke-width="10" stroke-linejoin="round"/><path d="M50 92V68H70V92" fill="none" stroke="currentColor" stroke-width="10" stroke-linejoin="round"/></svg>',
+    icon_share_nodes: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="34" cy="60" r="10" fill="none" stroke="currentColor" stroke-width="8"/><circle cx="84" cy="34" r="10" fill="none" stroke="currentColor" stroke-width="8"/><circle cx="86" cy="86" r="10" fill="none" stroke="currentColor" stroke-width="8"/><path d="M43 55L75 39" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M44 66L76 81" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
+    icon_link_chain: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M42 72L32 82C24 90 24 102 32 110C40 118 52 118 60 110L70 100" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M78 48L88 38C96 30 96 18 88 10C80 2 68 2 60 10L50 20" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M46 74L74 46" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
+    icon_message_chat: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M26 30H94V78H54L36 94V78H26Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><path d="M42 48H78" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" opacity="0.8"/><path d="M42 62H68" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" opacity="0.5"/></svg>',
+    icon_eye_watch: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M14 60C24 42 40 30 60 30C80 30 96 42 106 60C96 78 80 90 60 90C40 90 24 78 14 60Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><circle cx="60" cy="60" r="12" fill="none" stroke="currentColor" stroke-width="8"/></svg>',
+    icon_lock_safe: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><rect x="28" y="52" width="64" height="48" rx="8" fill="none" stroke="currentColor" stroke-width="8"/><path d="M42 52V38C42 28 50 20 60 20C70 20 78 28 78 38V52" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><circle cx="60" cy="74" r="6" fill="currentColor"/></svg>',
+    icon_bell_notice: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M36 84H84L78 74V52C78 40 70 30 60 30C50 30 42 40 42 52V74L36 84Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><path d="M52 92C54 98 58 102 60 102C62 102 66 98 68 92" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M60 18V26" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
+    icon_user_profile: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="40" r="18" fill="none" stroke="currentColor" stroke-width="8"/><path d="M28 94C34 78 46 68 60 68C74 68 86 78 92 94" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
+    icon_check_mark: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M26 64L48 86L94 34" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    icon_alert_mark: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="60" r="34" fill="none" stroke="currentColor" stroke-width="8"/><path d="M60 42V66" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><circle cx="60" cy="80" r="5" fill="currentColor"/></svg>',
+    icon_close_mark: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M34 34L86 86" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/><path d="M86 34L34 86" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>',
+    icon_settings_gear: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="60" r="18" fill="none" stroke="currentColor" stroke-width="8"/><path d="M60 18V30" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M60 90V102" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M18 60H30" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M90 60H102" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M31 31L40 40" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M80 80L89 89" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M89 31L80 40" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M40 80L31 89" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
 }[props.chartType] ?? '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="60" r="28" fill="none" stroke="currentColor" stroke-width="10"/></svg>'));
 const themeName = computed(() => {
     if (isDecorationChartType(props.chartType))
@@ -173,12 +212,19 @@ let __VLS_components;
 let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['decor-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-corner--tr']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-corner--bl']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-corner--br']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_glow']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_corner']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-corner']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_stream']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_pulse']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-corner']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_bracket']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-corner']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_circuit']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_title_plate']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_divider_glow']} */ ;
@@ -203,6 +249,8 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['metric-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['list-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['trend-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-shell__stage']} */ ;
 /** @type {__VLS_StyleScopedClasses['time-shell']} */ ;

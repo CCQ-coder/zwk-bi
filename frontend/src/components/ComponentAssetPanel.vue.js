@@ -23,10 +23,14 @@ const fieldLabels = computed(() => getChartFieldLabels(form.chartType));
 const showGroupField = computed(() => currentChartMeta.value.requiresGroup || currentChartMeta.value.allowsGroup);
 const staticChartTypeValues = [
     'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
+    'decor_border_stream', 'decor_border_pulse', 'decor_border_bracket', 'decor_border_circuit', 'decor_border_panel',
     'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',
     'hyperlink', 'image_list', 'text_list', 'clock_display', 'word_cloud', 'qr_code',
     'business_trend', 'metric_indicator', 'icon_arrow_trend', 'icon_warning_badge',
     'icon_location_pin', 'icon_data_signal', 'icon_user_badge', 'icon_chart_mark',
+    'icon_plus', 'icon_minus', 'icon_search', 'icon_focus_frame', 'icon_home_badge', 'icon_share_nodes',
+    'icon_link_chain', 'icon_message_chat', 'icon_eye_watch', 'icon_lock_safe', 'icon_bell_notice', 'icon_user_profile',
+    'icon_check_mark', 'icon_alert_mark', 'icon_close_mark', 'icon_settings_gear',
 ];
 const chartTypeOptions = [
     { label: '基础柱状图', value: 'bar' },
