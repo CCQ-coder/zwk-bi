@@ -27,7 +27,7 @@
             <el-icon class="panel-section-icon"><FolderOpened /></el-icon>
             <span class="panel-section-label">已发布</span>
           </div>
-          <div class="panel-list" v-loading="loading">
+          <div class="panel-list" v-loading="dashboardLoading">
             <div
               v-for="db in publishedDashboards"
               :key="db.id"
@@ -40,13 +40,23 @@
             </div>
             <div v-if="!loading && !publishedDashboards.length" class="panel-empty">暂无已发布仪表板</div>
           </div>
+          <div v-if="dashboardTotal > dashboardPageSize" class="panel-pagination">
+            <el-pagination
+              v-model:current-page="dashboardPage"
+              small
+              background
+              layout="prev, pager, next"
+              :page-size="dashboardPageSize"
+              :total="dashboardTotal"
+            />
+          </div>
 
           <!-- 模板区块（已发布的数据大屏） -->
           <div class="panel-section-header">
             <el-icon class="panel-section-icon"><Monitor /></el-icon>
             <span class="panel-section-label">模板（大屏）</span>
           </div>
-          <div class="panel-list panel-list--templates">
+          <div class="panel-list panel-list--templates" v-loading="templateLoading">
             <div
               v-for="scr in screenTemplates"
               :key="'scr-' + scr.id"
@@ -58,6 +68,16 @@
               <span class="panel-item-name" :title="scr.name">{{ scr.name }}</span>
             </div>
             <div v-if="!screenTemplates.length" class="panel-empty">暂无已发布大屏模板</div>
+          </div>
+          <div v-if="templateTotal > templatePageSize" class="panel-pagination panel-pagination--templates">
+            <el-pagination
+              v-model:current-page="templatePage"
+              small
+              background
+              layout="prev, pager, next"
+              :page-size="templatePageSize"
+              :total="templateTotal"
+            />
           </div>
         </template>
       </aside>
@@ -146,7 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -157,70 +177,117 @@ import TopNavBar from '../components/TopNavBar.vue'
 import ReportPreviewCanvas from '../components/ReportPreviewCanvas.vue'
 import {
   createDashboard,
-  getDashboardList,
+  getDashboardPage,
   type Dashboard,
 } from '../api/dashboard'
 import {
   buildReportConfig,
   normalizeCoverConfig,
-  normalizePublishConfig,
   parseReportConfig,
-  type PublishStatus,
 } from '../utils/report-config'
 
 const router = useRouter()
-const loading = ref(false)
+const dashboardLoading = ref(false)
+const templateLoading = ref(false)
+const loading = computed(() => dashboardLoading.value || templateLoading.value)
 const saving = ref(false)
-const rawDashboards = ref<Dashboard[]>([])
+const publishedDashboards = ref<Dashboard[]>([])
+const screenTemplates = ref<Dashboard[]>([])
+const dashboardTotal = ref(0)
+const templateTotal = ref(0)
 const createVisible = ref(false)
 const keyword = ref('')
 const sidebarCollapsed = ref(false)
 const selectedId = ref<number | null>(null)
 const selectedTemplateId = ref<number | null>(null)
+const dashboardPage = ref(1)
+const templatePage = ref(1)
+const dashboardPageSize = 12
+const templatePageSize = 8
 const form = reactive({ name: '' })
-
-const dashboardScene = (d: Dashboard) => parseReportConfig(d.configJson).scene !== 'screen'
-
-const publishState = (d: Dashboard): PublishStatus =>
-  normalizePublishConfig(parseReportConfig(d.configJson).publish).status
-
-const sortByCreatedAt = (list: Dashboard[]) => [...list].sort((a, b) =>
-  new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-)
-
-const isScreen = (d: Dashboard) => parseReportConfig(d.configJson).scene === 'screen'
-
-const allDashboards = computed(() => sortByCreatedAt(rawDashboards.value.filter(dashboardScene)))
-
-// 只显示已发布的仪表板
-const publishedDashboards = computed(() => {
-  const list = allDashboards.value.filter(d => publishState(d) === 'PUBLISHED')
-  const q = keyword.value.trim().toLowerCase()
-  return q ? list.filter(d => d.name.toLowerCase().includes(q)) : list
-})
-
-// 模板 = 已发布的数据大屏
-const screenTemplates = computed(() =>
-  sortByCreatedAt(rawDashboards.value.filter(d => isScreen(d) && publishState(d) === 'PUBLISHED'))
-)
 
 const getCoverUrl = (d: Dashboard) => normalizeCoverConfig(parseReportConfig(d.configJson).cover).url
 
 const selectedDashboard = computed(() =>
-  selectedId.value ? rawDashboards.value.find(d => d.id === selectedId.value) ?? null : null
+  selectedId.value ? publishedDashboards.value.find(d => d.id === selectedId.value) ?? null : null
 )
 
 const selectedScreenTemplate = computed(() =>
-  selectedTemplateId.value ? rawDashboards.value.find(d => d.id === selectedTemplateId.value) ?? null : null
+  selectedTemplateId.value ? screenTemplates.value.find(d => d.id === selectedTemplateId.value) ?? null : null
 )
 
-// 自动选中第一个已发布仪表板
+const loadPublishedDashboards = async () => {
+  dashboardLoading.value = true
+  try {
+    const pageData = await getDashboardPage({
+      page: dashboardPage.value,
+      pageSize: dashboardPageSize,
+      keyword: keyword.value.trim() || undefined,
+      scene: 'dashboard',
+      publishStatus: 'PUBLISHED',
+    })
+    publishedDashboards.value = pageData.items
+    dashboardTotal.value = pageData.total
+    const maxPage = Math.max(1, Math.ceil(pageData.total / pageData.pageSize))
+    if (dashboardPage.value > maxPage) {
+      dashboardPage.value = maxPage
+    }
+  } finally {
+    dashboardLoading.value = false
+  }
+}
+
+const loadScreenTemplates = async () => {
+  templateLoading.value = true
+  try {
+    const pageData = await getDashboardPage({
+      page: templatePage.value,
+      pageSize: templatePageSize,
+      scene: 'screen',
+      publishStatus: 'PUBLISHED',
+    })
+    screenTemplates.value = pageData.items
+    templateTotal.value = pageData.total
+    const maxPage = Math.max(1, Math.ceil(pageData.total / pageData.pageSize))
+    if (templatePage.value > maxPage) {
+      templatePage.value = maxPage
+    }
+  } finally {
+    templateLoading.value = false
+  }
+}
+
+// 自动选中当前页第一个已发布仪表板
 watch(publishedDashboards, (list) => {
   if (list.length && (!selectedId.value || !list.find(d => d.id === selectedId.value))) {
     selectedId.value = list[0].id
     selectedTemplateId.value = null
   }
+  if (!list.length && selectedId.value !== null) {
+    selectedId.value = null
+  }
 }, { immediate: true })
+
+watch(
+  () => [keyword.value.trim(), dashboardPage.value] as const,
+  ([nextKeyword, nextPage], previous) => {
+    const prevKeyword = previous?.[0] ?? nextKeyword
+    if (nextKeyword !== prevKeyword && nextPage !== 1) {
+      dashboardPage.value = 1
+      return
+    }
+    loadPublishedDashboards()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => templatePage.value,
+  () => {
+    loadScreenTemplates()
+  },
+  { immediate: true }
+)
 
 const selectDashboard = (db: Dashboard) => {
   selectedId.value = db.id
@@ -230,15 +297,6 @@ const selectDashboard = (db: Dashboard) => {
 const selectScreenTemplate = (scr: Dashboard) => {
   selectedTemplateId.value = scr.id
   selectedId.value = null
-}
-
-const loadDashboards = async () => {
-  loading.value = true
-  try {
-    rawDashboards.value = await getDashboardList()
-  } finally {
-    loading.value = false
-  }
 }
 
 const openCreate = () => {
@@ -289,8 +347,6 @@ const openPreview = () => {
 const openFullscreen = () => {
   if (selectedId.value) window.open(`/preview/dashboard/${selectedId.value}`, '_blank')
 }
-
-onMounted(loadDashboards)
 </script>
 
 <style scoped>
@@ -377,6 +433,18 @@ onMounted(loadDashboards)
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
+}
+
+.panel-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 8px 12px 12px;
+  border-top: 1px solid #f0f2f5;
+}
+
+.panel-pagination--templates {
+  border-top: none;
+  padding-top: 4px;
 }
 
 .panel-item {

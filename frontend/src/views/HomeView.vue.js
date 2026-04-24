@@ -1,7 +1,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { getChartList } from '../api/chart';
-import { getDashboardComponents, getDashboardList } from '../api/dashboard';
+import { getDashboardList } from '../api/dashboard';
 import { getDatasetList } from '../api/dataset';
 import { getDatasourceList } from '../api/datasource';
 import TopNavBar from '../components/TopNavBar.vue';
@@ -19,7 +19,7 @@ const datasourceList = ref([]);
 const datasetList = ref([]);
 const chartList = ref([]);
 const reportList = ref([]);
-const componentCountMap = ref({});
+const componentCountMap = computed(() => Object.fromEntries(reportList.value.map((item) => [item.id, item.componentCount ?? 0])));
 const displayName = computed(() => getAuthDisplayName());
 const userId = computed(() => localStorage.getItem('bi_user_id') || '--');
 const avatarText = computed(() => displayName.value.slice(0, 1) || '用');
@@ -239,8 +239,6 @@ const loadData = async () => {
         datasetList.value = datasets;
         chartList.value = charts;
         reportList.value = dashboards;
-        const countEntries = await Promise.all(dashboards.map(async (item) => [item.id, (await getDashboardComponents(item.id)).length]));
-        componentCountMap.value = Object.fromEntries(countEntries);
     }
     finally {
         loading.value = false;

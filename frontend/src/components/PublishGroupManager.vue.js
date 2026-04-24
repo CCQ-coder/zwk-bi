@@ -1,4 +1,4 @@
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { CollectionTag, FolderOpened, Plus, Search, Tickets } from '@element-plus/icons-vue';
 import { createPublishGroup, deletePublishGroup, getManagePublishGroups, getPublishedScreenOptions, updatePublishGroup, updatePublishGroupScreens, } from '../api/publish';
@@ -12,6 +12,8 @@ const screenKeyword = ref('');
 const selectedGroupId = ref(null);
 const creating = ref(false);
 const assignedScreenIds = ref([]);
+const listPanelWidth = ref(324);
+let stopListPanelResize = null;
 const groupForm = reactive({
     name: '',
     description: '',
@@ -55,6 +57,26 @@ const movingScreenCount = computed(() => assignedScreenIds.value.filter((id) => 
     const screen = screenOptionMap.value.get(id);
     return Boolean(screen?.groupId && screen.groupId !== persistedGroupId.value);
 }).length);
+const listPanelStyle = computed(() => ({ width: `${listPanelWidth.value}px` }));
+const startListPanelResize = (event) => {
+    if (window.innerWidth <= 960) {
+        return;
+    }
+    const startX = event.clientX;
+    const startWidth = listPanelWidth.value;
+    const handleMouseMove = (moveEvent) => {
+        const nextWidth = startWidth + (moveEvent.clientX - startX);
+        listPanelWidth.value = Math.min(420, Math.max(280, nextWidth));
+    };
+    const handleMouseUp = () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        stopListPanelResize = null;
+    };
+    stopListPanelResize = handleMouseUp;
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+};
 const applyGroup = (group) => {
     if (!group) {
         groupForm.name = '';
@@ -214,17 +236,37 @@ onMounted(() => {
         ElMessage.error('发布分组数据加载失败');
     });
 });
+onBeforeUnmount(() => {
+    stopListPanelResize?.();
+});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-shell__resize']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['panel-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['panel-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['panel-subtitle']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-input__inner']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-item--active']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-item--active']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-item__name']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-option']} */ ;
 /** @type {__VLS_StyleScopedClasses['placeholder-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-card__thumb']} */ ;
 /** @type {__VLS_StyleScopedClasses['stats-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace']} */ ;
-/** @type {__VLS_StyleScopedClasses['workspace']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-shell__resize']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-form__grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-toolbar']} */ ;
 /** @type {__VLS_StyleScopedClasses['stats-row']} */ ;
@@ -298,6 +340,10 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "workspace" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "group-list-shell" },
+    ...{ style: (__VLS_ctx.listPanelStyle) },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
     ...{ class: "group-list-panel panel-card" },
 });
@@ -307,9 +353,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "panel-title" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "panel-subtitle" },
 });
 const __VLS_0 = {}.ElButton;
 /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
@@ -417,6 +460,13 @@ if (!__VLS_ctx.loading && !__VLS_ctx.filteredGroups.length) {
     }, ...__VLS_functionalComponentArgsRest(__VLS_21));
 }
 var __VLS_15;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "group-list-panel__foot" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
+    ...{ onMousedown: (__VLS_ctx.startListPanelResize) },
+    ...{ class: "group-list-shell__resize" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
     ...{ class: "group-detail" },
 });
@@ -435,9 +485,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "panel-title" },
 });
 (__VLS_ctx.persistedGroupId ? '编辑分组' : '新建分组');
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "panel-subtitle" },
-});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "detail-chip" },
 });
@@ -635,9 +682,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "panel-title" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "panel-subtitle" },
 });
 const __VLS_80 = {}.ElTag;
 /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
@@ -861,9 +905,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "panel-title" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "panel-subtitle" },
-});
 if (!__VLS_ctx.previewScreens.length) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "placeholder-card placeholder-card--compact" },
@@ -932,11 +973,11 @@ else {
 /** @type {__VLS_StyleScopedClasses['stat-card__value']} */ ;
 /** @type {__VLS_StyleScopedClasses['stat-card__meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['panel-subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-search']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-scroll']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list']} */ ;
@@ -945,6 +986,8 @@ else {
 /** @type {__VLS_StyleScopedClasses['group-item__name']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-item__meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-item__desc']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-panel__foot']} */ ;
+/** @type {__VLS_StyleScopedClasses['group-list-shell__resize']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-detail']} */ ;
 /** @type {__VLS_StyleScopedClasses['detail-stack']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-card']} */ ;
@@ -952,7 +995,6 @@ else {
 /** @type {__VLS_StyleScopedClasses['panel-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-head--detail']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['panel-subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['detail-chip']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-form']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-form__grid']} */ ;
@@ -963,7 +1005,6 @@ else {
 /** @type {__VLS_StyleScopedClasses['panel-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-head--detail']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['panel-subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['placeholder-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-toolbar']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-toolbar__info']} */ ;
@@ -982,7 +1023,6 @@ else {
 /** @type {__VLS_StyleScopedClasses['panel-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-head--detail']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['panel-subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['placeholder-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['placeholder-card--compact']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-grid']} */ ;
@@ -1018,6 +1058,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             visibleGroupCount: visibleGroupCount,
             assignedScreenCount: assignedScreenCount,
             movingScreenCount: movingScreenCount,
+            listPanelStyle: listPanelStyle,
+            startListPanelResize: startListPanelResize,
             selectGroup: selectGroup,
             startCreate: startCreate,
             restoreAssignments: restoreAssignments,

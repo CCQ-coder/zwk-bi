@@ -1,88 +1,81 @@
 <template>
   <div class="publish-display">
-    <section class="display-summary">
-      <article class="summary-card summary-card--lead">
-        <div class="summary-card__label">可展示分组</div>
-        <div class="summary-card__value">{{ groups.length }}</div>
-        <div class="summary-card__meta">仅展示已经分配了已发布大屏的分组</div>
-      </article>
-      <article class="summary-card">
-        <div class="summary-card__label">分组内大屏</div>
-        <div class="summary-card__value">{{ totalScreens }}</div>
-        <div class="summary-card__meta">左侧列表只显示属于对应分组的 BI 大屏</div>
-      </article>
-      <article class="summary-card">
-        <div class="summary-card__label">当前分组</div>
-        <div class="summary-card__value summary-card__value--sm">{{ currentGroup?.name || '未选择' }}</div>
-        <div class="summary-card__meta">切换分组后右侧 iframe 会同步切换</div>
-      </article>
-    </section>
-
     <div v-loading="loading" class="display-shell panel-shell">
       <el-empty v-if="!loading && !groups.length" description="暂无已分配到分组的已发布大屏，请先在分组管理里完成分配。" class="display-empty" />
 
       <template v-else>
-        <aside class="group-rail panel-card">
-          <div class="rail-head">
+        <aside class="display-sidebar panel-card" :style="sidebarStyle">
+          <div class="display-sidebar__head">
             <div>
-              <div class="rail-title">分组</div>
-              <div class="rail-subtitle">按分组筛选可展示的大屏</div>
+              <div class="display-sidebar__title">展示导航</div>
             </div>
+            <el-tag size="small" type="primary">{{ currentScreen ? '已选大屏' : '待选择' }}</el-tag>
           </div>
 
-          <div class="group-rail__list">
-            <button
-              v-for="group in groups"
-              :key="group.id"
-              type="button"
-              class="group-pill"
-              :class="{ 'group-pill--active': currentGroup?.id === group.id }"
-              @click="selectGroup(group.id)"
-            >
-              <div class="group-pill__name">{{ group.name }}</div>
-              <div class="group-pill__meta">{{ group.screenCount }} 个已发布大屏</div>
-            </button>
-          </div>
-        </aside>
-
-        <aside class="screen-rail panel-card">
-          <div class="rail-head">
-            <div>
-              <div class="rail-title">BI大屏</div>
-              <div class="rail-subtitle">只显示分配到当前分组的大屏名称</div>
-            </div>
-            <el-tag size="small" type="success">{{ currentGroup?.screens.length || 0 }} 个</el-tag>
-          </div>
-
-          <div v-if="!currentGroup?.screens.length" class="screen-rail__empty">
-            当前分组没有可展示的大屏
-          </div>
-
-          <div v-else class="screen-rail__list">
-            <button
-              v-for="screen in currentGroup.screens"
-              :key="screen.id"
-              type="button"
-              class="screen-row"
-              :class="{ 'screen-row--active': currentScreen?.id === screen.id }"
-              @click="selectScreen(screen.id)"
-            >
-              <div class="screen-row__thumb" :style="screen.coverUrl ? { backgroundImage: `url(${screen.coverUrl})` } : undefined">
-                <span v-if="!screen.coverUrl">BI</span>
+          <div class="display-sidebar__sections">
+            <section class="sidebar-section">
+              <div class="sidebar-section__head">
+                <div>
+                  <div class="sidebar-section__title">分组</div>
+                </div>
+                <el-tag size="small" effect="plain">{{ groups.length }}</el-tag>
               </div>
-              <div class="screen-row__copy">
-                <div class="screen-row__name">{{ screen.name }}</div>
-                <div class="screen-row__meta">{{ formatDate(screen.publishedAt || screen.createdAt) || '发布时间待补充' }}</div>
+
+              <div class="sidebar-section__list">
+                <button
+                  v-for="group in groups"
+                  :key="group.id"
+                  type="button"
+                  class="group-pill"
+                  :class="{ 'group-pill--active': currentGroup?.id === group.id }"
+                  @click="selectGroup(group.id)"
+                >
+                  <div class="group-pill__name">{{ group.name }}</div>
+                  <div class="group-pill__meta">{{ group.screenCount }} 个已发布大屏</div>
+                </button>
               </div>
-            </button>
+            </section>
+
+            <section class="sidebar-section sidebar-section--screens">
+              <div class="sidebar-section__head">
+                <div>
+                  <div class="sidebar-section__title">BI大屏</div>
+                </div>
+                <el-tag size="small" type="success">{{ currentGroup?.screens.length || 0 }}</el-tag>
+              </div>
+
+              <div v-if="!currentGroup?.screens.length" class="screen-rail__empty">
+                当前分组没有可展示的大屏
+              </div>
+
+              <div v-else class="sidebar-section__list sidebar-section__list--screens">
+                <button
+                  v-for="screen in currentGroup.screens"
+                  :key="screen.id"
+                  type="button"
+                  class="screen-row"
+                  :class="{ 'screen-row--active': currentScreen?.id === screen.id }"
+                  @click="selectScreen(screen.id)"
+                >
+                  <div class="screen-row__thumb" :style="screen.coverUrl ? { backgroundImage: `url(${screen.coverUrl})` } : undefined">
+                    <span v-if="!screen.coverUrl">BI</span>
+                  </div>
+                  <div class="screen-row__copy">
+                    <div class="screen-row__name">{{ screen.name }}</div>
+                    <div class="screen-row__meta">{{ formatDate(screen.publishedAt || screen.createdAt) || '发布时间待补充' }}</div>
+                  </div>
+                </button>
+              </div>
+            </section>
           </div>
+
+          <div class="display-sidebar__resize" @mousedown.prevent="startSidebarResize" />
         </aside>
 
         <section class="preview-stage panel-card">
           <div class="preview-stage__toolbar">
             <div>
               <div class="preview-stage__title">{{ currentScreen?.name || '等待选择大屏' }}</div>
-              <div class="preview-stage__subtitle">右侧直接以 iframe 方式加载已发布大屏，适配当前页面宽高。</div>
             </div>
             <div class="preview-stage__actions">
               <el-tag v-if="currentGroup" size="small" effect="plain">{{ currentGroup.name }}</el-tag>
@@ -114,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getDisplayPublishGroups, type PublishGroup } from '../api/publish'
 
@@ -123,10 +116,12 @@ const iframeLoading = ref(true)
 const groups = ref<PublishGroup[]>([])
 const selectedGroupId = ref<number | null>(null)
 const selectedScreenId = ref<number | null>(null)
+const sidebarWidth = ref(332)
+let stopSidebarResize: (() => void) | null = null
 
 const currentGroup = computed(() => groups.value.find((group) => group.id === selectedGroupId.value) ?? null)
 const currentScreen = computed(() => currentGroup.value?.screens.find((screen) => screen.id === selectedScreenId.value) ?? null)
-const totalScreens = computed(() => groups.value.reduce((sum, group) => sum + group.screens.length, 0))
+const sidebarStyle = computed(() => ({ width: `${sidebarWidth.value}px` }))
 const currentScreenUrl = computed(() => {
   if (!currentScreen.value) {
     return ''
@@ -143,6 +138,26 @@ const selectGroup = (groupId: number) => {
 
 const selectScreen = (screenId: number) => {
   selectedScreenId.value = screenId
+}
+
+const startSidebarResize = (event: MouseEvent) => {
+  if (window.innerWidth <= 960) {
+    return
+  }
+  const startX = event.clientX
+  const startWidth = sidebarWidth.value
+  const handleMouseMove = (moveEvent: MouseEvent) => {
+    const nextWidth = startWidth + (moveEvent.clientX - startX)
+    sidebarWidth.value = Math.min(420, Math.max(280, nextWidth))
+  }
+  const handleMouseUp = () => {
+    window.removeEventListener('mousemove', handleMouseMove)
+    window.removeEventListener('mouseup', handleMouseUp)
+    stopSidebarResize = null
+  }
+  stopSidebarResize = handleMouseUp
+  window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('mouseup', handleMouseUp)
 }
 
 const loadGroups = async () => {
@@ -207,6 +222,10 @@ onMounted(() => {
     ElMessage.error('BI 发布展示数据加载失败')
   })
 })
+
+onBeforeUnmount(() => {
+  stopSidebarResize?.()
+})
 </script>
 
 <style scoped>
@@ -214,51 +233,14 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 8px;
+  gap: 12px;
 }
 
-.display-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.summary-card {
-  border-radius: 22px;
-  padding: 18px 20px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(214, 223, 234, 0.94);
-  box-shadow: 0 16px 34px rgba(20, 54, 90, 0.08);
-}
-
-.summary-card--lead {
-  background: linear-gradient(135deg, #15365f 0%, #1f6da8 62%, #28b39a 100%);
-  color: #f7fbff;
-  border-color: transparent;
-}
-
-.summary-card__label {
-  font-size: 12px;
-  opacity: 0.76;
-}
-
-.summary-card__value {
-  margin-top: 10px;
-  font-size: 30px;
-  font-weight: 700;
-}
-
-.summary-card__value--sm {
-  font-size: 22px;
-  line-height: 1.4;
-}
-
-.summary-card__meta {
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.7;
-  opacity: 0.8;
+.panel-card {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(209, 221, 233, 0.94);
+  box-shadow: 0 12px 28px rgba(22, 60, 102, 0.06);
 }
 
 .panel-shell {
@@ -267,107 +249,198 @@ onMounted(() => {
 }
 
 .display-shell {
-  display: grid;
-  grid-template-columns: 250px 320px minmax(0, 1fr);
-  gap: 16px;
+  display: flex;
+  gap: 12px;
 }
 
-.panel-card {
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(209, 221, 233, 0.94);
-  box-shadow: 0 18px 42px rgba(22, 60, 102, 0.08);
-}
-
-.group-rail,
-.screen-rail,
+.display-sidebar,
 .preview-stage {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 18px;
+  padding: 14px;
 }
 
-.rail-head,
+.display-sidebar {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  background: linear-gradient(180deg, #152436 0%, #1b2d43 100%);
+  border-color: rgba(118, 154, 191, 0.18);
+  box-shadow: 0 16px 34px rgba(11, 25, 40, 0.16);
+}
+
+.display-sidebar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(184, 208, 233, 0.1);
+}
+
 .preview-stage__toolbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(214, 225, 236, 0.9);
 }
 
-.rail-title,
+.display-sidebar__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f3f7fd;
+}
+
 .preview-stage__title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: #18324d;
 }
 
-.rail-subtitle,
-.preview-stage__subtitle {
-  margin-top: 6px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: #72839a;
+.display-sidebar__sections {
+  margin-top: 12px;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 12px;
 }
 
-.group-rail__list,
-.screen-rail__list {
-  margin-top: 16px;
+.sidebar-section {
+  min-height: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(184, 208, 233, 0.08);
+  background: rgba(8, 18, 30, 0.2);
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+}
+
+.sidebar-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-section__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #eff5fd;
+}
+
+.sidebar-section__list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   overflow: auto;
+}
+
+.sidebar-section__list--screens {
+  margin-top: 10px;
 }
 
 .group-pill,
 .screen-row {
   width: 100%;
-  border: 1px solid rgba(214, 224, 235, 0.96);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  padding: 14px 16px;
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  padding: 10px 12px;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.group-pill::before,
+.screen-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: #6ea8eb;
+  opacity: 0;
+  transition: height 0.18s ease, opacity 0.18s ease;
 }
 
 .group-pill:hover,
 .screen-row:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 26px rgba(27, 74, 122, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(184, 208, 233, 0.08);
 }
 
 .group-pill--active,
 .screen-row--active {
-  border-color: rgba(33, 125, 240, 0.48);
-  box-shadow: 0 18px 34px rgba(32, 113, 212, 0.16);
+  border-color: rgba(106, 157, 226, 0.18);
+  background: rgba(47, 99, 164, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.group-pill--active::before,
+.screen-row--active::before {
+  height: 22px;
+  opacity: 1;
 }
 
 .group-pill__name,
 .screen-row__name {
-  font-size: 15px;
-  font-weight: 700;
-  color: #17324c;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(244, 248, 253, 0.94);
 }
 
 .group-pill__meta,
 .screen-row__meta {
-  margin-top: 7px;
-  font-size: 12px;
-  color: #73849b;
+  margin-top: 4px;
+  font-size: 11px;
+  color: rgba(191, 210, 231, 0.66);
+}
+
+.group-pill--active .group-pill__name,
+.screen-row--active .screen-row__name {
+  color: #70b2ff;
 }
 
 .screen-row {
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 60px minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
 }
 
+.display-sidebar__resize {
+  position: absolute;
+  top: 14px;
+  right: -9px;
+  width: 18px;
+  height: calc(100% - 28px);
+  cursor: col-resize;
+}
+
+.display-sidebar__resize::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 7px;
+  width: 3px;
+  height: 64px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(106, 157, 226, 0.06) 0%, rgba(106, 157, 226, 0.24) 100%);
+}
+
 .screen-row__thumb {
-  min-height: 68px;
-  border-radius: 16px;
+  min-height: 54px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #143863 0%, #1f5b91 100%);
   background-size: cover;
   background-position: center;
@@ -385,21 +458,21 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #7c8ba0;
+  color: rgba(196, 214, 234, 0.68);
 }
 
 .preview-stage__actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
 
 .preview-stage__canvas {
-  margin-top: 16px;
+  margin-top: 12px;
   flex: 1;
-  min-height: 560px;
-  border-radius: 22px;
+  min-height: 520px;
+  border-radius: 16px;
   overflow: hidden;
   border: 1px solid rgba(208, 221, 233, 0.94);
   background:
@@ -424,40 +497,33 @@ onMounted(() => {
 .preview-stage__iframe {
   width: 100%;
   height: 100%;
-  min-height: 560px;
+  min-height: 520px;
   border: none;
   background: #071525;
 }
 
-@media (max-width: 1280px) {
-  .display-shell {
-    grid-template-columns: 230px 280px minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 1080px) {
-  .display-summary {
-    grid-template-columns: 1fr;
-  }
-
   .display-shell {
-    grid-template-columns: 1fr 1fr;
+    flex-direction: column;
   }
 
-  .preview-stage {
-    grid-column: 1 / -1;
+  .display-sidebar {
+    width: 100% !important;
+  }
+
+  .display-sidebar__resize {
+    display: none;
+  }
+
+  .display-sidebar__sections {
+    grid-template-rows: none;
   }
 }
 
 @media (max-width: 720px) {
-  .display-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .group-rail,
-  .screen-rail,
+  .display-sidebar,
   .preview-stage {
-    padding: 16px;
+    padding: 12px;
   }
 
   .preview-stage__toolbar {
@@ -467,7 +533,7 @@ onMounted(() => {
 
   .preview-stage__canvas,
   .preview-stage__iframe {
-    min-height: 420px;
+    min-height: 400px;
   }
 }
 </style>

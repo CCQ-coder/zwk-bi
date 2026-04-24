@@ -211,7 +211,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getChartList, type Chart } from '../api/chart'
-import { getDashboardComponents, getDashboardList, type Dashboard } from '../api/dashboard'
+import { getDashboardList, type Dashboard } from '../api/dashboard'
 import { getDatasetList, type Dataset } from '../api/dataset'
 import { getDatasourceList, type Datasource, type DatasourceSourceKind } from '../api/datasource'
 import TopNavBar from '../components/TopNavBar.vue'
@@ -259,7 +259,9 @@ const datasourceList = ref<Datasource[]>([])
 const datasetList = ref<Dataset[]>([])
 const chartList = ref<Chart[]>([])
 const reportList = ref<Dashboard[]>([])
-const componentCountMap = ref<Record<number, number>>({})
+const componentCountMap = computed<Record<number, number>>(() => Object.fromEntries(
+  reportList.value.map((item) => [item.id, item.componentCount ?? 0])
+))
 
 const displayName = computed(() => getAuthDisplayName())
 const userId = computed(() => localStorage.getItem('bi_user_id') || '--')
@@ -504,11 +506,6 @@ const loadData = async () => {
     datasetList.value = datasets
     chartList.value = charts
     reportList.value = dashboards
-
-    const countEntries = await Promise.all(
-      dashboards.map(async (item) => [item.id, (await getDashboardComponents(item.id)).length] as const)
-    )
-    componentCountMap.value = Object.fromEntries(countEntries)
   } finally {
     loading.value = false
   }

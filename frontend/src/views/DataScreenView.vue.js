@@ -1,20 +1,22 @@
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Monitor, Plus } from '@element-plus/icons-vue';
 import TopNavBar from '../components/TopNavBar.vue';
-import { createDashboard, deleteDashboard, getDashboardComponents, getDashboardList, } from '../api/dashboard';
+import { createDashboard, deleteDashboard, getDashboardPage, } from '../api/dashboard';
 import { buildReportConfig, normalizeCanvasConfig, normalizeCoverConfig, normalizePublishConfig, parseReportConfig, } from '../utils/report-config';
 const router = useRouter();
 const loading = ref(false);
 const saving = ref(false);
-const rawScreens = ref([]);
-const countMap = ref(new Map());
+const screens = ref([]);
+const totalScreens = ref(0);
 const createVisible = ref(false);
 const keyword = ref('');
 const statusFilter = ref('ALL');
+const currentPage = ref(1);
+const pageSize = ref(12);
+const pageSizeOptions = [12, 24, 48];
 const form = reactive({ name: '' });
-const screenScene = (screen) => parseReportConfig(screen.configJson).scene === 'screen';
 const publishState = (screen) => {
     const cfg = parseReportConfig(screen.configJson);
     return normalizePublishConfig(cfg.publish).status;
@@ -28,19 +30,8 @@ const canvasLabel = (screen) => {
     const canvas = normalizeCanvasConfig(cfg.canvas, 'screen');
     return `${canvas.width} × ${canvas.height}`;
 };
-const sortByCreatedAt = (list) => [...list].sort((left, right) => {
-    const leftTime = new Date(left.createdAt || 0).getTime();
-    const rightTime = new Date(right.createdAt || 0).getTime();
-    return rightTime - leftTime;
-});
-const allScreens = computed(() => sortByCreatedAt(rawScreens.value.filter((item) => screenScene(item))));
-const screens = computed(() => allScreens.value.filter((screen) => {
-    const nameMatched = !keyword.value.trim() || screen.name.toLowerCase().includes(keyword.value.trim().toLowerCase());
-    const statusMatched = statusFilter.value === 'ALL' || publishState(screen) === statusFilter.value;
-    return nameMatched && statusMatched;
-}));
-const publishedCount = computed(() => allScreens.value.filter((screen) => publishState(screen) === 'PUBLISHED').length);
-const coverReadyCount = computed(() => allScreens.value.filter((screen) => Boolean(coverUrl(screen))).length);
+const totalPages = computed(() => Math.max(1, Math.ceil(totalScreens.value / pageSize.value)));
+const pageCoverReadyCount = computed(() => screens.value.filter((screen) => Boolean(coverUrl(screen))).length);
 const formatDate = (iso) => {
     if (!iso)
         return '';
@@ -58,10 +49,19 @@ const formatDate = (iso) => {
 const loadScreens = async () => {
     loading.value = true;
     try {
-        const list = await getDashboardList();
-        rawScreens.value = list;
-        const entries = await Promise.all(list.filter((item) => screenScene(item)).map(async (screen) => [screen.id, (await getDashboardComponents(screen.id)).length]));
-        countMap.value = new Map(entries);
+        const pageData = await getDashboardPage({
+            page: currentPage.value,
+            pageSize: pageSize.value,
+            keyword: keyword.value.trim() || undefined,
+            scene: 'screen',
+            publishStatus: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
+        });
+        screens.value = pageData.items;
+        totalScreens.value = pageData.total;
+        const maxPage = Math.max(1, Math.ceil(pageData.total / pageData.pageSize));
+        if (currentPage.value > maxPage) {
+            currentPage.value = maxPage;
+        }
     }
     finally {
         loading.value = false;
@@ -95,11 +95,23 @@ const openPreview = (id) => {
 };
 const handleDelete = async (id) => {
     await deleteDashboard(id);
-    rawScreens.value = rawScreens.value.filter((screen) => screen.id !== id);
-    countMap.value.delete(id);
+    if (screens.value.length === 1 && currentPage.value > 1) {
+        currentPage.value -= 1;
+    }
+    else {
+        await loadScreens();
+    }
     ElMessage.success('已删除');
 };
-onMounted(loadScreens);
+watch(() => [keyword.value.trim(), statusFilter.value, currentPage.value, pageSize.value], ([nextKeyword, nextStatus, nextPage], previous) => {
+    const prevKeyword = previous?.[0] ?? nextKeyword;
+    const prevStatus = previous?.[1] ?? nextStatus;
+    if ((nextKeyword !== prevKeyword || nextStatus !== prevStatus) && nextPage !== 1) {
+        currentPage.value = 1;
+        return;
+    }
+    loadScreens();
+}, { immediate: true });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -148,11 +160,12 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "hero-summary" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-(__VLS_ctx.allScreens.length);
+(__VLS_ctx.totalScreens);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-(__VLS_ctx.publishedCount);
+(__VLS_ctx.currentPage);
+(__VLS_ctx.totalPages);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-(__VLS_ctx.coverReadyCount);
+(__VLS_ctx.pageCoverReadyCount);
 const __VLS_3 = {}.ElButton;
 /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
 // @ts-ignore
@@ -322,7 +335,7 @@ for (const [screen] of __VLS_getVForSourceType((__VLS_ctx.screens))) {
         ...{ class: "screen-card-meta" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    (__VLS_ctx.countMap.get(screen.id) ?? 0);
+    (screen.componentCount ?? 0);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (__VLS_ctx.coverUrl(screen) ? '已配置封面' : '待生成封面');
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -430,105 +443,129 @@ if (!__VLS_ctx.loading && !__VLS_ctx.screens.length) {
         ...{ class: "empty-state" },
     }, ...__VLS_functionalComponentArgsRest(__VLS_72));
 }
-const __VLS_75 = {}.ElDialog;
+if (__VLS_ctx.totalScreens) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+        ...{ class: "pagination-panel" },
+    });
+    const __VLS_75 = {}.ElPagination;
+    /** @type {[typeof __VLS_components.ElPagination, typeof __VLS_components.elPagination, ]} */ ;
+    // @ts-ignore
+    const __VLS_76 = __VLS_asFunctionalComponent(__VLS_75, new __VLS_75({
+        currentPage: (__VLS_ctx.currentPage),
+        pageSize: (__VLS_ctx.pageSize),
+        background: true,
+        layout: "total, sizes, prev, pager, next",
+        pageSizes: (__VLS_ctx.pageSizeOptions),
+        total: (__VLS_ctx.totalScreens),
+    }));
+    const __VLS_77 = __VLS_76({
+        currentPage: (__VLS_ctx.currentPage),
+        pageSize: (__VLS_ctx.pageSize),
+        background: true,
+        layout: "total, sizes, prev, pager, next",
+        pageSizes: (__VLS_ctx.pageSizeOptions),
+        total: (__VLS_ctx.totalScreens),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_76));
+}
+const __VLS_79 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_76 = __VLS_asFunctionalComponent(__VLS_75, new __VLS_75({
-    modelValue: (__VLS_ctx.createVisible),
-    title: "新建数据大屏",
-    width: "420px",
-    destroyOnClose: true,
-}));
-const __VLS_77 = __VLS_76({
-    modelValue: (__VLS_ctx.createVisible),
-    title: "新建数据大屏",
-    width: "420px",
-    destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_76));
-__VLS_78.slots.default;
-const __VLS_79 = {}.ElForm;
-/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
-// @ts-ignore
 const __VLS_80 = __VLS_asFunctionalComponent(__VLS_79, new __VLS_79({
-    model: (__VLS_ctx.form),
-    labelWidth: "80px",
+    modelValue: (__VLS_ctx.createVisible),
+    title: "新建数据大屏",
+    width: "420px",
+    destroyOnClose: true,
 }));
 const __VLS_81 = __VLS_80({
-    model: (__VLS_ctx.form),
-    labelWidth: "80px",
+    modelValue: (__VLS_ctx.createVisible),
+    title: "新建数据大屏",
+    width: "420px",
+    destroyOnClose: true,
 }, ...__VLS_functionalComponentArgsRest(__VLS_80));
 __VLS_82.slots.default;
-const __VLS_83 = {}.ElFormItem;
-/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
+const __VLS_83 = {}.ElForm;
+/** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
 const __VLS_84 = __VLS_asFunctionalComponent(__VLS_83, new __VLS_83({
-    label: "名称",
+    model: (__VLS_ctx.form),
+    labelWidth: "80px",
 }));
 const __VLS_85 = __VLS_84({
-    label: "名称",
+    model: (__VLS_ctx.form),
+    labelWidth: "80px",
 }, ...__VLS_functionalComponentArgsRest(__VLS_84));
 __VLS_86.slots.default;
-const __VLS_87 = {}.ElInput;
-/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+const __VLS_87 = {}.ElFormItem;
+/** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
 const __VLS_88 = __VLS_asFunctionalComponent(__VLS_87, new __VLS_87({
+    label: "名称",
+}));
+const __VLS_89 = __VLS_88({
+    label: "名称",
+}, ...__VLS_functionalComponentArgsRest(__VLS_88));
+__VLS_90.slots.default;
+const __VLS_91 = {}.ElInput;
+/** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
+// @ts-ignore
+const __VLS_92 = __VLS_asFunctionalComponent(__VLS_91, new __VLS_91({
     modelValue: (__VLS_ctx.form.name),
     placeholder: "请输入大屏名称",
     maxlength: "50",
     showWordLimit: true,
 }));
-const __VLS_89 = __VLS_88({
+const __VLS_93 = __VLS_92({
     modelValue: (__VLS_ctx.form.name),
     placeholder: "请输入大屏名称",
     maxlength: "50",
     showWordLimit: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_88));
+}, ...__VLS_functionalComponentArgsRest(__VLS_92));
+var __VLS_90;
 var __VLS_86;
-var __VLS_82;
 {
-    const { footer: __VLS_thisSlot } = __VLS_78.slots;
-    const __VLS_91 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_82.slots;
+    const __VLS_95 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_92 = __VLS_asFunctionalComponent(__VLS_91, new __VLS_91({
+    const __VLS_96 = __VLS_asFunctionalComponent(__VLS_95, new __VLS_95({
         ...{ 'onClick': {} },
     }));
-    const __VLS_93 = __VLS_92({
+    const __VLS_97 = __VLS_96({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_92));
-    let __VLS_95;
-    let __VLS_96;
-    let __VLS_97;
-    const __VLS_98 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_96));
+    let __VLS_99;
+    let __VLS_100;
+    let __VLS_101;
+    const __VLS_102 = {
         onClick: (...[$event]) => {
             __VLS_ctx.createVisible = false;
         }
     };
-    __VLS_94.slots.default;
-    var __VLS_94;
-    const __VLS_99 = {}.ElButton;
+    __VLS_98.slots.default;
+    var __VLS_98;
+    const __VLS_103 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_100 = __VLS_asFunctionalComponent(__VLS_99, new __VLS_99({
+    const __VLS_104 = __VLS_asFunctionalComponent(__VLS_103, new __VLS_103({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.saving),
     }));
-    const __VLS_101 = __VLS_100({
+    const __VLS_105 = __VLS_104({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.saving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_100));
-    let __VLS_103;
-    let __VLS_104;
-    let __VLS_105;
-    const __VLS_106 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_104));
+    let __VLS_107;
+    let __VLS_108;
+    let __VLS_109;
+    const __VLS_110 = {
         onClick: (__VLS_ctx.handleCreate)
     };
-    __VLS_102.slots.default;
-    var __VLS_102;
+    __VLS_106.slots.default;
+    var __VLS_106;
 }
-var __VLS_78;
+var __VLS_82;
 /** @type {__VLS_StyleScopedClasses['page-wrap']} */ ;
 /** @type {__VLS_StyleScopedClasses['page-main']} */ ;
 /** @type {__VLS_StyleScopedClasses['hero-panel']} */ ;
@@ -554,6 +591,7 @@ var __VLS_78;
 /** @type {__VLS_StyleScopedClasses['screen-card-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-card-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['empty-state']} */ ;
+/** @type {__VLS_StyleScopedClasses['pagination-panel']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -563,18 +601,20 @@ const __VLS_self = (await import('vue')).defineComponent({
             TopNavBar: TopNavBar,
             loading: loading,
             saving: saving,
-            countMap: countMap,
+            screens: screens,
+            totalScreens: totalScreens,
             createVisible: createVisible,
             keyword: keyword,
             statusFilter: statusFilter,
+            currentPage: currentPage,
+            pageSize: pageSize,
+            pageSizeOptions: pageSizeOptions,
             form: form,
             publishState: publishState,
             coverUrl: coverUrl,
             canvasLabel: canvasLabel,
-            allScreens: allScreens,
-            screens: screens,
-            publishedCount: publishedCount,
-            coverReadyCount: coverReadyCount,
+            totalPages: totalPages,
+            pageCoverReadyCount: pageCoverReadyCount,
             formatDate: formatDate,
             openCreate: openCreate,
             handleCreate: handleCreate,

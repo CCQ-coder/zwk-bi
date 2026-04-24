@@ -27,7 +27,6 @@
         <span class="user-avatar">{{ avatarText }}</span>
         <div class="user-copy">
           <span class="user-name">{{ displayName }}</span>
-          <span class="user-role">已登录</span>
         </div>
       </div>
       <el-button link class="logout-btn" @click="logout">退出</el-button>
@@ -38,7 +37,6 @@
     <template #header>
       <div class="drawer-head">
         <div class="drawer-brand">AI BI</div>
-        <div class="drawer-subtitle">业务分析工作区</div>
       </div>
     </template>
 
@@ -59,7 +57,6 @@
       <span class="user-avatar">{{ avatarText }}</span>
       <div class="drawer-user-copy">
         <div class="drawer-user-name">{{ displayName }}</div>
-        <div class="drawer-user-tip">当前会话账号</div>
       </div>
       <el-button link class="logout-btn" @click="logout">退出</el-button>
     </div>
@@ -165,14 +162,15 @@ onMounted(loadMenus)
 
 <style scoped>
 .top-nav {
-  height: 64px;
+  height: 56px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 18px;
-  padding: 0 20px;
-  background: linear-gradient(90deg, #08182f 0%, #0b2344 52%, #112e57 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 14px;
+  padding: 0 16px;
+  background: #0f1d2f;
+  border-bottom: 1px solid rgba(126, 153, 185, 0.16);
+  box-shadow: 0 6px 18px rgba(8, 19, 33, 0.18);
   color: #ffffff;
   position: sticky;
   top: 0;
@@ -188,7 +186,7 @@ onMounted(loadMenus)
 .nav-mobile-trigger {
   display: none;
   color: #dbe8ff;
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .brand {
@@ -203,20 +201,20 @@ onMounted(loadMenus)
 }
 
 .brand-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #42d6c5 0%, #2587ff 100%);
+  background: #1f6feb;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
 
 .brand-text {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -224,7 +222,7 @@ onMounted(loadMenus)
 .nav-items {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -235,63 +233,58 @@ onMounted(loadMenus)
 }
 
 .nav-btn {
-  border: 1px solid transparent;
+  border: 1px solid rgba(255, 255, 255, 0.04);
   background: transparent;
   color: rgba(255, 255, 255, 0.78);
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 14px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
   white-space: nowrap;
-  transition: all 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
 .nav-btn:hover {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(154, 182, 216, 0.14);
 }
 
 .nav-btn--active {
   color: #ffffff;
-  border-color: rgba(123, 196, 255, 0.35);
-  background: linear-gradient(135deg, rgba(61, 142, 255, 0.26) 0%, rgba(40, 101, 209, 0.46) 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  border-color: rgba(106, 151, 210, 0.28);
+  background: rgba(47, 99, 164, 0.26);
 }
 
 .user-menu {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .user-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .user-copy {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
 }
 
 .user-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
-.user-role {
-  font-size: 11px;
-  color: rgba(219, 232, 255, 0.72);
-}
-
 .user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(59, 130, 246, 0.92);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(43, 104, 183, 0.92);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -300,30 +293,24 @@ onMounted(loadMenus)
 }
 
 .logout-btn {
-  color: #ffd783;
+  color: rgba(215, 228, 245, 0.82);
 }
 
 .drawer-head {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
 }
 
 .drawer-brand {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: #15355d;
-}
-
-.drawer-subtitle {
-  font-size: 12px;
-  color: #6f86a3;
 }
 
 .drawer-menu {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .drawer-menu-btn {
@@ -331,9 +318,9 @@ onMounted(loadMenus)
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: 48px;
-  padding: 0 14px;
-  border-radius: 14px;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 10px;
   border: 1px solid #d9e6f4;
   background: #ffffff;
   color: #23405f;
@@ -348,13 +335,13 @@ onMounted(loadMenus)
 }
 
 .drawer-user-card {
-  margin-top: 20px;
-  padding: 14px;
-  border-radius: 16px;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 12px;
   background: #f5f9ff;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .drawer-user-copy {
@@ -366,11 +353,6 @@ onMounted(loadMenus)
   font-size: 14px;
   font-weight: 600;
   color: #183153;
-}
-
-.drawer-user-tip {
-  font-size: 12px;
-  color: #6f86a3;
 }
 
 @media (max-width: 900px) {

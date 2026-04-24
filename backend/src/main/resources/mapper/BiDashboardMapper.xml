@@ -11,6 +11,44 @@
         <result column="created_at"  property="createdAt"/>
     </resultMap>
 
+    <sql id="DashboardConfigJson">
+        CASE WHEN d.layout_json IS NULL OR d.layout_json = '' THEN '{}' ELSE d.layout_json END
+    </sql>
+
+    <sql id="DashboardFilterWhere">
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND d.name LIKE CONCAT('%', #{keyword}, '%')
+            </if>
+            <if test="scene != null and scene != ''">
+                <choose>
+                    <when test="scene == 'screen'">
+                        AND JSON_UNQUOTE(JSON_EXTRACT(<include refid="DashboardConfigJson"/>, '$.scene')) = 'screen'
+                    </when>
+                    <otherwise>
+                        AND (
+                            JSON_UNQUOTE(JSON_EXTRACT(<include refid="DashboardConfigJson"/>, '$.scene')) IS NULL
+                            OR JSON_UNQUOTE(JSON_EXTRACT(<include refid="DashboardConfigJson"/>, '$.scene')) != 'screen'
+                        )
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="publishStatus != null and publishStatus != ''">
+                <choose>
+                    <when test="publishStatus == 'PUBLISHED'">
+                        AND JSON_UNQUOTE(JSON_EXTRACT(<include refid="DashboardConfigJson"/>, '$.publish.status')) = 'PUBLISHED'
+                    </when>
+                    <otherwise>
+                        AND (
+                            JSON_UNQUOTE(JSON_EXTRACT(<include refid="DashboardConfigJson"/>, '$.publish.status')) IS NULL
+                            OR JSON_UNQUOTE(JSON_EXTRACT(<include refid="DashboardConfigJson"/>, '$.publish.status')) != 'PUBLISHED'
+                        )
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+    </sql>
+
     <select id="listAll" resultMap="BiDashboardMap">
         SELECT d.id,
                d.name,
@@ -23,6 +61,28 @@
                d.created_at
         FROM bi_dashboard d
         ORDER BY id DESC
+    </select>
+
+    <select id="listPage" resultMap="BiDashboardMap">
+        SELECT d.id,
+               d.name,
+               d.layout_json AS configJson,
+               (
+                   SELECT COUNT(1)
+                   FROM bi_dashboard_component dc
+                   WHERE dc.dashboard_id = d.id
+               ) AS component_count,
+               d.created_at
+        FROM bi_dashboard d
+        <include refid="DashboardFilterWhere"/>
+        ORDER BY d.created_at DESC, d.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(1)
+        FROM bi_dashboard d
+        <include refid="DashboardFilterWhere"/>
     </select>
 
     <select id="findLatest" resultMap="BiDashboardMap">

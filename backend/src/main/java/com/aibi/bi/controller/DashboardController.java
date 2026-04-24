@@ -4,6 +4,7 @@ import com.aibi.bi.common.ApiResponse;
 import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiDashboard;
 import com.aibi.bi.model.response.DashboardSummaryResponse;
+import com.aibi.bi.model.response.PageResult;
 import com.aibi.bi.service.DashboardService;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -34,6 +36,17 @@ public class DashboardController {
     @GetMapping
     public ApiResponse<List<BiDashboard>> list() {
         return ApiResponse.ok(dashboardService.list());
+    }
+
+    @GetMapping("/page")
+    public ApiResponse<PageResult<BiDashboard>> listPage(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String scene,
+            @RequestParam(required = false) String publishStatus,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "12") int pageSize
+    ) {
+        return ApiResponse.ok(dashboardService.listPage(keyword, scene, publishStatus, page, pageSize));
     }
 
     @GetMapping("/{id}")

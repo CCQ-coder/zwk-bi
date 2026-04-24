@@ -24,39 +24,43 @@
     </section>
 
     <div class="workspace">
-      <aside class="group-list-panel panel-card">
-        <div class="panel-head">
-          <div>
-            <div class="panel-title">分组目录</div>
-            <div class="panel-subtitle">维护发布分组的名称、排序和显示状态</div>
+      <div class="group-list-shell" :style="listPanelStyle">
+        <aside class="group-list-panel panel-card">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">分组目录</div>
+            </div>
+            <el-button type="primary" :icon="Plus" @click="startCreate">新建分组</el-button>
           </div>
-          <el-button type="primary" :icon="Plus" @click="startCreate">新建分组</el-button>
-        </div>
 
-        <el-input v-model="groupKeyword" :prefix-icon="Search" placeholder="搜索分组名称" clearable class="panel-search" />
+          <el-input v-model="groupKeyword" :prefix-icon="Search" placeholder="搜索分组名称" clearable class="panel-search" />
 
-        <el-scrollbar class="group-list-scroll">
-          <div class="group-list">
-            <button
-              v-for="group in filteredGroups"
-              :key="group.id"
-              type="button"
-              class="group-item"
-              :class="{ 'group-item--active': selectedGroupId === group.id && !creating }"
-              @click="selectGroup(group.id)"
-            >
-              <div class="group-item__head">
-                <span class="group-item__name">{{ group.name }}</span>
-                <el-tag size="small" :type="group.visible ? 'success' : 'info'">{{ group.visible ? '显示' : '隐藏' }}</el-tag>
-              </div>
-              <div class="group-item__meta">{{ group.screenCount }} 个大屏 · 排序 {{ group.sort }}</div>
-              <div v-if="group.description" class="group-item__desc">{{ group.description }}</div>
-            </button>
+          <el-scrollbar class="group-list-scroll">
+            <div class="group-list">
+              <button
+                v-for="group in filteredGroups"
+                :key="group.id"
+                type="button"
+                class="group-item"
+                :class="{ 'group-item--active': selectedGroupId === group.id && !creating }"
+                @click="selectGroup(group.id)"
+              >
+                <div class="group-item__head">
+                  <span class="group-item__name">{{ group.name }}</span>
+                  <el-tag size="small" :type="group.visible ? 'success' : 'info'">{{ group.visible ? '显示' : '隐藏' }}</el-tag>
+                </div>
+                <div class="group-item__meta">{{ group.screenCount }} 个大屏 · 排序 {{ group.sort }}</div>
+                <div v-if="group.description" class="group-item__desc">{{ group.description }}</div>
+              </button>
 
-            <el-empty v-if="!loading && !filteredGroups.length" description="暂无匹配分组" />
-          </div>
-        </el-scrollbar>
-      </aside>
+              <el-empty v-if="!loading && !filteredGroups.length" description="暂无匹配分组" />
+            </div>
+          </el-scrollbar>
+
+          <div class="group-list-panel__foot">拖拽右侧边缘可调整目录栏宽度</div>
+        </aside>
+        <div class="group-list-shell__resize" @mousedown.prevent="startListPanelResize" />
+      </div>
 
       <section class="group-detail">
         <div v-loading="loading" class="detail-stack">
@@ -64,7 +68,6 @@
             <div class="panel-head panel-head--detail">
               <div>
                 <div class="panel-title">{{ persistedGroupId ? '编辑分组' : '新建分组' }}</div>
-                <div class="panel-subtitle">保存后可继续分配大屏，隐藏分组不会在展示页出现。</div>
               </div>
               <div class="detail-chip">{{ persistedGroupId ? '已存在分组' : '草稿分组' }}</div>
             </div>
@@ -96,7 +99,6 @@
             <div class="panel-head panel-head--detail">
               <div>
                 <div class="panel-title">分配已发布大屏</div>
-                <div class="panel-subtitle">只会展示已发布的大屏，保存后会自动把大屏迁移到当前分组。</div>
               </div>
               <el-tag size="small" type="warning">已选 {{ assignedScreenIds.length }} 个</el-tag>
             </div>
@@ -159,7 +161,6 @@
             <div class="panel-head panel-head--detail">
               <div>
                 <div class="panel-title">当前分组预览</div>
-                <div class="panel-subtitle">仅展示已经挂到当前分组下的大屏名称，用于核对展示结果。</div>
               </div>
             </div>
 
@@ -187,7 +188,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CollectionTag, FolderOpened, Plus, Search, Tickets } from '@element-plus/icons-vue'
 import {
@@ -211,6 +212,8 @@ const screenKeyword = ref('')
 const selectedGroupId = ref<number | null>(null)
 const creating = ref(false)
 const assignedScreenIds = ref<number[]>([])
+const listPanelWidth = ref(324)
+let stopListPanelResize: (() => void) | null = null
 const groupForm = reactive({
   name: '',
   description: '',
@@ -259,6 +262,27 @@ const movingScreenCount = computed(() => assignedScreenIds.value.filter((id) => 
   const screen = screenOptionMap.value.get(id)
   return Boolean(screen?.groupId && screen.groupId !== persistedGroupId.value)
 }).length)
+const listPanelStyle = computed(() => ({ width: `${listPanelWidth.value}px` }))
+
+const startListPanelResize = (event: MouseEvent) => {
+  if (window.innerWidth <= 960) {
+    return
+  }
+  const startX = event.clientX
+  const startWidth = listPanelWidth.value
+  const handleMouseMove = (moveEvent: MouseEvent) => {
+    const nextWidth = startWidth + (moveEvent.clientX - startX)
+    listPanelWidth.value = Math.min(420, Math.max(280, nextWidth))
+  }
+  const handleMouseUp = () => {
+    window.removeEventListener('mousemove', handleMouseMove)
+    window.removeEventListener('mouseup', handleMouseUp)
+    stopListPanelResize = null
+  }
+  stopListPanelResize = handleMouseUp
+  window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('mouseup', handleMouseUp)
+}
 
 const applyGroup = (group: PublishGroup | null) => {
   if (!group) {
@@ -426,6 +450,10 @@ onMounted(() => {
     ElMessage.error('发布分组数据加载失败')
   })
 })
+
+onBeforeUnmount(() => {
+  stopListPanelResize?.()
+})
 </script>
 
 <style scoped>
@@ -480,8 +508,7 @@ onMounted(() => {
 .workspace {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  display: flex;
   gap: 16px;
 }
 
@@ -492,11 +519,66 @@ onMounted(() => {
   box-shadow: 0 18px 42px rgba(22, 60, 102, 0.08);
 }
 
-.group-list-panel {
+.group-list-shell {
+  position: relative;
+  flex: 0 0 auto;
   min-height: 0;
+}
+
+.group-list-panel {
+  height: 100%;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   padding: 18px;
+  background:
+    linear-gradient(180deg, rgba(17, 33, 53, 0.98) 0%, rgba(23, 46, 73, 0.98) 48%, rgba(28, 56, 88, 0.96) 100%),
+    linear-gradient(135deg, #20354a 0%, #314a63 100%);
+  border-color: rgba(118, 154, 191, 0.18);
+  box-shadow:
+    0 28px 60px rgba(11, 25, 40, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.group-list-panel::before {
+  content: '';
+  position: absolute;
+  inset: -20% auto auto -20%;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(80, 137, 205, 0.18) 0%, rgba(80, 137, 205, 0) 72%);
+  pointer-events: none;
+}
+
+.group-list-panel__foot {
+  margin-top: 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(196, 214, 234, 0.62);
+}
+
+.group-list-shell__resize {
+  position: absolute;
+  top: 18px;
+  right: -9px;
+  width: 18px;
+  height: calc(100% - 36px);
+  cursor: col-resize;
+}
+
+.group-list-shell__resize::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 7px;
+  width: 4px;
+  height: 74px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(106, 157, 226, 0.08) 0%, rgba(106, 157, 226, 0.34) 100%);
 }
 
 .panel-head {
@@ -527,6 +609,32 @@ onMounted(() => {
   margin-top: 14px;
 }
 
+.group-list-panel .panel-head {
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(184, 208, 233, 0.12);
+}
+
+.group-list-panel .panel-title {
+  color: #f3f7fd;
+}
+
+.group-list-panel .panel-subtitle {
+  color: rgba(196, 214, 234, 0.72);
+}
+
+.group-list-panel :deep(.el-input__wrapper) {
+  background: rgba(8, 18, 30, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(184, 208, 233, 0.12);
+}
+
+.group-list-panel :deep(.el-input__inner) {
+  color: #eff5fd;
+}
+
+.group-list-panel :deep(.el-input__inner::placeholder) {
+  color: rgba(191, 210, 231, 0.48);
+}
+
 .group-list-scroll {
   flex: 1;
   min-height: 0;
@@ -541,23 +649,44 @@ onMounted(() => {
 
 .group-item {
   width: 100%;
-  border: 1px solid rgba(214, 224, 235, 0.96);
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: transparent;
   padding: 14px 16px;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.group-item::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #72b6ff 0%, #3f86ff 100%);
+  opacity: 0;
+  transition: height 0.18s ease, opacity 0.18s ease;
 }
 
 .group-item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 26px rgba(27, 74, 122, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(184, 208, 233, 0.1);
 }
 
 .group-item--active {
-  border-color: rgba(33, 125, 240, 0.48);
-  box-shadow: 0 18px 34px rgba(32, 113, 212, 0.16);
+  border-color: rgba(106, 157, 226, 0.24);
+  background: linear-gradient(180deg, rgba(11, 20, 32, 0.68) 0%, rgba(16, 31, 48, 0.92) 100%);
+  box-shadow: 0 12px 24px rgba(7, 15, 26, 0.22);
+}
+
+.group-item--active::before {
+  height: 34px;
+  opacity: 1;
 }
 
 .group-item__head {
@@ -570,7 +699,7 @@ onMounted(() => {
 .group-item__name {
   font-size: 15px;
   font-weight: 700;
-  color: #17324c;
+  color: rgba(244, 248, 253, 0.94);
 }
 
 .group-item__meta,
@@ -578,10 +707,15 @@ onMounted(() => {
   margin-top: 8px;
   font-size: 12px;
   line-height: 1.7;
-  color: #718299;
+  color: rgba(191, 210, 231, 0.66);
+}
+
+.group-item--active .group-item__name {
+  color: #70b2ff;
 }
 
 .group-detail {
+  flex: 1;
   min-height: 0;
 }
 
@@ -767,15 +901,19 @@ onMounted(() => {
   .stats-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .workspace {
-    grid-template-columns: 300px minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 980px) {
   .workspace {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .group-list-shell {
+    width: 100% !important;
+  }
+
+  .group-list-shell__resize {
+    display: none;
   }
 
   .group-form__grid,

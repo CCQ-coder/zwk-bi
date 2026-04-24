@@ -10,6 +10,7 @@ import com.aibi.bi.mapper.BiDatasetMapper;
 import com.aibi.bi.mapper.BiDatasourceMapper;
 import com.aibi.bi.model.response.DashboardKpiResponse;
 import com.aibi.bi.model.response.DashboardSummaryResponse;
+import com.aibi.bi.model.response.PageResult;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -41,6 +42,20 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<BiDashboard> list() {
         return biDashboardMapper.listAll();
+    }
+
+    @Override
+    public PageResult<BiDashboard> listPage(String keyword, String scene, String publishStatus, int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safePageSize = Math.max(1, Math.min(pageSize, 60));
+        int offset = (safePage - 1) * safePageSize;
+        String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        String normalizedScene = normalizeScene(scene);
+        String normalizedPublishStatus = normalizePublishStatus(publishStatus);
+
+        List<BiDashboard> items = biDashboardMapper.listPage(normalizedKeyword, normalizedScene, normalizedPublishStatus, offset, safePageSize);
+        long total = biDashboardMapper.countPage(normalizedKeyword, normalizedScene, normalizedPublishStatus);
+        return PageResult.of(items, total, safePage, safePageSize);
     }
 
     @Override
@@ -110,5 +125,27 @@ public class DashboardServiceImpl implements DashboardService {
         response.setKpi(kpi);
         response.setCharts(charts);
         return response;
+    }
+
+    private String normalizeScene(String scene) {
+        if (!StringUtils.hasText(scene)) {
+            return null;
+        }
+        String normalized = scene.trim().toLowerCase();
+        if ("screen".equals(normalized) || "dashboard".equals(normalized)) {
+            return normalized;
+        }
+        return null;
+    }
+
+    private String normalizePublishStatus(String publishStatus) {
+        if (!StringUtils.hasText(publishStatus)) {
+            return null;
+        }
+        String normalized = publishStatus.trim().toUpperCase();
+        if ("PUBLISHED".equals(normalized) || "DRAFT".equals(normalized)) {
+            return normalized;
+        }
+        return null;
     }
 }

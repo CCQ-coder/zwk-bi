@@ -11,9 +11,9 @@
 
         <div class="hero-actions">
           <div class="hero-summary">
-            <span>{{ allScreens.length }} 个大屏</span>
-            <span>{{ publishedCount }} 个已发布</span>
-            <span>{{ coverReadyCount }} 个已生成封面</span>
+            <span>{{ totalScreens }} 个筛选结果</span>
+            <span>第 {{ currentPage }} / {{ totalPages }} 页</span>
+            <span>{{ pageCoverReadyCount }} 个本页已生成封面</span>
           </div>
           <el-button type="primary" :icon="Plus" @click="openCreate">新建数据大屏</el-button>
         </div>
@@ -54,7 +54,7 @@
             </div>
 
             <div class="screen-card-meta">
-              <span>{{ countMap.get(screen.id) ?? 0 }} 个组件</span>
+              <span>{{ screen.componentCount ?? 0 }} 个组件</span>
               <span>{{ coverUrl(screen) ? '已配置封面' : '待生成封面' }}</span>
             </div>
 
@@ -71,6 +71,17 @@
         </article>
 
         <el-empty v-if="!loading && !screens.length" description="暂无符合条件的数据大屏，可直接新建或先在编辑器中生成封面" class="empty-state" />
+      </section>
+
+      <section v-if="totalScreens" class="pagination-panel">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          background
+          layout="total, sizes, prev, pager, next"
+          :page-sizes="pageSizeOptions"
+          :total="totalScreens"
+        />
       </section>
     </main>
 
@@ -89,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Monitor, Plus } from '@element-plus/icons-vue'
@@ -97,7 +108,7 @@ import TopNavBar from '../components/TopNavBar.vue'
 import {
   createDashboard,
   deleteDashboard,
-  getDashboardComponents,
+  getDashboardPage,
   getDashboardList,
   type Dashboard,
 } from '../api/dashboard'
@@ -113,14 +124,15 @@ import {
 const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
-const rawScreens = ref<Dashboard[]>([])
-const countMap = ref(new Map<number, number>())
+const screens = ref<Dashboard[]>([])
+const totalScreens = ref(0)
 const createVisible = ref(false)
 const keyword = ref('')
 const statusFilter = ref<'ALL' | PublishStatus>('ALL')
+const currentPage = ref(1)
+const pageSize = ref(12)
+const pageSizeOptions = [12, 24, 48]
 const form = reactive({ name: '' })
-
-const screenScene = (screen: Dashboard) => parseReportConfig(screen.configJson).scene === 'screen'
 
 const publishState = (screen: Dashboard): PublishStatus => {
   const cfg = parseReportConfig(screen.configJson)
@@ -138,20 +150,8 @@ const canvasLabel = (screen: Dashboard) => {
   return `${canvas.width} × ${canvas.height}`
 }
 
-const sortByCreatedAt = (list: Dashboard[]) => [...list].sort((left, right) => {
-  const leftTime = new Date(left.createdAt || 0).getTime()
-  const rightTime = new Date(right.createdAt || 0).getTime()
-  return rightTime - leftTime
-})
-
-const allScreens = computed(() => sortByCreatedAt(rawScreens.value.filter((item) => screenScene(item))))
-const screens = computed(() => allScreens.value.filter((screen) => {
-  const nameMatched = !keyword.value.trim() || screen.name.toLowerCase().includes(keyword.value.trim().toLowerCase())
-  const statusMatched = statusFilter.value === 'ALL' || publishState(screen) === statusFilter.value
-  return nameMatched && statusMatched
-}))
-const publishedCount = computed(() => allScreens.value.filter((screen) => publishState(screen) === 'PUBLISHED').length)
-const coverReadyCount = computed(() => allScreens.value.filter((screen) => Boolean(coverUrl(screen))).length)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalScreens.value / pageSize.value)))
+const pageCoverReadyCount = computed(() => screens.value.filter((screen) => Boolean(coverUrl(screen))).length)
 
 const formatDate = (iso: string) => {
   if (!iso) return ''
@@ -169,12 +169,19 @@ const formatDate = (iso: string) => {
 const loadScreens = async () => {
   loading.value = true
   try {
-    const list = await getDashboardList()
-    rawScreens.value = list
-    const entries = await Promise.all(
-      list.filter((item) => screenScene(item)).map(async (screen) => [screen.id, (await getDashboardComponents(screen.id)).length] as const)
-    )
-    countMap.value = new Map(entries)
+    const pageData = await getDashboardPage({
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      keyword: keyword.value.trim() || undefined,
+      scene: 'screen',
+      publishStatus: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
+    })
+    screens.value = pageData.items
+    totalScreens.value = pageData.total
+    const maxPage = Math.max(1, Math.ceil(pageData.total / pageData.pageSize))
+    if (currentPage.value > maxPage) {
+      currentPage.value = maxPage
+    }
   } finally {
     loading.value = false
   }
@@ -211,12 +218,28 @@ const openPreview = (id: number) => {
 
 const handleDelete = async (id: number) => {
   await deleteDashboard(id)
-  rawScreens.value = rawScreens.value.filter((screen) => screen.id !== id)
-  countMap.value.delete(id)
+  if (screens.value.length === 1 && currentPage.value > 1) {
+    currentPage.value -= 1
+  } else {
+    await loadScreens()
+  }
   ElMessage.success('已删除')
 }
 
-onMounted(loadScreens)
+watch(
+  () => [keyword.value.trim(), statusFilter.value, currentPage.value, pageSize.value] as const,
+  ([nextKeyword, nextStatus, nextPage], previous) => {
+    const prevKeyword = previous?.[0] ?? nextKeyword
+    const prevStatus = previous?.[1] ?? nextStatus
+    if ((nextKeyword !== prevKeyword || nextStatus !== prevStatus) && nextPage !== 1) {
+      currentPage.value = 1
+      return
+    }
+    loadScreens()
+  }
+  ,
+  { immediate: true }
+)
 </script>
 
 <style scoped>
@@ -296,6 +319,11 @@ onMounted(loadScreens)
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 18px;
   align-items: start;
+}
+
+.pagination-panel {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .screen-card {

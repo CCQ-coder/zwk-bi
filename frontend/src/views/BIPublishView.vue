@@ -3,35 +3,60 @@
     <TopNavBar active="publish" />
 
     <main class="page-main">
-      <section class="publish-hero">
-        <div>
-          <div class="publish-hero__eyebrow">BI Publish Hub</div>
-          <div class="publish-hero__title">BI发布平台</div>
-          <div class="publish-hero__subtitle">统一管理发布分组，并按分组通过 iframe 展示正式发布的大屏。</div>
-        </div>
-        <div class="publish-hero__tags">
-          <span>分组控制</span>
-          <span>已发布筛选</span>
-          <span>iframe 展示</span>
-        </div>
-      </section>
-
       <el-empty v-if="!visibleTabs.length" description="当前账号没有 BI 发布平台菜单权限" class="publish-empty" />
 
-      <el-tabs v-else v-model="activeTab" type="border-card" class="publish-tabs">
-        <el-tab-pane v-if="hasTab('groups')" label="分组管理" name="groups" lazy>
-          <PublishGroupManager />
-        </el-tab-pane>
-        <el-tab-pane v-if="hasTab('panels')" label="BI面板展示" name="panels" lazy>
-          <PublishPanelDisplay />
-        </el-tab-pane>
-      </el-tabs>
+      <div v-else class="publish-shell">
+        <aside class="publish-nav" :class="{ 'publish-nav--collapsed': navCollapsed }" :style="publishNavStyle">
+          <div class="publish-nav__inner panel-card">
+            <div class="publish-nav__head">
+              <div v-if="!navCollapsed">
+                <div class="publish-nav__title">BI发布</div>
+              </div>
+              <el-button text class="publish-nav__toggle" @click="toggleNavCollapsed">
+                {{ navCollapsed ? '展开' : '折叠' }}
+              </el-button>
+            </div>
+
+            <div v-if="!navCollapsed" class="publish-nav__section-label">导航</div>
+
+            <div class="publish-nav__menu" :class="{ 'publish-nav__menu--compact': navCollapsed }">
+              <button
+                v-for="tab in visibleTabs"
+                :key="tab.name"
+                type="button"
+                class="publish-nav__item"
+                :class="{ 'publish-nav__item--active': activeTab === tab.name }"
+                @click="activeTab = tab.name"
+              >
+                <div class="publish-nav__item-icon">
+                  <el-icon><component :is="tab.icon" /></el-icon>
+                </div>
+                <template v-if="!navCollapsed">
+                  <div class="publish-nav__item-copy">
+                    <div class="publish-nav__item-title">{{ tab.label }}</div>
+                  </div>
+                </template>
+              </button>
+            </div>
+
+          </div>
+          <div class="publish-nav__resize" @mousedown.prevent="startNavResize" />
+        </aside>
+
+        <section class="publish-workspace">
+          <section class="publish-workspace__body">
+            <PublishGroupManager v-if="activeTab === 'groups' && hasTab('groups')" />
+            <PublishPanelDisplay v-else-if="activeTab === 'panels' && hasTab('panels')" />
+          </section>
+        </section>
+      </div>
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { CollectionTag, Monitor } from '@element-plus/icons-vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getCurrentMenus } from '../api/menu'
 import TopNavBar from '../components/TopNavBar.vue'
@@ -44,10 +69,23 @@ const route = useRoute()
 const router = useRouter()
 const activeTab = ref('panels')
 const menus = ref<AuthMenuItem[]>(getAuthMenus())
+const navWidth = ref(264)
+const navCollapsed = ref(false)
+let stopNavResize: (() => void) | null = null
 
 const tabs = [
-  { name: 'groups', path: '/home/publish/groups' },
-  { name: 'panels', path: '/home/publish/panels' },
+  {
+    name: 'groups',
+    path: '/home/publish/groups',
+    label: '分组管理',
+    icon: CollectionTag,
+  },
+  {
+    name: 'panels',
+    path: '/home/publish/panels',
+    label: 'BI面板展示',
+    icon: Monitor,
+  },
 ] as const
 
 const routeTabMap: Record<string, 'groups' | 'panels'> = {
@@ -63,8 +101,35 @@ const tabRouteMap: Record<'groups' | 'panels', string> = {
 const authPaths = computed(() => new Set(flattenAuthMenus(menus.value).map((item) => item.path).filter(Boolean)))
 const visibleTabs = computed(() => tabs.filter((tab) => authPaths.value.has(tab.path)))
 const fallbackTab = computed(() => visibleTabs.value[0]?.name ?? 'panels')
+const publishNavStyle = computed(() => navCollapsed.value
+  ? { width: '76px' }
+  : { width: `${navWidth.value}px` })
 
 const hasTab = (tabName: 'groups' | 'panels') => visibleTabs.value.some((tab) => tab.name === tabName)
+
+const toggleNavCollapsed = () => {
+  navCollapsed.value = !navCollapsed.value
+}
+
+const startNavResize = (event: MouseEvent) => {
+  if (navCollapsed.value || window.innerWidth <= 960) {
+    return
+  }
+  const startX = event.clientX
+  const startWidth = navWidth.value
+  const handleMouseMove = (moveEvent: MouseEvent) => {
+    const nextWidth = startWidth + (moveEvent.clientX - startX)
+    navWidth.value = Math.min(320, Math.max(220, nextWidth))
+  }
+  const handleMouseUp = () => {
+    window.removeEventListener('mousemove', handleMouseMove)
+    window.removeEventListener('mouseup', handleMouseUp)
+    stopNavResize = null
+  }
+  stopNavResize = handleMouseUp
+  window.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('mouseup', handleMouseUp)
+}
 
 const loadMenus = async () => {
   if (!hasAuthSession()) {
@@ -109,6 +174,10 @@ watch(activeTab, (tab) => {
 })
 
 onMounted(loadMenus)
+
+onBeforeUnmount(() => {
+  stopNavResize?.()
+})
 </script>
 
 <style scoped>
@@ -123,69 +192,214 @@ onMounted(loadMenus)
 
 .page-main {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 20px 24px 28px;
+  padding: 14px 16px 18px;
 }
 
-.publish-hero {
-  border-radius: 28px;
-  padding: 24px 28px;
-  background:
-    linear-gradient(135deg, rgba(6, 30, 60, 0.96) 0%, rgba(13, 58, 112, 0.94) 55%, rgba(22, 105, 173, 0.92) 100%),
-    linear-gradient(135deg, #0f2744 0%, #19416f 100%);
-  color: #f7fbff;
+.panel-card {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(208, 220, 234, 0.92);
+  box-shadow: 0 12px 28px rgba(21, 58, 99, 0.06);
+}
+
+.publish-shell {
+  height: 100%;
+  min-height: calc(100vh - 86px);
   display: flex;
-  align-items: flex-end;
+  gap: 12px;
+}
+
+.publish-nav {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.publish-nav__inner {
+  height: 100%;
+  padding: 14px 12px 12px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(180deg, #152436 0%, #1b2d43 100%);
+  border: 1px solid rgba(118, 154, 191, 0.2);
+  box-shadow: 0 16px 34px rgba(12, 26, 42, 0.16);
+  color: #f5f9ff;
+}
+
+.publish-nav__head {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  box-shadow: 0 18px 48px rgba(18, 50, 91, 0.18);
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(184, 208, 233, 0.12);
 }
 
-.publish-hero__eyebrow {
-  font-size: 12px;
+.publish-nav__title {
+  font-size: 18px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.02em;
+}
+
+.publish-nav__toggle {
+  min-height: 30px;
+  padding-inline: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(184, 208, 233, 0.14);
+  color: rgba(245, 249, 255, 0.92);
+}
+
+.publish-nav__section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(205, 228, 255, 0.8);
+  color: rgba(210, 225, 242, 0.52);
 }
 
-.publish-hero__title {
-  margin-top: 10px;
-  font-size: 30px;
-  font-weight: 700;
-}
-
-.publish-hero__subtitle {
-  margin-top: 8px;
-  max-width: 640px;
-  font-size: 14px;
-  line-height: 1.8;
-  color: rgba(224, 237, 255, 0.82);
-}
-
-.publish-hero__tags {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.publish-hero__tags span {
-  padding: 9px 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  font-size: 12px;
-  color: rgba(248, 251, 255, 0.92);
-}
-
-.publish-tabs {
+.publish-nav__menu {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  border: none;
+  gap: 4px;
+}
+
+.publish-nav__menu--compact {
+  align-items: center;
+}
+
+.publish-nav__item {
+  width: 100%;
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 12px;
   background: transparent;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.publish-nav__item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: #6ea8eb;
+  opacity: 0;
+  transition: height 0.18s ease, opacity 0.18s ease;
+}
+
+.publish-nav__item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(184, 208, 233, 0.08);
+}
+
+.publish-nav__item--active {
+  background: rgba(47, 99, 164, 0.18);
+  border-color: rgba(106, 157, 226, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.publish-nav__item--active::before {
+  height: 24px;
+  opacity: 1;
+}
+
+.publish-nav__item-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(184, 208, 233, 0.08);
+  font-size: 16px;
+}
+
+.publish-nav__item--active .publish-nav__item-icon {
+  background: rgba(55, 123, 206, 0.12);
+  border-color: rgba(110, 171, 246, 0.18);
+  color: #8abfff;
+}
+
+.publish-nav__item-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.publish-nav__item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(247, 250, 255, 0.94);
+}
+
+.publish-nav__item--active .publish-nav__item-title {
+  color: #8abfff;
+}
+
+.publish-nav__resize {
+  position: absolute;
+  top: 14px;
+  right: -9px;
+  width: 18px;
+  height: calc(100% - 28px);
+  cursor: col-resize;
+}
+
+.publish-nav__resize::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 7px;
+  width: 3px;
+  height: 64px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(106, 157, 226, 0.06) 0%, rgba(106, 157, 226, 0.24) 100%);
+}
+
+.publish-nav--collapsed .publish-nav__inner {
+  align-items: center;
+  padding-inline: 8px;
+}
+
+.publish-nav--collapsed .publish-nav__head {
+  width: 100%;
+  justify-content: center;
+}
+
+.publish-nav--collapsed .publish-nav__item {
+  width: 44px;
+  padding: 8px 0;
+  justify-content: center;
+}
+
+.publish-workspace {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.publish-workspace__body {
+  flex: 1;
+  min-height: 0;
 }
 
 .publish-empty {
@@ -193,57 +407,41 @@ onMounted(loadMenus)
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 24px;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(208, 220, 234, 0.86);
 }
 
-:deep(.el-tabs__header) {
-  margin-bottom: 14px;
-}
-
-:deep(.el-tabs__content) {
-  flex: 1;
-  overflow: hidden;
-  padding: 0;
-}
-
-:deep(.el-tab-pane) {
-  height: 100%;
-}
-
-:deep(.el-tabs__nav-wrap) {
-  padding: 12px 12px 0;
-  background: rgba(255, 255, 255, 0.74);
-  border-radius: 22px 22px 0 0;
-}
-
-:deep(.el-tabs__item) {
-  height: 44px;
-  font-weight: 600;
-}
-
-:deep(.el-tabs__item.is-active) {
-  color: #1458a8;
-}
-
-:deep(.el-tabs__active-bar) {
-  background: linear-gradient(90deg, #1b7df0 0%, #16b8a4 100%);
-}
-
-@media (max-width: 900px) {
+@media (max-width: 1080px) {
   .page-main {
-    padding: 16px 16px 24px;
+    padding: 12px 12px 16px;
   }
 
-  .publish-hero {
-    padding: 20px;
+  .publish-shell {
     flex-direction: column;
-    align-items: flex-start;
   }
 
-  .publish-hero__title {
+  .publish-nav,
+  .publish-nav--collapsed {
+    width: 100% !important;
+  }
+
+  .publish-nav__resize {
+    display: none;
+  }
+
+  .publish-nav__title {
     font-size: 24px;
+  }
+}
+
+@media (max-width: 720px) {
+  .publish-nav__head {
+    align-items: center;
+  }
+
+  .publish-nav__menu {
+    gap: 6px;
   }
 }
 </style>

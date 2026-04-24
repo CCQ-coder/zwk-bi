@@ -24,11 +24,19 @@ export interface DashboardData {
   charts: DashboardChart[]
 }
 
+export interface PageResult<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 export interface Dashboard {
   id: number
   name: string
   configJson: string
   createdAt: string
+  componentCount?: number
 }
 
 export interface DashboardComponent {
@@ -43,6 +51,14 @@ export interface DashboardComponent {
   configJson?: string
 }
 
+export interface DashboardPageParams {
+  page?: number
+  pageSize?: number
+  keyword?: string
+  scene?: 'dashboard' | 'screen'
+  publishStatus?: 'DRAFT' | 'PUBLISHED'
+}
+
 // 首页默认仪表板（最新一条）
 export const getDefaultDashboard = (): Promise<DashboardData> =>
   request.get('/dashboard/default')
@@ -50,6 +66,9 @@ export const getDefaultDashboard = (): Promise<DashboardData> =>
 // 仪表板 CRUD
 export const getDashboardList = (): Promise<Dashboard[]> =>
   request.get('/dashboard')
+
+export const getDashboardPage = (params: DashboardPageParams): Promise<PageResult<Dashboard>> =>
+  request.get('/dashboard/page', { params })
 
 export const getDashboardById = (id: number): Promise<Dashboard> =>
   request.get(`/dashboard/${id}`)

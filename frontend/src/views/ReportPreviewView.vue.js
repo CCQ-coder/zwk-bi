@@ -4,21 +4,23 @@ import { useRoute, useRouter } from 'vue-router';
 import { getDashboardById } from '../api/dashboard';
 import { getPublicDashboardById } from '../api/report';
 import ReportPreviewCanvas from '../components/ReportPreviewCanvas.vue';
-import { canAccessPublishedReport, normalizePublishConfig, parseReportConfig } from '../utils/report-config';
+import { buildPublishedLink, canAccessPublishedReport, normalizePublishConfig, parseReportConfig } from '../utils/report-config';
 import { getAuthRole, hasAuthSession } from '../utils/auth-session';
 const route = useRoute();
 const router = useRouter();
 const dashboardId = computed(() => Number(route.params.id || 0));
 const scene = computed(() => String(route.meta.scene) === 'screen' ? 'screen' : 'dashboard');
-const shareLink = computed(() => `${window.location.origin}${route.fullPath.replace(/[?].*$/, '')}`);
 const dashboard = ref(null);
 const loading = ref(false);
 const accessReason = ref('');
 const localRole = computed(() => getAuthRole());
 const hasSession = computed(() => hasAuthSession());
 const token = computed(() => String(route.query.token || ''));
-const accessMode = computed(() => !hasSession.value && Boolean(token.value) ? 'public' : 'private');
+const accessMode = computed(() => token.value ? 'public' : 'private');
 const publishConfig = computed(() => normalizePublishConfig(parseReportConfig(dashboard.value?.configJson).publish));
+const shareLink = computed(() => dashboard.value
+    ? buildPublishedLink(scene.value, dashboard.value.id, publishConfig.value.shareToken)
+    : '');
 const accessResult = computed(() => {
     if (accessMode.value === 'public') {
         return {
@@ -95,7 +97,7 @@ onMounted(() => {
     }
 });
 watch(dashboardId, loadDashboard);
-watch([dashboardId, token, hasSession], loadDashboard);
+watch([dashboardId, token], loadDashboard);
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
