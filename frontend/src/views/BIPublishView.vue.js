@@ -10,7 +10,7 @@ const route = useRoute();
 const router = useRouter();
 const activeTab = ref('panels');
 const menus = ref(getAuthMenus());
-const navWidth = ref(292);
+const navWidth = ref(264);
 const navCollapsed = ref(false);
 let stopNavResize = null;
 const tabs = [
@@ -39,7 +39,7 @@ const authPaths = computed(() => new Set(flattenAuthMenus(menus.value).map((item
 const visibleTabs = computed(() => tabs.filter((tab) => authPaths.value.has(tab.path)));
 const fallbackTab = computed(() => visibleTabs.value[0]?.name ?? 'panels');
 const publishNavStyle = computed(() => navCollapsed.value
-    ? { width: '88px' }
+    ? { width: '76px' }
     : { width: `${navWidth.value}px` });
 const hasTab = (tabName) => visibleTabs.value.some((tab) => tab.name === tabName);
 const toggleNavCollapsed = () => {
@@ -53,7 +53,7 @@ const startNavResize = (event) => {
     const startWidth = navWidth.value;
     const handleMouseMove = (moveEvent) => {
         const nextWidth = startWidth + (moveEvent.clientX - startX);
-        navWidth.value = Math.min(360, Math.max(236, nextWidth));
+        navWidth.value = Math.min(320, Math.max(220, nextWidth));
     };
     const handleMouseUp = () => {
         window.removeEventListener('mousemove', handleMouseMove);
@@ -103,7 +103,6 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['publish-nav__inner']} */ ;
 /** @type {__VLS_StyleScopedClasses['publish-nav__item']} */ ;
 /** @type {__VLS_StyleScopedClasses['publish-nav__item']} */ ;
 /** @type {__VLS_StyleScopedClasses['publish-nav__item--active']} */ ;
@@ -195,7 +194,7 @@ else {
         onClick: (__VLS_ctx.toggleNavCollapsed)
     };
     __VLS_10.slots.default;
-    (__VLS_ctx.navCollapsed ? '展开' : '收起');
+    (__VLS_ctx.navCollapsed ? '展开' : '折叠');
     var __VLS_10;
     if (!__VLS_ctx.navCollapsed) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -242,11 +241,6 @@ else {
             (tab.label);
         }
     }
-    if (!__VLS_ctx.navCollapsed) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "publish-nav__foot" },
-        });
-    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
         ...{ onMousedown: (__VLS_ctx.startNavResize) },
         ...{ class: "publish-nav__resize" },
@@ -288,7 +282,6 @@ else {
 /** @type {__VLS_StyleScopedClasses['publish-nav__item-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['publish-nav__item-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['publish-nav__item-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['publish-nav__foot']} */ ;
 /** @type {__VLS_StyleScopedClasses['publish-nav__resize']} */ ;
 /** @type {__VLS_StyleScopedClasses['publish-workspace']} */ ;
 /** @type {__VLS_StyleScopedClasses['publish-workspace__body']} */ ;

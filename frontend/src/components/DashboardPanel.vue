@@ -91,6 +91,7 @@
           <div
             v-for="comp in components"
             :key="comp.id"
+            :ref="(el) => setCardRef(el as HTMLElement | null, comp.id)"
             class="chart-card"
             :class="{ active: activeCompId === comp.id }"
             :style="getCardStyle(comp)"
@@ -385,8 +386,20 @@ const getComponentStatus = (comp: DashboardComponent) => {
 }
 
 // echarts instances
+const cardRefs = new Map<number, HTMLElement>()
 const chartRefs = new Map<number, HTMLElement>()
 const chartInstances = new Map<number, ECharts>()
+
+const setCardRef = (el: HTMLElement | null, compId: number) => {
+  if (!el) {
+    cardRefs.delete(compId)
+    return
+  }
+  cardRefs.set(compId, el)
+  if (interactionPreviewSnapshot?.compId === compId) {
+    applyInteractionPreviewToCard(interactionPreviewSnapshot)
+  }
+}
 
 const setChartRef = (el: HTMLElement | null, compId: number) => {
   if (el) chartRefs.set(compId, el)
@@ -639,10 +652,128 @@ interface InteractionState {
   handle?: ResizeHandle
 }
 
+interface InteractionPreview {
+  compId: number
+  nextX: number
+  nextY: number
+  nextWidth: number
+  nextHeight: number
+  transform: string
+  transformOrigin: string
+}
+
 let interaction: InteractionState | null = null
+let interactionPreviewSnapshot: InteractionPreview | null = null
+let interactionFrame: number | null = null
+let pendingPointer: { x: number; y: number } | null = null
 const resizeHandles: ResizeHandle[] = ['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw']
 
 const findComp = (id: number) => components.value.find(c => c.id === id)
+
+const getResizeTransformOrigin = (handle: ResizeHandle) => {
+  const horizontal = handle.includes('w') ? 'right' : handle.includes('e') ? 'left' : 'center'
+  const vertical = handle.includes('n') ? 'bottom' : handle.includes('s') ? 'top' : 'center'
+  return `${horizontal} ${vertical}`
+}
+
+const applyInteractionPreviewToCard = (preview: InteractionPreview | null) => {
+  if (!preview) return
+  const card = cardRefs.get(preview.compId)
+  if (!card) return
+  card.style.transform = preview.transform
+  card.style.transformOrigin = preview.transformOrigin
+}
+
+const clearInteractionPreviewFromCard = (componentId?: number) => {
+  const targetId = componentId ?? interactionPreviewSnapshot?.compId
+  if (!targetId) return
+  const card = cardRefs.get(targetId)
+  if (!card) return
+  card.style.transform = ''
+  card.style.transformOrigin = ''
+}
+
+const applyInteractionFrame = () => {
+  interactionFrame = null
+  if (!interaction || !pendingPointer) return
+  const comp = findComp(interaction.compId)
+  if (!comp) return
+
+  const dx = pendingPointer.x - interaction.startMouseX
+  const dy = pendingPointer.y - interaction.startMouseY
+
+  if (interaction.mode === 'move') {
+    const maxX = Math.max(0, getCanvasWidth() - interaction.startWidth)
+    const nextX = Math.min(maxX, Math.max(0, interaction.startX + dx))
+    const nextY = Math.max(0, interaction.startY + dy)
+    const preview = {
+      compId: comp.id,
+      nextX: Math.round(nextX),
+      nextY: Math.round(nextY),
+      nextWidth: interaction.startWidth,
+      nextHeight: interaction.startHeight,
+      transform: `translate(${Math.round(nextX - interaction.startX)}px, ${Math.round(nextY - interaction.startY)}px)`,
+      transformOrigin: 'left top',
+    }
+    interactionPreviewSnapshot = preview
+    applyInteractionPreviewToCard(preview)
+    return
+  }
+
+  const handle = interaction.handle ?? 'se'
+  let nextX = interaction.startX
+  let nextY = interaction.startY
+  let nextWidth = interaction.startWidth
+  let nextHeight = interaction.startHeight
+  const canvasWidth = getCanvasWidth()
+
+  if (handle.includes('e')) {
+    nextWidth = Math.min(Math.max(MIN_CARD_WIDTH, interaction.startWidth + dx), Math.max(MIN_CARD_WIDTH, canvasWidth - interaction.startX))
+  }
+  if (handle.includes('s')) {
+    nextHeight = Math.max(MIN_CARD_HEIGHT, interaction.startHeight + dy)
+  }
+  if (handle.includes('w')) {
+    const maxLeft = interaction.startX + interaction.startWidth - MIN_CARD_WIDTH
+    nextX = Math.min(Math.max(0, interaction.startX + dx), maxLeft)
+    nextWidth = interaction.startWidth - (nextX - interaction.startX)
+  }
+  if (handle.includes('n')) {
+    const maxTop = interaction.startY + interaction.startHeight - MIN_CARD_HEIGHT
+    nextY = Math.min(Math.max(0, interaction.startY + dy), maxTop)
+    nextHeight = interaction.startHeight - (nextY - interaction.startY)
+  }
+
+  const preview = {
+    compId: comp.id,
+    nextX: Math.round(nextX),
+    nextY: Math.round(nextY),
+    nextWidth: Math.round(nextWidth),
+    nextHeight: Math.round(nextHeight),
+    transform: `translate(${Math.round(nextX - interaction.startX)}px, ${Math.round(nextY - interaction.startY)}px) scale(${nextWidth / interaction.startWidth}, ${nextHeight / interaction.startHeight})`,
+    transformOrigin: getResizeTransformOrigin(handle),
+  }
+  interactionPreviewSnapshot = preview
+  applyInteractionPreviewToCard(preview)
+}
+
+const scheduleInteractionFrame = () => {
+  if (interactionFrame !== null) return
+  interactionFrame = window.requestAnimationFrame(applyInteractionFrame)
+}
+
+const cleanupInteractionFrame = (clearCardPreview = true) => {
+  if (interactionFrame !== null) {
+    window.cancelAnimationFrame(interactionFrame)
+    interactionFrame = null
+  }
+  pendingPointer = null
+  if (clearCardPreview) {
+    clearInteractionPreviewFromCard()
+    interactionPreviewSnapshot = null
+  }
+  document.body.classList.remove('canvas-interacting')
+}
 
 const persistLayout = async (comp: DashboardComponent) => {
   if (!currentDashboard.value) return
@@ -671,6 +802,8 @@ const startDrag = (evt: MouseEvent, comp: DashboardComponent) => {
     startWidth: comp.width,
     startHeight: comp.height
   }
+  pendingPointer = { x: evt.clientX, y: evt.clientY }
+  document.body.classList.add('canvas-interacting')
   document.addEventListener('mousemove', onPointerMove)
   document.addEventListener('mouseup', onPointerUp)
 }
@@ -688,64 +821,48 @@ const startResize = (evt: MouseEvent, comp: DashboardComponent, handle: ResizeHa
     startHeight: comp.height,
     handle,
   }
+  pendingPointer = { x: evt.clientX, y: evt.clientY }
+  document.body.classList.add('canvas-interacting')
   document.addEventListener('mousemove', onPointerMove)
   document.addEventListener('mouseup', onPointerUp)
 }
 
 const onPointerMove = (evt: MouseEvent) => {
   if (!interaction) return
-  const comp = findComp(interaction.compId)
-  if (!comp) return
-
-  const dx = evt.clientX - interaction.startMouseX
-  const dy = evt.clientY - interaction.startMouseY
-
-  if (interaction.mode === 'move') {
-    const maxX = Math.max(0, getCanvasWidth() - comp.width)
-    comp.posX = Math.min(maxX, Math.max(0, interaction.startX + dx))
-    comp.posY = Math.max(0, interaction.startY + dy)
-  } else {
-    const handle = interaction.handle ?? 'se'
-    let nextX = interaction.startX
-    let nextY = interaction.startY
-    let nextWidth = interaction.startWidth
-    let nextHeight = interaction.startHeight
-    const canvasWidth = getCanvasWidth()
-
-    if (handle.includes('e')) {
-      nextWidth = Math.min(Math.max(MIN_CARD_WIDTH, interaction.startWidth + dx), Math.max(MIN_CARD_WIDTH, canvasWidth - interaction.startX))
-    }
-    if (handle.includes('s')) {
-      nextHeight = Math.max(MIN_CARD_HEIGHT, interaction.startHeight + dy)
-    }
-    if (handle.includes('w')) {
-      const maxLeft = interaction.startX + interaction.startWidth - MIN_CARD_WIDTH
-      nextX = Math.min(Math.max(0, interaction.startX + dx), maxLeft)
-      nextWidth = interaction.startWidth - (nextX - interaction.startX)
-    }
-    if (handle.includes('n')) {
-      const maxTop = interaction.startY + interaction.startHeight - MIN_CARD_HEIGHT
-      nextY = Math.min(Math.max(0, interaction.startY + dy), maxTop)
-      nextHeight = interaction.startHeight - (nextY - interaction.startY)
-    }
-
-    comp.posX = Math.round(nextX)
-    comp.posY = Math.round(nextY)
-    comp.width = Math.round(nextWidth)
-    comp.height = Math.round(nextHeight)
-    chartInstances.get(comp.id)?.resize()
-  }
+  pendingPointer = { x: evt.clientX, y: evt.clientY }
+  scheduleInteractionFrame()
 }
 
 const onPointerUp = async () => {
   if (!interaction) return
   const comp = findComp(interaction.compId)
+  if (pendingPointer) {
+    applyInteractionFrame()
+  }
+  const preview = interactionPreviewSnapshot?.compId === interaction.compId ? { ...interactionPreviewSnapshot } : null
   interaction = null
   document.removeEventListener('mousemove', onPointerMove)
   document.removeEventListener('mouseup', onPointerUp)
+  cleanupInteractionFrame(false)
   if (comp) {
+    if (preview) {
+      clearInteractionPreviewFromCard(comp.id)
+      interactionPreviewSnapshot = null
+      comp.posX = preview.nextX
+      comp.posY = preview.nextY
+      comp.width = preview.nextWidth
+      comp.height = preview.nextHeight
+      normalizeLayout(comp)
+    } else {
+      clearInteractionPreviewFromCard(comp.id)
+      interactionPreviewSnapshot = null
+    }
+    await nextTick()
     chartInstances.get(comp.id)?.resize()
     await persistLayout(comp)
+  } else {
+    clearInteractionPreviewFromCard()
+    interactionPreviewSnapshot = null
   }
 }
 
@@ -934,9 +1051,11 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('mousemove', onPointerMove)
   document.removeEventListener('mouseup', onPointerUp)
+  cleanupInteractionFrame()
   window.removeEventListener('resize', handleWindowResize)
   chartInstances.forEach(i => i.dispose())
   chartInstances.clear()
+  cardRefs.clear()
 })
 </script>
 
@@ -1082,6 +1201,12 @@ onBeforeUnmount(() => {
   user-select: none;
   will-change: transform, width, height;
 }
+
+:global(body.canvas-interacting) .chart-grid .chart-card,
+:global(body.canvas-interacting) .chart-grid .chart-card * {
+  transition: none !important;
+}
+
 .chart-card.active {
   border-color: #409eff;
   box-shadow: 0 2px 12px rgba(64, 158, 255, .18);

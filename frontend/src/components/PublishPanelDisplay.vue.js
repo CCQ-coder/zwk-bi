@@ -6,11 +6,10 @@ const iframeLoading = ref(true);
 const groups = ref([]);
 const selectedGroupId = ref(null);
 const selectedScreenId = ref(null);
-const sidebarWidth = ref(372);
+const sidebarWidth = ref(332);
 let stopSidebarResize = null;
 const currentGroup = computed(() => groups.value.find((group) => group.id === selectedGroupId.value) ?? null);
 const currentScreen = computed(() => currentGroup.value?.screens.find((screen) => screen.id === selectedScreenId.value) ?? null);
-const totalScreens = computed(() => groups.value.reduce((sum, group) => sum + group.screens.length, 0));
 const sidebarStyle = computed(() => ({ width: `${sidebarWidth.value}px` }));
 const currentScreenUrl = computed(() => {
     if (!currentScreen.value) {
@@ -35,7 +34,7 @@ const startSidebarResize = (event) => {
     const startWidth = sidebarWidth.value;
     const handleMouseMove = (moveEvent) => {
         const nextWidth = startWidth + (moveEvent.clientX - startX);
-        sidebarWidth.value = Math.min(520, Math.max(308, nextWidth));
+        sidebarWidth.value = Math.min(420, Math.max(280, nextWidth));
     };
     const handleMouseUp = () => {
         window.removeEventListener('mousemove', handleMouseMove);
@@ -110,7 +109,6 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['display-sidebar']} */ ;
 /** @type {__VLS_StyleScopedClasses['display-sidebar']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-pill']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-row']} */ ;

@@ -12,7 +12,7 @@ const screenKeyword = ref('');
 const selectedGroupId = ref(null);
 const creating = ref(false);
 const assignedScreenIds = ref([]);
-const listPanelWidth = ref(324);
+const listPanelWidth = ref(296);
 let stopListPanelResize = null;
 const groupForm = reactive({
     name: '',
@@ -51,8 +51,6 @@ const previewScreens = computed(() => {
     }
     return assignedScreenIds.value.map((id) => screenOptionMap.value.get(id)).filter(Boolean);
 });
-const visibleGroupCount = computed(() => groups.value.filter((group) => group.visible).length);
-const assignedScreenCount = computed(() => screenOptions.value.filter((screen) => screen.groupId !== null).length);
 const movingScreenCount = computed(() => assignedScreenIds.value.filter((id) => {
     const screen = screenOptionMap.value.get(id);
     return Boolean(screen?.groupId && screen.groupId !== persistedGroupId.value);
@@ -66,7 +64,7 @@ const startListPanelResize = (event) => {
     const startWidth = listPanelWidth.value;
     const handleMouseMove = (moveEvent) => {
         const nextWidth = startWidth + (moveEvent.clientX - startX);
-        listPanelWidth.value = Math.min(420, Math.max(280, nextWidth));
+        listPanelWidth.value = Math.min(360, Math.max(256, nextWidth));
     };
     const handleMouseUp = () => {
         window.removeEventListener('mousemove', handleMouseMove);
@@ -243,14 +241,11 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-shell__resize']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['panel-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
-/** @type {__VLS_StyleScopedClasses['panel-subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
@@ -263,13 +258,11 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['screen-option']} */ ;
 /** @type {__VLS_StyleScopedClasses['placeholder-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['preview-card__thumb']} */ ;
-/** @type {__VLS_StyleScopedClasses['stats-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-shell__resize']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-form__grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-toolbar']} */ ;
-/** @type {__VLS_StyleScopedClasses['stats-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['detail-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-options-grid']} */ ;
@@ -281,61 +274,6 @@ let __VLS_directives;
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "group-manager" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "stats-row" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
-    ...{ class: "stat-card stat-card--accent" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__label" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__value" },
-});
-(__VLS_ctx.groups.length);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__meta" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
-    ...{ class: "stat-card" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__label" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__value" },
-});
-(__VLS_ctx.visibleGroupCount);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__meta" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
-    ...{ class: "stat-card" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__label" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__value" },
-});
-(__VLS_ctx.screenOptions.length);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__meta" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
-    ...{ class: "stat-card" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__label" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__value" },
-});
-(__VLS_ctx.assignedScreenCount);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "stat-card__meta" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "workspace" },
@@ -460,9 +398,6 @@ if (!__VLS_ctx.loading && !__VLS_ctx.filteredGroups.length) {
     }, ...__VLS_functionalComponentArgsRest(__VLS_21));
 }
 var __VLS_15;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "group-list-panel__foot" },
-});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
     ...{ onMousedown: (__VLS_ctx.startListPanelResize) },
     ...{ class: "group-list-shell__resize" },
@@ -954,24 +889,6 @@ else {
     }
 }
 /** @type {__VLS_StyleScopedClasses['group-manager']} */ ;
-/** @type {__VLS_StyleScopedClasses['stats-row']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card--accent']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__label']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__value']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__label']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__value']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__label']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__value']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__label']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__value']} */ ;
-/** @type {__VLS_StyleScopedClasses['stat-card__meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['workspace']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-panel']} */ ;
@@ -986,7 +903,6 @@ else {
 /** @type {__VLS_StyleScopedClasses['group-item__name']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-item__meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-item__desc']} */ ;
-/** @type {__VLS_StyleScopedClasses['group-list-panel__foot']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-list-shell__resize']} */ ;
 /** @type {__VLS_StyleScopedClasses['group-detail']} */ ;
 /** @type {__VLS_StyleScopedClasses['detail-stack']} */ ;
@@ -1043,8 +959,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             loading: loading,
             groupSaving: groupSaving,
             assignmentSaving: assignmentSaving,
-            groups: groups,
-            screenOptions: screenOptions,
             groupKeyword: groupKeyword,
             screenKeyword: screenKeyword,
             selectedGroupId: selectedGroupId,
@@ -1055,8 +969,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             filteredGroups: filteredGroups,
             filteredScreenOptions: filteredScreenOptions,
             previewScreens: previewScreens,
-            visibleGroupCount: visibleGroupCount,
-            assignedScreenCount: assignedScreenCount,
             movingScreenCount: movingScreenCount,
             listPanelStyle: listPanelStyle,
             startListPanelResize: startListPanelResize,

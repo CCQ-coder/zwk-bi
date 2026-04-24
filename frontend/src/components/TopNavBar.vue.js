@@ -167,9 +167,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.
     ...{ class: "user-name" },
 });
 (__VLS_ctx.displayName);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "user-role" },
-});
 const __VLS_16 = {}.ElButton;
 /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
 // @ts-ignore
@@ -215,9 +212,6 @@ __VLS_27.slots.default;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "drawer-brand" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "drawer-subtitle" },
-    });
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "drawer-menu" },
@@ -260,9 +254,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "drawer-user-name" },
 });
 (__VLS_ctx.displayName);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "drawer-user-tip" },
-});
 const __VLS_36 = {}.ElButton;
 /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
 // @ts-ignore
@@ -298,19 +289,16 @@ var __VLS_27;
 /** @type {__VLS_StyleScopedClasses['user-avatar']} */ ;
 /** @type {__VLS_StyleScopedClasses['user-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['user-name']} */ ;
-/** @type {__VLS_StyleScopedClasses['user-role']} */ ;
 /** @type {__VLS_StyleScopedClasses['logout-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-drawer']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-brand']} */ ;
-/** @type {__VLS_StyleScopedClasses['drawer-subtitle']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-menu-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-user-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['user-avatar']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-user-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-user-name']} */ ;
-/** @type {__VLS_StyleScopedClasses['drawer-user-tip']} */ ;
 /** @type {__VLS_StyleScopedClasses['logout-btn']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
