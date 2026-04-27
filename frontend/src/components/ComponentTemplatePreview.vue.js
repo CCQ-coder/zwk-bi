@@ -1,4 +1,3 @@
-/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import ComponentDataFallback from './ComponentDataFallback.vue';
 import { DEFAULT_COMPONENT_STYLE, buildComponentOption, chartTypeLabel, getChartTypeMeta, isCanvasRenderableChartType, materializeChartData, postProcessChartOption, } from '../utils/component-config';

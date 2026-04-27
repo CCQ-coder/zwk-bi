@@ -1,32 +1,34 @@
 ﻿<template>
   <div class="login-shell">
+    <div class="shell-novas" aria-hidden="true">
+      <span class="shell-nova shell-nova--1"></span>
+      <span class="shell-nova shell-nova--2"></span>
+      <span class="shell-nova shell-nova--3"></span>
+    </div>
     <div class="login-stage">
 
-      <!-- 鈺愨晲鈺?Left: scene panel 鈺愨晲鈺?-->
+      <!-- Left: scene panel -->
       <div class="scene-panel">
-        <!-- Rotating gradient backgrounds -->
+        <!-- Rotating scene backgrounds -->
         <div class="scene-slides" aria-hidden="true">
           <div
-            v-for="(grad, i) in sceneGradients"
-            :key="i"
+            v-for="(scene, i) in sceneSlides"
+            :key="scene.label"
             class="scene-slide"
             :class="{ active: i === currentBg }"
-            :style="{ background: grad }"
+            :style="{ backgroundImage: `url(${scene.image})` }"
           ></div>
         </div>
 
-        <!-- Mountain silhouettes -->
-        <div class="scene-mtn scene-mtn--far" aria-hidden="true"></div>
-        <div class="scene-mtn scene-mtn--pine" aria-hidden="true"></div>
-        <div class="scene-mtn scene-mtn--near" aria-hidden="true"></div>
-
-        <!-- Lake -->
-        <div class="scene-lake" aria-hidden="true">
-          <div class="scene-lake__lines"></div>
+        <div class="scene-glow" aria-hidden="true"></div>
+        <div class="scene-vignette" aria-hidden="true"></div>
+        <div class="scene-reflection" aria-hidden="true"></div>
+        <div class="scene-stars" aria-hidden="true">
+          <span class="scene-star scene-star--1"></span>
+          <span class="scene-star scene-star--2"></span>
+          <span class="scene-star scene-star--3"></span>
+          <span class="scene-star scene-star--4"></span>
         </div>
-
-        <!-- Overlay -->
-        <div class="scene-overlay" aria-hidden="true"></div>
 
         <!-- Content -->
         <div class="scene-body">
@@ -42,6 +44,7 @@
           </header>
 
           <div class="scene-hero">
+            <div class="scene-kicker">{{ sceneSlides[currentBg]?.label }}</div>
             <h1 class="scene-title">{{ platformName }}</h1>
             <p class="scene-sub">{{ platformSlogan }}</p>
           </div>
@@ -50,49 +53,52 @@
 
           <!-- Feature list -->
           <div class="scene-features">
-            <div class="feat">
-              <span class="feat__dot" aria-hidden="true"></span>
-              <div>
-                <p class="feat__title">澶氱淮鍒嗘瀽</p>
-                <p class="feat__desc">澶氭暟鎹簮鎺ュ叆锛屾礊瀵熶笟鍔¤秼鍔?/p>
+            <div class="scene-features__eyebrow">平台能力</div>
+            <div class="scene-features__list">
+              <div class="feat">
+                <span class="feat__dot" aria-hidden="true"></span>
+                <div>
+                  <p class="feat__title">多维分析</p>
+                  <p class="feat__desc">多数据源接入，洞察业务趋势</p>
+                </div>
               </div>
-            </div>
-            <div class="feat">
-              <span class="feat__dot feat__dot--violet" aria-hidden="true"></span>
-              <div>
-                <p class="feat__title">鍙鍖栫湅鏉?/p>
-                <p class="feat__desc">涓板瘜鍥捐〃缁勪欢锛岀洿瑙傚憟鐜版暟鎹?/p>
+              <div class="feat">
+                <span class="feat__dot feat__dot--violet" aria-hidden="true"></span>
+                <div>
+                  <p class="feat__title">可视化看板</p>
+                  <p class="feat__desc">丰富图表组件，直观呈现数据</p>
+                </div>
               </div>
-            </div>
-            <div class="feat">
-              <span class="feat__dot feat__dot--sky" aria-hidden="true"></span>
-              <div>
-                <p class="feat__title">瀹夊叏鍙潬</p>
-                <p class="feat__desc">浼佷笟绾ф潈闄愮鐞嗕笌鏁版嵁闅旂</p>
+              <div class="feat">
+                <span class="feat__dot feat__dot--sky" aria-hidden="true"></span>
+                <div>
+                  <p class="feat__title">安全可靠</p>
+                  <p class="feat__desc">企业级权限管理与数据隔离</p>
+                </div>
               </div>
             </div>
           </div>
 
           <footer class="scene-ft">
             <span class="scene-copy-text">{{ copyright }}</span>
-            <nav class="scene-nav" aria-label="鍒囨崲鑳屾櫙">
-              <button type="button" class="scene-nav__btn" aria-label="涓婁竴寮? @click="prevBg">
+            <nav class="scene-nav" aria-label="切换背景">
+              <button type="button" class="scene-nav__btn" aria-label="上一张" @click="prevBg">
                 <svg width="8" height="12" viewBox="0 0 8 12" fill="none" aria-hidden="true">
                   <path d="M6 1 2 6l4 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
-              <div class="scene-dots" role="group" aria-label="鑳屾櫙閫夋嫨">
+              <div class="scene-dots" role="group" aria-label="背景选择">
                 <button
-                  v-for="i in sceneGradients.length"
-                  :key="i"
+                  v-for="(scene, i) in sceneSlides"
+                  :key="scene.label"
                   type="button"
                   class="scene-dot"
-                  :class="{ 'scene-dot--on': (i - 1) === currentBg }"
-                  :aria-label="`绗?{i}寮燻"
-                  @click="goToBg(i - 1)"
+                  :class="{ 'scene-dot--on': i === currentBg }"
+                  :aria-label="scene.label"
+                  @click="goToBg(i)"
                 ></button>
               </div>
-              <button type="button" class="scene-nav__btn" aria-label="涓嬩竴寮? @click="nextBg">
+              <button type="button" class="scene-nav__btn" aria-label="下一张" @click="nextBg">
                 <svg width="8" height="12" viewBox="0 0 8 12" fill="none" aria-hidden="true">
                   <path d="M2 1l4 5-4 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -102,8 +108,8 @@
         </div>
       </div>
 
-      <!-- 鈺愨晲鈺?Right: login panel 鈺愨晲鈺?-->
-      <section class="auth-panel" aria-label="鐧诲綍">
+      <!-- Right: login panel -->
+      <section class="auth-panel" aria-label="登录">
         <div class="auth-logo" aria-hidden="true">
           <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
             <rect width="44" height="44" rx="14" fill="#EEF4FF"/>
@@ -114,8 +120,8 @@
         </div>
 
         <div class="auth-head">
-          <h2 class="auth-title">娆㈣繋鍥炴潵</h2>
-          <p class="auth-sub">璇风櫥褰曟偍鐨勮处鍙?/p>
+          <h2 class="auth-title">欢迎回来</h2>
+          <p class="auth-sub">请登录您的账号</p>
         </div>
 
         <el-form
@@ -126,25 +132,25 @@
           @submit.prevent="handleLogin"
         >
           <el-form-item prop="username">
-            <label for="f-user" class="sr-only">璐﹀彿</label>
+            <label for="f-user" class="sr-only">账号</label>
             <el-input
               id="f-user"
               v-model="loginForm.username"
               size="large"
-              placeholder="璇疯緭鍏ヨ处鍙?
+              placeholder="请输入账号"
               :prefix-icon="User"
               @keyup.enter="handleLogin"
             />
           </el-form-item>
 
           <el-form-item prop="password">
-            <label for="f-pass" class="sr-only">瀵嗙爜</label>
+            <label for="f-pass" class="sr-only">密码</label>
             <el-input
               id="f-pass"
               v-model="loginForm.password"
               type="password"
               size="large"
-              placeholder="璇疯緭鍏ュ瘑鐮?
+              placeholder="请输入密码"
               show-password
               :prefix-icon="Lock"
               @keyup.enter="handleLogin"
@@ -152,8 +158,8 @@
           </el-form-item>
 
           <div class="auth-row">
-            <el-checkbox v-model="rememberUser">璁颁綇鎴?/el-checkbox>
-            <el-link type="primary" underline="never" @click="onForgotPwd">蹇樿瀵嗙爜锛?/el-link>
+            <el-checkbox v-model="rememberUser">记住我</el-checkbox>
+            <el-link type="primary" underline="never" @click="onForgotPwd">忘记密码？</el-link>
           </div>
 
           <el-button
@@ -163,23 +169,23 @@
             :loading="loading"
             @click="handleLogin"
           >
-            <span class="auth-btn__label">{{ loading ? '鐧诲綍涓€? : '鐧?褰? }}</span>
+            <span class="auth-btn__label">{{ loading ? '登录中...' : '登录' }}</span>
             <span v-if="!loading" class="auth-btn__icon" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9h12M15 9l-4-5M15 9l-4 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </span>
           </el-button>
 
           <div class="auth-or" aria-hidden="true">
-            <span></span><span class="auth-or__text">鎴?/span><span></span>
+            <span></span><span class="auth-or__text">或</span><span></span>
           </div>
 
           <button type="button" class="sso-btn" @click="onSSO">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-  ElMessageBox.alert('SSO 单点登录功能正在配置中，请使用账号密码登录。', 'SSO 登录', {
+            企业 SSO 登录
           </button>
 
           <div v-if="quickAccounts.length" class="auth-quick">
-            <span class="auth-quick__label">蹇€熻瘯鐢細</span>
+            <span class="auth-quick__label">快速试用：</span>
             <el-tag
               v-for="item in quickAccounts"
               :key="item.username"
@@ -194,13 +200,16 @@
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Lock, User } from '@element-plus/icons-vue'
+import sceneAlpineCube from '../assets/login/uploaded/scene-1.png'
+import sceneMoonTerrace from '../assets/login/uploaded/scene-2.png'
+import sceneSunsetVilla from '../assets/login/uploaded/scene-3.png'
+import sceneAlpineLake from '../assets/login/uploaded/scene-4.png'
 import { login } from '../api/auth'
 import { getCurrentMenus } from '../api/menu'
 import { saveAuthMenus, saveAuthSession } from '../utils/auth-session'
@@ -218,26 +227,20 @@ const platformSlogan = ref(branding.slogan)
 const copyright = ref(branding.copyright)
 const version = ref(branding.version)
 
-// 鈹€鈹€鈹€ Background rotation 鈹€鈹€鈹€
-const sceneGradients = [
-  // Dawn: warm pink-peach horizon over cool blue sky
-  'linear-gradient(180deg, #8faed2 0%, #aac4df 18%, #c6d9ed 35%, #dce8f3 48%, #eeddd0 60%, #ecc898 72%, #e0a85a 85%, #cc8830 100%)',
-  // Midday alpine: vivid blue sky, bright
-  'linear-gradient(180deg, #1858a8 0%, #2878cc 20%, #4898de 40%, #6eb4ea 58%, #96ccf4 74%, #bce0fa 88%, #d8eef8 100%)',
-  // Clear afternoon: deep blue to light sky
-  'linear-gradient(180deg, #1e5eaa 0%, #3278c8 18%, #5298e0 38%, #7ab8f0 55%, #a2d0f8 72%, #c4e4fc 88%, #daf0fc 100%)',
-  // Dusk: violet-blue to golden glow
-  'linear-gradient(180deg, #4a5aa8 0%, #7878b8 16%, #a888a8 30%, #c8a088 48%, #dcb860 62%, #d8a840 76%, #c09030 90%, #a07820 100%)',
+const sceneSlides = [
+  { label: '冰湖立方', image: sceneAlpineCube },
+  { label: '月下露台', image: sceneMoonTerrace },
+  { label: '日落水院', image: sceneSunsetVilla },
+  { label: '雪山湖湾', image: sceneAlpineLake },
 ]
 const currentBg = ref(0)
 let bgTimer: ReturnType<typeof setInterval> | null = null
 
 const goToBg = (i: number) => {
-  currentBg.value = ((i % sceneGradients.length) + sceneGradients.length) % sceneGradients.length
+  currentBg.value = ((i % sceneSlides.length) + sceneSlides.length) % sceneSlides.length
 }
 const nextBg = () => goToBg(currentBg.value + 1)
 const prevBg = () => goToBg(currentBg.value - 1)
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const rules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
@@ -283,7 +286,7 @@ const handleLogin = async () => {
     } else {
       localStorage.removeItem('bi_last_username')
     }
-    ElMessage.success(`娆㈣繋鍥炴潵锛?{result.displayName || result.username}`)
+    ElMessage.success(`欢迎回来，${result.displayName || result.username}`)
     router.push('/home')
   } finally {
     loading.value = false
@@ -311,16 +314,94 @@ onUnmounted(() => {
 
 /* 鈹€鈹€鈹€ Page shell 鈹€鈹€鈹€ */
 .login-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 20px;
-  background: #d8e8f4;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 100%),
+    #edf4ff url('../assets/login/shell-starry-sky.svg') center top / cover no-repeat;
   font-family: 'Fira Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.login-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.18) 100%);
+}
+
+.shell-novas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.shell-nova {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.6) 34%, rgba(255, 255, 255, 0) 72%);
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.55));
+  opacity: 0.2;
+  transform: scale(0.75);
+  animation: shell-nova-pulse 5.6s ease-in-out infinite;
+}
+
+.shell-nova::before,
+.shell-nova::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.95) 50%, rgba(255, 255, 255, 0) 100%);
+}
+
+.shell-nova::before {
+  width: 42px;
+  height: 1.5px;
+}
+
+.shell-nova::after {
+  width: 1.5px;
+  height: 42px;
+}
+
+.shell-nova--1 {
+  top: 12%;
+  left: 18%;
+  animation-delay: 0s;
+}
+
+.shell-nova--2 {
+  top: 20%;
+  right: 15%;
+  width: 10px;
+  height: 10px;
+  animation-delay: 1.8s;
+}
+
+.shell-nova--3 {
+  top: 30%;
+  left: 64%;
+  width: 9px;
+  height: 9px;
+  animation-delay: 3.2s;
 }
 
 /* 鈹€鈹€鈹€ Main stage 鈹€鈹€鈹€ */
 .login-stage {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1.72fr 1fr;
   width: min(1280px, 100%);
@@ -334,6 +415,7 @@ onUnmounted(() => {
 .scene-panel {
   position: relative;
   overflow: hidden;
+  background: #d8e6f3;
 }
 
 /* Background slides */
@@ -346,110 +428,119 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 1.4s ease;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  transform: scale(1.03);
+  filter: saturate(1.04) contrast(1.02);
+  transition: opacity 1.2s ease, transform 6s ease;
 }
 
 .scene-slide.active {
   opacity: 1;
+  transform: scale(1);
 }
 
-/* 鈹€鈹€鈹€ Mountain silhouettes 鈹€鈹€鈹€ */
-.scene-mtn {
+.scene-glow,
+.scene-vignette,
+.scene-reflection {
   position: absolute;
-  left: 0;
-  right: 0;
+  inset: 0;
   pointer-events: none;
 }
 
-/* Far peaks 鈥?snowy, blue-grey tones */
-.scene-mtn--far {
-  bottom: 30%;
-  height: 32%;
-  background: linear-gradient(180deg, rgba(210, 228, 248, 0.82) 0%, rgba(180, 206, 232, 0.6) 100%);
-  clip-path: polygon(
-    0% 100%, 0% 56%, 7% 34%, 16% 12%, 24% 4%,
-    32% 20%, 40% 5%, 49% 22%, 57% 2%, 66% 17%,
-    74% 30%, 82% 11%, 90% 28%, 95% 44%, 100% 38%, 100% 100%
-  );
+.scene-glow {
   z-index: 2;
+  background:
+    radial-gradient(circle at 22% 12%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 28%);
 }
 
-/* Snow cap highlight */
-.scene-mtn--far::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(240, 248, 255, 0.72);
-  clip-path: polygon(
-    22% 100%, 22% 62%, 24% 40%, 27% 22%, 31% 4%, 34% 20%, 38% 40%, 43% 55%, 48% 32%, 51% 8%,
-    54% 28%, 58% 44%, 64% 60%, 72% 34%, 76% 14%, 80% 34%, 86% 52%, 91% 66%, 100% 100%
-  );
-  opacity: 0.58;
-}
-
-/* Pine forest treeline */
-.scene-mtn--pine {
-  bottom: 26%;
-  height: 26%;
-  background: rgba(32, 56, 40, 0.78);
-  clip-path: polygon(
-    0% 100%, 0% 72%, 4% 56%, 8% 66%, 12% 50%, 17% 62%, 21% 44%, 26% 56%,
-    30% 40%, 34% 52%, 38% 36%, 42% 48%, 46% 32%, 50% 24%, 54% 36%, 58% 22%,
-    62% 34%, 66% 20%, 70% 32%, 74% 18%, 78% 30%, 82% 16%, 86% 28%, 90% 42%,
-    94% 56%, 97% 66%, 100% 72%, 100% 100%
-  );
-  z-index: 3;
-}
-
-/* Near foreground shore */
-.scene-mtn--near {
-  bottom: 24%;
-  height: 12%;
-  background: rgba(22, 44, 30, 0.88);
-  clip-path: polygon(
-    0% 100%, 0% 62%, 8% 44%, 18% 28%, 30% 14%,
-    44% 6%, 56% 14%, 68% 28%, 80% 44%, 90% 62%, 100% 74%, 100% 100%
-  );
-  z-index: 4;
-}
-
-/* 鈹€鈹€鈹€ Lake 鈹€鈹€鈹€ */
-.scene-lake {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 26%;
+.scene-vignette {
+  z-index: 2;
   background: linear-gradient(
     180deg,
-    rgba(50, 90, 155, 0.58) 0%,
-    rgba(40, 75, 140, 0.72) 40%,
-    rgba(30, 62, 120, 0.84) 100%
-  );
-  z-index: 5;
-}
-
-.scene-lake__lines {
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.08) 0,
-    rgba(255, 255, 255, 0.08) 1px,
-    transparent 1px,
-    transparent 9px
+    rgba(8, 24, 54, 0.02) 0%,
+    rgba(8, 24, 54, 0.06) 42%,
+    rgba(5, 16, 38, 0.26) 100%
   );
 }
 
-/* 鈹€鈹€鈹€ Overlay 鈹€鈹€鈹€ */
-.scene-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
+.scene-reflection {
+  z-index: 3;
   background:
-    linear-gradient(180deg, rgba(0, 18, 50, 0.16) 0%, transparent 42%),
-    linear-gradient(0deg, rgba(0, 14, 40, 0.18) 0%, transparent 36%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 58%, rgba(255, 255, 255, 0.08) 80%, rgba(255, 255, 255, 0.01) 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 16%, rgba(255, 255, 255, 0) 84%, rgba(255, 255, 255, 0.05) 100%);
+}
+
+.scene-stars {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
   pointer-events: none;
+}
+
+.scene-star {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.58) 34%, rgba(255, 255, 255, 0) 74%);
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.42));
+  opacity: 0.18;
+  transform: scale(0.72);
+  animation: scene-star-pulse 4.8s ease-in-out infinite;
+}
+
+.scene-star::before,
+.scene-star::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.88) 50%, rgba(255, 255, 255, 0) 100%);
+}
+
+.scene-star::before {
+  width: 34px;
+  height: 1.4px;
+}
+
+.scene-star::after {
+  width: 1.4px;
+  height: 34px;
+}
+
+.scene-star--1 {
+  top: 13%;
+  left: 17%;
+  animation-delay: 0.2s;
+}
+
+.scene-star--2 {
+  top: 18%;
+  left: 44%;
+  width: 8px;
+  height: 8px;
+  animation-delay: 1.6s;
+}
+
+.scene-star--3 {
+  top: 12%;
+  right: 14%;
+  width: 11px;
+  height: 11px;
+  animation-delay: 2.8s;
+}
+
+.scene-star--4 {
+  top: 27%;
+  right: 28%;
+  width: 7px;
+  height: 7px;
+  animation-delay: 3.9s;
 }
 
 /* 鈹€鈹€鈹€ Scene content 鈹€鈹€鈹€ */
@@ -471,13 +562,30 @@ onUnmounted(() => {
   width: 46px;
   height: 46px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.24);
 }
 
 .scene-hero {
   margin-top: 22px;
   flex-shrink: 0;
+}
+
+.scene-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+  background: rgba(8, 31, 66, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
 }
 
 .scene-title {
@@ -486,7 +594,8 @@ onUnmounted(() => {
   color: #ffffff;
   letter-spacing: -0.02em;
   line-height: 1.15;
-  text-shadow: 0 2px 14px rgba(0, 20, 60, 0.35);
+  max-width: 420px;
+  text-shadow: 0 2px 20px rgba(0, 20, 60, 0.34);
   margin: 0;
 }
 
@@ -494,35 +603,57 @@ onUnmounted(() => {
   margin: 8px 0 0;
   font-size: 14px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.84);
-  text-shadow: 0 1px 6px rgba(0, 20, 60, 0.28);
+  max-width: 430px;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 8px rgba(0, 20, 60, 0.28);
 }
 
 .scene-spacer { flex: 1; }
 
 /* Feature list */
 .scene-features {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
+  align-self: flex-start;
+  width: min(410px, 100%);
   flex-shrink: 0;
   margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(245, 249, 255, 0.26) 0%, rgba(208, 223, 248, 0.18) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 16px 32px rgba(10, 36, 76, 0.12);
+  backdrop-filter: blur(14px);
+}
+
+.scene-features__eyebrow {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.76);
+  text-transform: uppercase;
+}
+
+.scene-features__list {
+  display: flex;
+  flex-direction: column;
 }
 
 .feat {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.13);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 12px 0;
+}
+
+.feat + .feat {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .feat__dot {
   width: 8px;
   height: 8px;
   min-width: 8px;
+  margin-top: 7px;
   border-radius: 50%;
   background: #60a5fa;
   flex-shrink: 0;
@@ -542,7 +673,7 @@ onUnmounted(() => {
 .feat__desc {
   margin: 0;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.68);
+  color: rgba(255, 255, 255, 0.76);
   line-height: 1.5;
 }
 
@@ -557,7 +688,7 @@ onUnmounted(() => {
 
 .scene-copy-text {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .scene-nav {
@@ -571,16 +702,17 @@ onUnmounted(() => {
   place-items: center;
   width: 26px;
   height: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.13);
+  background: rgba(8, 31, 66, 0.18);
   color: rgba(255, 255, 255, 0.88);
   cursor: pointer;
   transition: background 0.2s ease;
   appearance: none;
+  backdrop-filter: blur(10px);
 }
 
-.scene-nav__btn:hover { background: rgba(255, 255, 255, 0.26); }
+.scene-nav__btn:hover { background: rgba(8, 31, 66, 0.32); }
 .scene-nav__btn:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.8); outline-offset: 2px; }
 
 .scene-dots {
@@ -594,7 +726,7 @@ onUnmounted(() => {
   height: 4px;
   border-radius: 999px;
   border: none;
-  background: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.42);
   cursor: pointer;
   transition: width 0.25s ease, background 0.25s ease;
   appearance: none;
@@ -823,6 +955,7 @@ onUnmounted(() => {
   }
   .scene-panel { min-height: 260px; max-height: 38vh; }
   .scene-features { display: none; }
+  .scene-kicker { margin-bottom: 10px; }
   .auth-panel { padding: 32px 24px; }
   .auth-title { font-size: 24px; }
 }
@@ -839,13 +972,44 @@ onUnmounted(() => {
   .auth-btn { min-height: 46px; }
 }
 
+@keyframes shell-nova-pulse {
+  0%, 100% {
+    opacity: 0.18;
+    transform: scale(0.72);
+  }
+  45% {
+    opacity: 0.92;
+    transform: scale(1);
+  }
+  62% {
+    opacity: 0.42;
+    transform: scale(0.86);
+  }
+}
+
+@keyframes scene-star-pulse {
+  0%, 100% {
+    opacity: 0.14;
+    transform: scale(0.7);
+  }
+  40% {
+    opacity: 0.84;
+    transform: scale(1);
+  }
+  58% {
+    opacity: 0.34;
+    transform: scale(0.82);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .scene-star { animation: none !important; }
+  .shell-nova { animation: none !important; }
   .scene-slide { transition: none !important; }
   .auth-btn, .sso-btn, .scene-nav__btn, .scene-dot, .auth-quick__tag,
   .auth-form :deep(.el-input__wrapper) { transition: none !important; }
   .auth-btn:hover, .sso-btn:hover, .auth-btn:hover .auth-btn__icon { transform: none !important; }
 }
 </style>
-
 
 

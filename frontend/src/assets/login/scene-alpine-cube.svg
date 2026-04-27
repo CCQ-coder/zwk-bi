@@ -1,0 +1,88 @@
+<svg width="1600" height="1100" viewBox="0 0 1600 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="800" y1="0" x2="800" y2="650" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8DB5EA"/>
+      <stop offset="0.42" stop-color="#C4DAF6"/>
+      <stop offset="0.76" stop-color="#E6EDF9"/>
+      <stop offset="1" stop-color="#F7E2D1"/>
+    </linearGradient>
+    <linearGradient id="lake" x1="800" y1="650" x2="800" y2="1100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BFE0FA"/>
+      <stop offset="0.42" stop-color="#88B8E9"/>
+      <stop offset="1" stop-color="#5A8ECB"/>
+    </linearGradient>
+    <linearGradient id="glassFront" x1="0" y1="0" x2="250" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5FBFF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#7BB5F0" stop-opacity="0.42"/>
+    </linearGradient>
+    <linearGradient id="glassSide" x1="250" y1="0" x2="360" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D6EEFF" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#4F8CCE" stop-opacity="0.36"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="1100" fill="url(#sky)"/>
+  <circle cx="260" cy="145" r="180" fill="#FFFFFF" fill-opacity="0.22"/>
+
+  <g opacity="0.72" fill="#FFFFFF">
+    <ellipse cx="210" cy="150" rx="90" ry="20"/>
+    <ellipse cx="315" cy="128" rx="120" ry="24"/>
+    <ellipse cx="1260" cy="164" rx="110" ry="24"/>
+    <ellipse cx="1368" cy="142" rx="76" ry="18"/>
+  </g>
+
+  <path d="M0 660L80 598L142 620L220 532L294 614L382 488L492 620L604 430L728 618L844 458L962 622L1084 504L1208 638L1312 566L1410 626L1500 594L1600 646V760H0V660Z" fill="#B4CAE3"/>
+  <path d="M0 714L84 664L168 684L254 612L332 694L436 584L548 708L664 544L796 706L918 566L1026 714L1146 620L1288 720L1418 654L1600 720V820H0V714Z" fill="#8AA9CC"/>
+  <path d="M204 578L222 556L250 584L280 530L306 586L346 556L378 604L204 606V578Z" fill="#F4F9FF" fill-opacity="0.8"/>
+  <path d="M632 492L664 446L708 514L746 462L780 528L828 486L854 534L632 536V492Z" fill="#F4F9FF" fill-opacity="0.74"/>
+  <path d="M1058 570L1092 516L1148 590L1192 542L1230 602L1288 564L1310 612L1058 614V570Z" fill="#F4F9FF" fill-opacity="0.72"/>
+
+  <rect y="690" width="1600" height="410" fill="url(#lake)"/>
+  <g opacity="0.24" stroke="#FFFFFF" stroke-width="4">
+    <path d="M0 750C184 780 350 790 528 772C726 752 832 718 1038 730C1248 742 1388 792 1600 774"/>
+    <path d="M0 824C184 852 380 850 586 836C810 818 922 792 1108 804C1306 816 1438 846 1600 832"/>
+    <path d="M0 904C236 932 426 930 650 916C856 904 1010 880 1198 894C1396 908 1498 928 1600 920"/>
+  </g>
+
+  <ellipse cx="1078" cy="792" rx="250" ry="34" fill="#7AAFE6" fill-opacity="0.34"/>
+
+  <g transform="translate(930 392)">
+    <polygon points="0,0 248,0 360,72 112,72" fill="#F0FAFF" fill-opacity="0.44"/>
+    <polygon points="248,0 360,72 360,332 248,250" fill="url(#glassSide)"/>
+    <rect x="0" y="0" width="248" height="250" fill="url(#glassFront)" stroke="#F4FBFF" stroke-opacity="0.86" stroke-width="3"/>
+    <polygon points="0,250 248,250 360,332 112,332" fill="#CFE6FA" fill-opacity="0.3"/>
+    <g stroke="#E9F8FF" stroke-opacity="0.74" stroke-width="2">
+      <line x1="41" y1="0" x2="41" y2="250"/>
+      <line x1="82" y1="0" x2="82" y2="250"/>
+      <line x1="123" y1="0" x2="123" y2="250"/>
+      <line x1="164" y1="0" x2="164" y2="250"/>
+      <line x1="205" y1="0" x2="205" y2="250"/>
+      <line x1="0" y1="41" x2="248" y2="41"/>
+      <line x1="0" y1="82" x2="248" y2="82"/>
+      <line x1="0" y1="123" x2="248" y2="123"/>
+      <line x1="0" y1="164" x2="248" y2="164"/>
+      <line x1="0" y1="205" x2="248" y2="205"/>
+      <line x1="285" y1="26" x2="285" y2="278"/>
+      <line x1="322" y1="48" x2="322" y2="304"/>
+      <line x1="248" y1="82" x2="360" y2="154"/>
+      <line x1="248" y1="154" x2="360" y2="226"/>
+      <line x1="248" y1="226" x2="360" y2="298"/>
+    </g>
+  </g>
+
+  <g opacity="0.22">
+    <polygon points="930,722 1178,722 1290,804 1042,804" fill="#F5FBFF"/>
+    <polygon points="1178,722 1290,804 1290,948 1178,870" fill="#B0D6F7"/>
+    <rect x="930" y="722" width="248" height="148" fill="#D8EEFF"/>
+    <g stroke="#F7FCFF" stroke-opacity="0.58" stroke-width="2">
+      <line x1="971" y1="722" x2="971" y2="870"/>
+      <line x1="1012" y1="722" x2="1012" y2="870"/>
+      <line x1="1053" y1="722" x2="1053" y2="870"/>
+      <line x1="1094" y1="722" x2="1094" y2="870"/>
+      <line x1="1135" y1="722" x2="1135" y2="870"/>
+      <line x1="930" y1="754" x2="1178" y2="754"/>
+      <line x1="930" y1="794" x2="1178" y2="794"/>
+      <line x1="930" y1="834" x2="1178" y2="834"/>
+    </g>
+  </g>
+</svg>

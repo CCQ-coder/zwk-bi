@@ -1,0 +1,62 @@
+<svg width="1600" height="1100" viewBox="0 0 1600 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="800" y1="0" x2="800" y2="670" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#86AFE4"/>
+      <stop offset="0.42" stop-color="#B7C9EE"/>
+      <stop offset="0.72" stop-color="#F0B9C8"/>
+      <stop offset="1" stop-color="#FFD49A"/>
+    </linearGradient>
+    <linearGradient id="water" x1="800" y1="660" x2="800" y2="1100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#99C1EA"/>
+      <stop offset="0.5" stop-color="#6EA3D7"/>
+      <stop offset="1" stop-color="#4D7EB9"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="170" y1="180" x2="590" y2="770" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.68"/>
+      <stop offset="1" stop-color="#7FB5EC" stop-opacity="0.18"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="1100" fill="url(#sky)"/>
+  <circle cx="1220" cy="474" r="54" fill="#FFD88C" fill-opacity="0.92"/>
+  <circle cx="1220" cy="474" r="118" fill="#FFD8A4" fill-opacity="0.24"/>
+
+  <g opacity="0.58" fill="#FFFFFF">
+    <ellipse cx="1110" cy="214" rx="112" ry="24"/>
+    <ellipse cx="1212" cy="234" rx="136" ry="28"/>
+    <ellipse cx="1336" cy="198" rx="102" ry="20"/>
+  </g>
+
+  <path d="M860 636C958 612 1080 610 1196 628C1314 646 1456 648 1600 638V708H860V636Z" fill="#95A6C8" fill-opacity="0.8"/>
+  <path d="M964 650C1056 628 1160 626 1244 640C1162 662 1062 666 964 650Z" fill="#DDE6F8" fill-opacity="0.64"/>
+
+  <rect y="670" width="1600" height="430" fill="url(#water)"/>
+  <g opacity="0.22" stroke="#FFFFFF" stroke-width="4">
+    <path d="M0 732C180 754 394 758 580 744C798 726 936 700 1142 710C1352 720 1470 752 1600 742"/>
+    <path d="M0 830C184 846 410 844 654 824C876 804 1048 792 1242 806C1390 816 1492 830 1600 826"/>
+    <path d="M0 922C228 936 444 934 668 918C884 902 1086 894 1268 908C1422 920 1512 928 1600 924"/>
+  </g>
+
+  <g transform="translate(0 18)">
+    <path d="M0 258C78 194 218 160 378 166H680C726 170 754 186 780 210L852 270H0V258Z" fill="#F7F4F6"/>
+    <path d="M0 270H602C664 270 708 292 744 332C790 380 810 434 810 502V804H0V270Z" fill="#FFFFFF" fill-opacity="0.18"/>
+    <path d="M124 270H564C618 270 652 286 680 314C714 348 730 392 730 450V794H124V270Z" fill="url(#glass)" stroke="#F7FAFE" stroke-opacity="0.74" stroke-width="3"/>
+    <g stroke="#EAF4FF" stroke-opacity="0.58" stroke-width="3">
+      <path d="M182 286V794"/>
+      <path d="M244 280V794"/>
+      <path d="M306 276V794"/>
+      <path d="M368 274V794"/>
+      <path d="M430 274V794"/>
+      <path d="M492 276V794"/>
+      <path d="M554 282V794"/>
+      <path d="M616 302V794"/>
+      <path d="M676 338V794"/>
+    </g>
+    <g opacity="0.34" stroke="#FFD8B4" stroke-width="8">
+      <line x1="146" y1="336" x2="688" y2="336"/>
+    </g>
+  </g>
+
+  <path d="M0 844H1080" stroke="#E3EFFD" stroke-width="7" stroke-opacity="0.68"/>
+  <path d="M0 876H948" stroke="#D2E7FD" stroke-width="3" stroke-opacity="0.4"/>
+</svg>
