@@ -3,10 +3,10 @@
 // - 当后端补上 /api/system/settings 后，可以在这里替换实现而调用方无需改动
 const STORAGE_KEY = 'bi_platform_settings_v1';
 export const DEFAULT_BRANDING = {
-    name: '链友融 BI智能分析平台',
+    name: 'AI BI 智能分析平台',
     slogan: '统一接入业务数据 · 构建可视化分析与决策大屏',
-    copyright: '© 2026 LYR BI Studio',
-    version: '1.0.5'
+    copyright: '© 2026 AI BI Studio',
+    version: '1.0.0'
 };
 export const DEFAULT_SECURITY = {
     passwordMinLength: 8,

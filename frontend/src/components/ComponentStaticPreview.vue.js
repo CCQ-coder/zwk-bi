@@ -1,3 +1,4 @@
+/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { chartTypeLabel, isDecorationChartType, isVectorIconChartType, } from '../utils/component-config';
 const props = withDefaults(defineProps(), {

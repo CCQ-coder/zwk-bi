@@ -1,3 +1,4 @@
+/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import TopNavBar from '../components/TopNavBar.vue';
 import ModelingPanel from '../components/ModelingPanel.vue';
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */

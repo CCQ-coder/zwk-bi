@@ -3,9 +3,13 @@ package com.aibi.bi.controller;
 import com.aibi.bi.common.ApiResponse;
 import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiDashboard;
+import com.aibi.bi.model.request.CreateDashboardRequest;
+import com.aibi.bi.model.request.UpdateDashboardRequest;
+import com.aibi.bi.model.response.DashboardResponse;
 import com.aibi.bi.model.response.DashboardSummaryResponse;
 import com.aibi.bi.model.response.PageResult;
 import com.aibi.bi.service.DashboardService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,38 +38,44 @@ public class DashboardController {
     }
 
     @GetMapping
-    public ApiResponse<List<BiDashboard>> list() {
-        return ApiResponse.ok(dashboardService.list());
+    public ApiResponse<List<DashboardResponse>> list() {
+        return ApiResponse.ok(dashboardService.list().stream().map(this::toResponse).toList());
     }
 
     @GetMapping("/page")
-    public ApiResponse<PageResult<BiDashboard>> listPage(
+    public ApiResponse<PageResult<DashboardResponse>> listPage(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String scene,
             @RequestParam(required = false) String publishStatus,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "12") int pageSize
     ) {
-        return ApiResponse.ok(dashboardService.listPage(keyword, scene, publishStatus, page, pageSize));
+        PageResult<BiDashboard> pageResult = dashboardService.listPage(keyword, scene, publishStatus, page, pageSize);
+        return ApiResponse.ok(PageResult.of(
+                pageResult.getItems().stream().map(this::toResponse).toList(),
+                pageResult.getTotal(),
+                pageResult.getPage(),
+                pageResult.getPageSize()
+        ));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<BiDashboard> getById(@PathVariable Long id) {
+    public ApiResponse<DashboardResponse> getById(@PathVariable Long id) {
         BiDashboard d = dashboardService.getById(id);
         if (d == null) return ApiResponse.fail(40401, "仪表板不存在");
-        return ApiResponse.ok(d);
+        return ApiResponse.ok(toResponse(d));
     }
 
     @PostMapping
     @RequireRoles({"ADMIN", "ANALYST"})
-    public ApiResponse<BiDashboard> create(@RequestBody BiDashboard req) {
-        return ApiResponse.ok(dashboardService.create(req));
+    public ApiResponse<DashboardResponse> create(@Valid @RequestBody CreateDashboardRequest request) {
+        return ApiResponse.ok(toResponse(dashboardService.create(toDomain(request))));
     }
 
     @PutMapping("/{id}")
     @RequireRoles({"ADMIN", "ANALYST"})
-    public ApiResponse<BiDashboard> update(@PathVariable Long id, @RequestBody BiDashboard req) {
-        return ApiResponse.ok(dashboardService.update(id, req));
+    public ApiResponse<DashboardResponse> update(@PathVariable Long id, @RequestBody UpdateDashboardRequest request) {
+        return ApiResponse.ok(toResponse(dashboardService.update(id, toDomain(request))));
     }
 
     @DeleteMapping("/{id}")
@@ -73,5 +83,29 @@ public class DashboardController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         dashboardService.delete(id);
         return ApiResponse.ok(null);
+    }
+
+    private BiDashboard toDomain(CreateDashboardRequest request) {
+        BiDashboard dashboard = new BiDashboard();
+        dashboard.setName(request.getName());
+        dashboard.setConfigJson(request.getConfigJson());
+        return dashboard;
+    }
+
+    private BiDashboard toDomain(UpdateDashboardRequest request) {
+        BiDashboard dashboard = new BiDashboard();
+        dashboard.setName(request.getName());
+        dashboard.setConfigJson(request.getConfigJson());
+        return dashboard;
+    }
+
+    private DashboardResponse toResponse(BiDashboard dashboard) {
+        DashboardResponse response = new DashboardResponse();
+        response.setId(dashboard.getId());
+        response.setName(dashboard.getName());
+        response.setConfigJson(dashboard.getConfigJson());
+        response.setComponentCount(dashboard.getComponentCount());
+        response.setCreatedAt(dashboard.getCreatedAt());
+        return response;
     }
 }

@@ -1,3 +1,4 @@
+/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed, defineComponent, h, onMounted, reactive, ref, withDirectives, vShow } from 'vue';
 import { ElMessage, ElMessageBox, ElIcon, ElTooltip, ElButton } from 'element-plus';
 import { ArrowRight, DataLine, Delete, Edit, Folder, FolderAdd, Grid, Loading, Plus } from '@element-plus/icons-vue';

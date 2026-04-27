@@ -1,3 +1,4 @@
+/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { createTemplate, deleteTemplate, getTemplateList, updateTemplate } from '../api/chart-template';

@@ -1,3 +1,4 @@
+/// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getDatasourceList, getDatasourceTables, previewExtract } from '../api/datasource';
