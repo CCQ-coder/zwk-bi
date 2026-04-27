@@ -1134,6 +1134,16 @@ const chartTypeGroups = [
       { label: '提醒', value: 'icon_alert_mark' },
       { label: '关闭', value: 'icon_close_mark' },
       { label: '设置', value: 'icon_settings_gear' },
+      { label: '双箭头', value: 'icon_chevron_double' },
+      { label: '轨道环', value: 'icon_orbit_ring' },
+      { label: '星芒标', value: 'icon_compass_star' },
+      { label: '数据仓', value: 'icon_database_stack' },
+      { label: '安全盾牌', value: 'icon_shield_guard' },
+      { label: '闪电', value: 'icon_lightning_bolt' },
+      { label: '地球网格', value: 'icon_globe_grid' },
+      { label: '雷达脉冲', value: 'icon_radar_pulse' },
+      { label: '立方线框', value: 'icon_cube_wire' },
+      { label: '波纹带', value: 'icon_wave_ribbon' },
     ],
   },
 ]
@@ -2114,11 +2124,12 @@ onBeforeUnmount(() => {
   overflow: hidden;
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid rgba(102, 152, 203, 0.22);
+  border: 1px solid rgba(118, 144, 153, 0.14);
   background:
-    radial-gradient(circle at top, rgba(78, 154, 255, 0.16), transparent 34%),
-    linear-gradient(180deg, rgba(8, 21, 35, 0.98) 0%, rgba(8, 16, 28, 0.98) 100%);
-  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.34);
+    radial-gradient(circle at top, rgba(88, 181, 171, 0.12), transparent 34%),
+    radial-gradient(circle at 100% 10%, rgba(122, 174, 214, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(244, 248, 248, 0.94) 100%);
+  box-shadow: 0 22px 48px rgba(39, 69, 77, 0.1);
 }
 
 .inspector-shell::before {
@@ -2127,7 +2138,7 @@ onBeforeUnmount(() => {
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0));
 }
 
 .inspector-head,
@@ -2142,20 +2153,20 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 4px;
   padding-bottom: 4px;
-  border-bottom: 1px solid rgba(92, 137, 185, 0.16);
+  border-bottom: 1px solid rgba(118, 144, 153, 0.12);
 }
 
 .inspector-title {
   font-size: 16px;
   font-weight: 700;
-  color: #f2f8ff;
+  color: #173246;
 }
 
 .inspector-subtitle,
 .hint-text {
   font-size: 12px;
   line-height: 1.6;
-  color: rgba(191, 213, 234, 0.68);
+  color: #7d939d;
 }
 
 .inspector-empty {
@@ -2185,8 +2196,8 @@ onBeforeUnmount(() => {
 .inspector-tabs :deep(.el-tabs__nav-scroll) {
   padding: 4px;
   border-radius: 999px;
-  background: rgba(8, 20, 34, 0.74);
-  border: 1px solid rgba(91, 138, 188, 0.14);
+  background: rgba(245, 249, 249, 0.92);
+  border: 1px solid rgba(118, 144, 153, 0.12);
 }
 
 .inspector-tabs :deep(.el-tabs__item) {
@@ -2194,13 +2205,13 @@ onBeforeUnmount(() => {
   padding: 0 12px;
   border-radius: 999px;
   font-size: 12px;
-  color: rgba(191, 213, 234, 0.68);
+  color: #7b9099;
   transition: background 0.18s ease, color 0.18s ease;
 }
 
 .inspector-tabs :deep(.el-tabs__item.is-active) {
-  color: #f4fbff;
-  background: linear-gradient(135deg, rgba(56, 147, 255, 0.22), rgba(20, 90, 168, 0.58));
+  color: #215b62;
+  background: linear-gradient(135deg, rgba(225, 245, 241, 0.98), rgba(241, 249, 247, 0.92));
 }
 
 .inspector-tabs :deep(.el-tabs__content) {
@@ -2212,14 +2223,14 @@ onBeforeUnmount(() => {
 .inspector-shell :deep(.el-select__wrapper),
 .inspector-shell :deep(.el-input-number .el-input__wrapper),
 .inspector-shell :deep(.el-color-picker__trigger) {
-  background: rgba(7, 22, 38, 0.9);
-  box-shadow: inset 0 0 0 1px rgba(96, 153, 214, 0.16);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(118, 144, 153, 0.14);
 }
 
 .inspector-shell :deep(.el-textarea__inner) {
-  background: rgba(7, 22, 38, 0.9);
-  border: 1px solid rgba(96, 153, 214, 0.16);
-  color: #edf6ff;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(118, 144, 153, 0.14);
+  color: #173246;
 }
 
 .inspector-shell :deep(.el-input__inner),
@@ -2227,7 +2238,7 @@ onBeforeUnmount(() => {
 .inspector-shell :deep(.el-select__selected-item),
 .inspector-shell :deep(.el-radio-button__inner),
 .inspector-shell :deep(.el-checkbox__label) {
-  color: #edf6ff;
+  color: #173246;
 }
 
 .inspector-shell :deep(.el-input-number) {
@@ -2235,42 +2246,46 @@ onBeforeUnmount(() => {
 }
 
 .inspector-shell :deep(.el-radio-button__inner) {
-  background: rgba(7, 22, 38, 0.88);
-  border-color: rgba(96, 153, 214, 0.16);
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(118, 144, 153, 0.14);
 }
 
 .inspector-shell :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  background: linear-gradient(135deg, rgba(56, 147, 255, 0.32), rgba(20, 90, 168, 0.72));
-  border-color: rgba(111, 188, 255, 0.32);
+  background: linear-gradient(135deg, rgba(88, 181, 171, 0.26), rgba(110, 174, 207, 0.44));
+  border-color: rgba(88, 181, 171, 0.24);
   box-shadow: none;
 }
 
 .inspector-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  padding: 2px 0 4px;
 }
 
 .section-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  color: #eef7ff;
+  color: #59717c;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .summary-card,
 .profile-card,
 .mode-card,
 .style-family-card {
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(95, 146, 199, 0.16);
-  background: linear-gradient(180deg, rgba(10, 27, 44, 0.86) 0%, rgba(8, 17, 30, 0.92) 100%);
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(118, 144, 153, 0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(246,250,250,0.95) 100%);
+  box-shadow: 0 14px 30px rgba(52, 84, 92, 0.06);
 }
 
 .summary-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
-  color: #f3f9ff;
+  color: #173246;
 }
 
 .summary-tags {
@@ -2283,22 +2298,23 @@ onBeforeUnmount(() => {
 .summary-meta {
   margin-top: 10px;
   font-size: 12px;
-  color: rgba(191, 213, 234, 0.66);
+  color: #6d8791;
 }
 
 .health-card,
 .preview-card,
 .suggestion-card,
 .filter-editor {
-  padding: 12px 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(95, 146, 199, 0.16);
-  background: rgba(8, 20, 34, 0.82);
+  padding: 14px 15px;
+  border-radius: 18px;
+  border: 1px solid rgba(118, 144, 153, 0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,250,250,0.92));
+  box-shadow: 0 12px 28px rgba(52, 84, 92, 0.05);
 }
 
 .health-card--warning {
-  border-color: rgba(232, 182, 86, 0.32);
-  background: linear-gradient(180deg, rgba(58, 35, 7, 0.56) 0%, rgba(8, 20, 34, 0.9) 100%);
+  border-color: rgba(217, 171, 87, 0.28);
+  background: linear-gradient(180deg, rgba(255, 245, 227, 0.96) 0%, rgba(255, 251, 243, 0.92) 100%);
 }
 
 .health-head,
@@ -2315,9 +2331,9 @@ onBeforeUnmount(() => {
 .preview-head span,
 .suggestion-head span,
 .filter-editor-head span {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: #eff7ff;
+  color: #173246;
 }
 
 .health-text,
@@ -2328,7 +2344,7 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   font-size: 12px;
   line-height: 1.6;
-  color: rgba(191, 213, 234, 0.68);
+  color: #667f89;
 }
 
 .table-basic-grid {
@@ -2338,11 +2354,12 @@ onBeforeUnmount(() => {
 }
 
 .table-column-editor {
-  padding: 12px;
+  padding: 14px;
   margin-bottom: 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(95, 146, 199, 0.16);
-  background: rgba(6, 19, 32, 0.72);
+  border-radius: 18px;
+  border: 1px solid rgba(118, 144, 153, 0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.99), rgba(247,250,250,0.95));
+  box-shadow: 0 12px 28px rgba(52, 84, 92, 0.05);
 }
 
 .table-column-editor__head {
@@ -2350,7 +2367,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: #eff7ff;
+  color: #173246;
   font-size: 13px;
   font-weight: 700;
 }
@@ -2360,7 +2377,7 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   font-size: 12px;
   line-height: 1.6;
-  color: rgba(191, 213, 234, 0.68);
+  color: #6b858f;
 }
 
 .table-column-editor__list {
@@ -2371,15 +2388,16 @@ onBeforeUnmount(() => {
 }
 
 .table-column-item {
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(111, 188, 255, 0.16);
-  background: linear-gradient(180deg, rgba(13, 36, 58, 0.88) 0%, rgba(7, 18, 31, 0.96) 100%);
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(118, 144, 153, 0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(244,248,248,0.96) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
   cursor: grab;
 }
 
 .table-column-item__label {
-  color: #eff7ff;
+  color: #173246;
   font-size: 13px;
   font-weight: 700;
 }
@@ -2400,7 +2418,7 @@ onBeforeUnmount(() => {
 
 .table-column-field span,
 .table-column-item__drag {
-  color: rgba(191, 213, 234, 0.78);
+  color: #7a8f98;
   font-size: 12px;
 }
 
@@ -2416,14 +2434,33 @@ onBeforeUnmount(() => {
   margin-top: 12px;
 }
 
+.preview-card :deep(.el-table) {
+  --el-table-border-color: rgba(118, 144, 153, 0.12);
+  --el-table-header-bg-color: #f1f7f7;
+  --el-table-row-hover-bg-color: rgba(226, 245, 241, 0.76);
+  --el-fill-color-blank: rgba(255, 255, 255, 0.98);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.preview-card :deep(.el-table th.el-table__cell) {
+  color: #54707c;
+  font-weight: 700;
+}
+
+.preview-card :deep(.el-table td.el-table__cell) {
+  color: #4d6670;
+}
+
 .query-json-block {
   margin: 0;
-  padding: 12px;
+  padding: 14px;
   max-height: 260px;
   overflow: auto;
-  border-radius: 12px;
-  background: rgba(4, 13, 24, 0.72);
-  color: #dff3ff;
+  border-radius: 14px;
+  border: 1px solid rgba(118, 144, 153, 0.1);
+  background: linear-gradient(180deg, rgba(248, 251, 251, 0.98), rgba(241, 246, 247, 0.94));
+  color: #40606b;
   font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
@@ -2436,7 +2473,7 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(120, 188, 255, 0.72);
+  color: #6a9e9a;
 }
 
 .profile-title,
@@ -2444,7 +2481,7 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   font-size: 15px;
   font-weight: 700;
-  color: #f5fbff;
+  color: #173246;
 }
 
 .profile-desc,
@@ -2452,7 +2489,7 @@ onBeforeUnmount(() => {
   margin-top: 6px;
   font-size: 12px;
   line-height: 1.6;
-  color: rgba(191, 213, 234, 0.72);
+  color: #7d939d;
 }
 
 .profile-chip-list,
@@ -2467,16 +2504,17 @@ onBeforeUnmount(() => {
 .profile-chip,
 .mode-card-tag,
 .style-family-tag {
-  padding: 5px 10px;
+  padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(111, 188, 255, 0.16);
-  background: rgba(6, 23, 38, 0.72);
-  color: rgba(227, 240, 255, 0.82);
+  border: 1px solid rgba(118, 144, 153, 0.12);
+  background: rgba(243, 248, 248, 0.98);
+  color: #5e7781;
   font-size: 11px;
+  font-weight: 600;
 }
 
 .style-family-card {
-  padding: 12px 14px;
+  padding: 14px 16px;
 }
 
 .style-family-head {
@@ -2484,7 +2522,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: #eff7ff;
+  color: #173246;
   font-size: 13px;
   font-weight: 700;
 }
@@ -2495,10 +2533,11 @@ onBeforeUnmount(() => {
   padding: 0 10px;
   height: 22px;
   border-radius: 999px;
-  background: rgba(73, 160, 255, 0.14);
-  border: 1px solid rgba(73, 160, 255, 0.22);
-  color: #dff3ff;
+  background: rgba(226, 245, 241, 0.96);
+  border: 1px solid rgba(88, 181, 171, 0.2);
+  color: #2f6d73;
   font-size: 11px;
+  font-weight: 700;
 }
 
 .preset-grid {

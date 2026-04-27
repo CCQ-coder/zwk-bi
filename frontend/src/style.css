@@ -1,10 +1,20 @@
 :root {
-  --bg-color: #f3f6fb;
-  --panel-color: #ffffff;
-  --text-primary: #1f2937;
-  --text-secondary: #6b7280;
-  --brand-color: #0f766e;
-  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --bg-color: #eef4f4;
+  --panel-color: rgba(255, 255, 255, 0.78);
+  --text-primary: #173246;
+  --text-secondary: #6d808d;
+  --brand-color: #2a9d8f;
+  --brand-accent: #6eaecf;
+  --line-color: rgba(115, 140, 152, 0.18);
+  --el-color-primary: #2a9d8f;
+  --el-color-primary-light-3: #55b4a8;
+  --el-color-primary-light-5: #82cbc2;
+  --el-color-primary-light-7: #b8e4de;
+  --el-color-primary-light-8: #d5f0eb;
+  --el-color-primary-light-9: #ecf8f5;
+  --el-color-primary-dark-2: #217d72;
+  --el-border-radius-base: 12px;
+  font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
   color: var(--text-primary);
   background: var(--bg-color);
 }
@@ -15,7 +25,10 @@
 
 body {
   margin: 0;
-  background: radial-gradient(circle at top right, #e6fffa 0%, var(--bg-color) 45%);
+  background:
+    radial-gradient(circle at top left, rgba(105, 187, 183, 0.18), transparent 24%),
+    radial-gradient(circle at 88% 16%, rgba(110, 174, 207, 0.16), transparent 24%),
+    linear-gradient(180deg, #f7fbfa 0%, #eef4f4 48%, #edf2f6 100%);
 }
 
 #app {

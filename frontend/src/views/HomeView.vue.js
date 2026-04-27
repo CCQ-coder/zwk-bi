@@ -233,8 +233,25 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['workbench-page']} */ ;
+/** @type {__VLS_StyleScopedClasses['workbench-page']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-button--primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-button--primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-button']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-button--primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['workflow-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['action-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['asset-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['spotlight-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['spotlight-cover']} */ ;
 /** @type {__VLS_StyleScopedClasses['metric-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['main-grid']} */ ;
@@ -373,13 +390,13 @@ const __VLS_28 = __VLS_asFunctionalComponent(__VLS_27, new __VLS_27({
     percentage: (__VLS_ctx.publishProgress),
     strokeWidth: (10),
     showText: (false),
-    color: "#2f7cf6",
+    color: "#58b5ab",
 }));
 const __VLS_29 = __VLS_28({
     percentage: (__VLS_ctx.publishProgress),
     strokeWidth: (10),
     showText: (false),
-    color: "#2f7cf6",
+    color: "#58b5ab",
 }, ...__VLS_functionalComponentArgsRest(__VLS_28));
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "highlight-user" },
@@ -465,13 +482,13 @@ const __VLS_36 = __VLS_asFunctionalComponent(__VLS_35, new __VLS_35({
     percentage: (__VLS_ctx.onboardingProgress),
     strokeWidth: (12),
     showText: (false),
-    color: "#1a9b88",
+    color: "#4b9f96",
 }));
 const __VLS_37 = __VLS_36({
     percentage: (__VLS_ctx.onboardingProgress),
     strokeWidth: (12),
     showText: (false),
-    color: "#1a9b88",
+    color: "#4b9f96",
 }, ...__VLS_functionalComponentArgsRest(__VLS_36));
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "workflow-list" },

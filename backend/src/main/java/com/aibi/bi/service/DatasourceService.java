@@ -159,12 +159,24 @@ public class DatasourceService {
     }
 
     public DatasetPreviewResponse previewDatasource(BiDatasource datasource, String sqlText, String runtimeConfigText) {
+        return queryDatasource(datasource, sqlText, runtimeConfigText, PREVIEW_LIMIT);
+    }
+
+    public DatasetPreviewResponse queryRuntimeDatasource(Long datasourceId, String sqlText, String runtimeConfigText, Integer maxRows) {
+        return queryDatasource(requireDatasource(datasourceId), sqlText, runtimeConfigText, maxRows);
+    }
+
+    public DatasetPreviewResponse queryRuntimeDatasource(BiDatasource datasource, String sqlText, String runtimeConfigText, Integer maxRows) {
+        return queryDatasource(datasource, sqlText, runtimeConfigText, maxRows);
+    }
+
+    private DatasetPreviewResponse queryDatasource(BiDatasource datasource, String sqlText, String runtimeConfigText, Integer maxRows) {
         String sourceKind = resolveSourceKind(datasource);
         return switch (sourceKind) {
-            case "DATABASE" -> previewDatabaseDatasource(datasource, sqlText);
-            case "API" -> previewApiDatasource(datasource, runtimeConfigText);
-            case "TABLE" -> previewTableDatasource(datasource, runtimeConfigText);
-            case "JSON_STATIC" -> previewJsonDatasource(datasource, runtimeConfigText);
+            case "DATABASE" -> queryDatabaseDatasource(datasource, sqlText, maxRows);
+            case "API" -> queryApiDatasource(datasource, runtimeConfigText, maxRows);
+            case "TABLE" -> queryTableDatasource(datasource, runtimeConfigText, maxRows);
+            case "JSON_STATIC" -> queryJsonDatasource(datasource, runtimeConfigText, maxRows);
             default -> throw new IllegalArgumentException("不支持的数据源类型: " + sourceKind);
         };
     }
@@ -273,14 +285,14 @@ public class DatasourceService {
         entity.setConfigJson(normalizeNonDatabaseConfig(normalizedSourceKind, configJson));
     }
 
-    private DatasetPreviewResponse previewDatabaseDatasource(BiDatasource datasource, String sqlText) {
+    private DatasetPreviewResponse queryDatabaseDatasource(BiDatasource datasource, String sqlText, Integer maxRows) {
         if (!StringUtils.hasText(sqlText)) {
             throw new IllegalArgumentException("数据库页面编写模式必须填写 SQL");
         }
-        return jdbcPreviewService.preview(datasource, sqlText);
+        return jdbcPreviewService.query(datasource, sqlText, maxRows);
     }
 
-    private DatasetPreviewResponse previewApiDatasource(BiDatasource datasource, String runtimeConfigText) {
+    private DatasetPreviewResponse queryApiDatasource(BiDatasource datasource, String runtimeConfigText, Integer maxRows) {
         Map<String, Object> config = mergeConfig(datasource.getConfigJson(), runtimeConfigText, "API 页面配置格式不正确");
         String url = readText(firstNonNull(config.get("apiUrl"), config.get("url")), "");
         String method = readText(firstNonNull(config.get("apiMethod"), config.get("method")), "GET").toUpperCase(Locale.ROOT);
@@ -324,7 +336,7 @@ public class DatasourceService {
                 throw new IllegalArgumentException("API 未返回可解析内容");
             }
             JsonNode root = objectMapper.readTree(bodyText);
-            return buildPreviewResponse(resolveResultNode(root, resultPath));
+            return buildPreviewResponse(resolveResultNode(root, resultPath), maxRows);
         } catch (IllegalArgumentException ex) {
             throw ex;
         } catch (InterruptedException ex) {
@@ -335,7 +347,7 @@ public class DatasourceService {
         }
     }
 
-    private DatasetPreviewResponse previewTableDatasource(BiDatasource datasource, String runtimeConfigText) {
+    private DatasetPreviewResponse queryTableDatasource(BiDatasource datasource, String runtimeConfigText, Integer maxRows) {
         Map<String, Object> config = mergeConfig(datasource.getConfigJson(), runtimeConfigText, "表格页面配置格式不正确");
         String tableText = readText(firstNonNull(config.get("tableText"), config.get("text")), "");
         if (!StringUtils.hasText(tableText)) {
@@ -360,7 +372,8 @@ public class DatasourceService {
                 : buildDefaultColumns(maxColumnSize);
         int startIndex = hasHeader ? 1 : 0;
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (int index = startIndex; index < records.size() && rows.size() < PREVIEW_LIMIT; index++) {
+        int safeMaxRows = resolveMaxRows(maxRows);
+        for (int index = startIndex; index < records.size() && rows.size() < safeMaxRows; index++) {
             List<String> record = records.get(index);
             Map<String, Object> row = new LinkedHashMap<>();
             for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
@@ -371,7 +384,7 @@ public class DatasourceService {
         return buildPreviewResponse(rows);
     }
 
-    private DatasetPreviewResponse previewJsonDatasource(BiDatasource datasource, String runtimeConfigText) {
+    private DatasetPreviewResponse queryJsonDatasource(BiDatasource datasource, String runtimeConfigText, Integer maxRows) {
         Map<String, Object> config = mergeConfig(datasource.getConfigJson(), runtimeConfigText, "JSON 页面配置格式不正确");
         String jsonText = readText(firstNonNull(config.get("jsonText"), config.get("text")), "");
         if (!StringUtils.hasText(jsonText)) {
@@ -380,7 +393,7 @@ public class DatasourceService {
         String resultPath = readText(firstNonNull(config.get("jsonResultPath"), config.get("resultPath")), "");
         try {
             JsonNode root = objectMapper.readTree(jsonText);
-            return buildPreviewResponse(resolveResultNode(root, resultPath));
+            return buildPreviewResponse(resolveResultNode(root, resultPath), maxRows);
         } catch (IllegalArgumentException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -638,16 +651,17 @@ public class DatasourceService {
         return current;
     }
 
-    private DatasetPreviewResponse buildPreviewResponse(JsonNode node) {
+    private DatasetPreviewResponse buildPreviewResponse(JsonNode node, Integer maxRows) {
         if (node == null || node.isNull() || node.isMissingNode()) {
             return emptyPreviewResponse();
         }
 
         List<Map<String, Object>> rows = new ArrayList<>();
+        int safeMaxRows = resolveMaxRows(maxRows);
         if (node.isArray()) {
             int index = 0;
             for (JsonNode item : node) {
-                if (index++ >= PREVIEW_LIMIT) {
+                if (index++ >= safeMaxRows) {
                     break;
                 }
                 rows.add(convertJsonRow(item));
@@ -676,6 +690,13 @@ public class DatasourceService {
         response.setRows(List.of());
         response.setRowCount(0);
         return response;
+    }
+
+    private int resolveMaxRows(Integer maxRows) {
+        if (maxRows == null || maxRows <= 0) {
+            return Integer.MAX_VALUE;
+        }
+        return maxRows;
     }
 
     private Map<String, Object> convertJsonRow(JsonNode node) {

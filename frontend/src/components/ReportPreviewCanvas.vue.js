@@ -4,7 +4,7 @@ import ComponentStaticPreview from './ComponentStaticPreview.vue';
 import { getChartData, getChartList } from '../api/chart';
 import { getDashboardById, getDashboardComponents } from '../api/dashboard';
 import { getPublicChartList, getPublicComponentData, getPublicDashboardById, getPublicDashboardComponents, } from '../api/report';
-import { buildTableWrapperStyleVars, buildComponentOption, getComponentTableRowClassName, getConfiguredTableRows, getConfiguredTableStepCount, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, mergeComponentRequestFilters, normalizeComponentConfig, postProcessChartOption, resolveConfiguredTableColumns, } from '../utils/component-config';
+import { buildTableWrapperStyleVars, buildComponentOption, getComponentTableRowClassName, getConfiguredTableRows, getConfiguredTableStepCount, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, mergeComponentRequestFilters, normalizeRuntimeChartData, normalizeComponentConfig, postProcessChartOption, resolveConfiguredTableColumns, } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 import { normalizeCanvasConfig, parseReportConfig } from '../utils/report-config';
 const props = defineProps();
@@ -25,10 +25,12 @@ const viewportSize = reactive({
     width: typeof window === 'undefined' ? 1920 : window.innerWidth,
     height: typeof window === 'undefined' ? 1080 : window.innerHeight,
 });
+const COMPONENT_DATA_BATCH_SIZE = 4;
 const MIN_CARD_WIDTH = 320;
 const MIN_CARD_HEIGHT = 220;
 const LEGACY_GRID_COL_PX = 42;
 const LEGACY_GRID_ROW_PX = 70;
+let componentDataLoadToken = 0;
 const renderedChartCount = computed(() => components.value.filter((item) => isRenderableChart(item)).length);
 const isPublicPreview = computed(() => props.accessMode === 'public' && Boolean(props.shareToken));
 const isImmersiveScreen = computed(() => props.scene === 'screen');
@@ -85,6 +87,13 @@ const filterDefinitions = computed(() => {
             const values = definitions.get(field) ?? new Set();
             if (field === chart.xField) {
                 data.labels.forEach((label) => values.add(String(label)));
+            }
+            if (field === chart.groupField) {
+                data.series.forEach((item) => {
+                    if (item?.name != null && String(item.name).trim()) {
+                        values.add(String(item.name));
+                    }
+                });
             }
             ;
             (data.rawRows ?? []).forEach((row) => {
@@ -509,7 +518,10 @@ const disposeChartInstance = (componentId) => {
     chartInstances.delete(componentId);
     chartRefs.delete(componentId);
 };
-const reloadSingleComponentData = async (component, targetMap) => {
+const yieldToMainThread = () => new Promise((resolve) => window.setTimeout(resolve, 0));
+const reloadSingleComponentData = async (component, targetMap, loadToken = componentDataLoadToken) => {
+    if (loadToken !== componentDataLoadToken)
+        return;
     const chart = getComponentChartConfig(component);
     const interaction = getComponentInteractionConfig(component);
     const nextMap = targetMap ?? new Map(componentDataMap.value);
@@ -527,25 +539,41 @@ const reloadSingleComponentData = async (component, targetMap) => {
                 filters: mergeComponentRequestFilters(interaction.dataFilters, { ...activeFilters }),
                 configJson: component.configJson,
             });
-        const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], chart);
+        if (loadToken !== componentDataLoadToken)
+            return;
+        const materialized = normalizeRuntimeChartData(data, chart);
         nextMap.set(component.id, materialized);
         if (isRenderableChart(component))
             renderChart(component, materialized);
         else
             disposeChartInstance(component.id);
         if (!targetMap) {
+            if (loadToken !== componentDataLoadToken)
+                return;
             componentDataMap.value = nextMap;
             scheduleTableCarouselSync();
             scheduleComponentRefreshSync();
         }
     }
     catch {
-        if (!targetMap) {
+        if (!targetMap && loadToken === componentDataLoadToken) {
             scheduleComponentRefreshSync();
         }
     }
 };
+const reloadComponentDataInBatches = async (items, targetMap, loadToken) => {
+    for (let start = 0; start < items.length; start += COMPONENT_DATA_BATCH_SIZE) {
+        const batch = items.slice(start, start + COMPONENT_DATA_BATCH_SIZE);
+        await Promise.all(batch.map((component) => reloadSingleComponentData(component, targetMap, loadToken)));
+        if (loadToken !== componentDataLoadToken)
+            return;
+        if (start + COMPONENT_DATA_BATCH_SIZE < items.length) {
+            await yieldToMainThread();
+        }
+    }
+};
 const reloadComponentData = async () => {
+    const loadToken = ++componentDataLoadToken;
     chartLoading.value = true;
     clearTableRenderCache();
     componentDataMap.value = new Map();
@@ -553,16 +581,20 @@ const reloadComponentData = async () => {
     scheduleTableCarouselSync();
     try {
         await nextTick();
+        if (loadToken !== componentDataLoadToken)
+            return;
         const nextDataMap = new Map();
-        await Promise.all(components.value.map(async (component) => {
-            await reloadSingleComponentData(component, nextDataMap);
-        }));
+        await reloadComponentDataInBatches(components.value, nextDataMap, loadToken);
+        if (loadToken !== componentDataLoadToken)
+            return;
         componentDataMap.value = nextDataMap;
         scheduleTableCarouselSync();
         scheduleComponentRefreshSync();
     }
     finally {
-        chartLoading.value = false;
+        if (loadToken === componentDataLoadToken) {
+            chartLoading.value = false;
+        }
     }
 };
 const updateFilter = (field, value) => {
@@ -625,6 +657,7 @@ onMounted(async () => {
     await loadAll();
 });
 onBeforeUnmount(() => {
+    componentDataLoadToken += 1;
     window.removeEventListener('resize', handleResize);
     stopAllComponentRefreshes();
     if (tableCarouselSyncFrame !== null) {

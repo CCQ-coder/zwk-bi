@@ -5,7 +5,7 @@ import ComponentStaticPreview from './ComponentStaticPreview.vue';
 import EditorComponentInspector from './EditorComponentInspector.vue';
 import { addDashboardComponent, createDashboard, deleteDashboard, getDashboardById, getDashboardComponents, getDashboardList, getDefaultDashboard, removeDashboardComponent, updateDashboard, updateDashboardComponent } from '../api/dashboard';
 import { getChartData, getChartList } from '../api/chart';
-import { buildChartSnapshot, buildComponentConfig, buildComponentOption, chartTypeLabel, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, mergeComponentRequestFilters, materializeChartData, normalizeComponentConfig, } from '../utils/component-config';
+import { buildChartSnapshot, buildComponentConfig, buildComponentOption, chartTypeLabel, getMissingChartFields, isCanvasRenderableChartType, isStaticWidgetChartType, mergeComponentRequestFilters, normalizeRuntimeChartData, normalizeComponentConfig, } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
 import { buildPublishedLink, buildReportConfig, normalizePublishConfig, parseReportConfig } from '../utils/report-config';
 const props = withDefaults(defineProps(), {
@@ -332,7 +332,7 @@ const renderChart = async (comp) => {
             configJson: comp.configJson,
             filters: mergeComponentRequestFilters(resolved.interaction.dataFilters),
         });
-        const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], resolved.chart);
+        const materialized = normalizeRuntimeChartData(data, resolved.chart);
         let inst = chartInstances.get(comp.id);
         if (!inst) {
             inst = echarts.init(el);

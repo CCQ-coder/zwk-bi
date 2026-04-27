@@ -21,7 +21,7 @@
           <div class="highlight-label">发布完成度</div>
           <div class="highlight-value">{{ publishedReportCount }}</div>
           <div class="highlight-meta">已发布数据大屏 / 共 {{ screens.length }} 个数据大屏</div>
-          <el-progress :percentage="publishProgress" :stroke-width="10" :show-text="false" color="#2f7cf6" />
+          <el-progress :percentage="publishProgress" :stroke-width="10" :show-text="false" color="#58b5ab" />
 
           <div class="highlight-user">
             <span class="highlight-avatar">{{ avatarText }}</span>
@@ -55,7 +55,7 @@
               </div>
             </template>
 
-            <el-progress :percentage="onboardingProgress" :stroke-width="12" :show-text="false" color="#1a9b88" />
+            <el-progress :percentage="onboardingProgress" :stroke-width="12" :show-text="false" color="#4b9f96" />
 
             <div class="workflow-list">
               <button
@@ -469,30 +469,74 @@ onMounted(loadData)
 
 <style scoped>
 .workbench-page {
+  position: relative;
   min-height: 100vh;
+  overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(71, 130, 218, 0.12), transparent 28%),
-    linear-gradient(180deg, #eef4fb 0%, #f6f9fc 48%, #edf3f8 100%);
+    radial-gradient(circle at top left, rgba(88, 181, 171, 0.16), transparent 22%),
+    radial-gradient(circle at 84% 18%, rgba(110, 174, 207, 0.14), transparent 24%),
+    linear-gradient(180deg, #f7fbfa 0%, #eef4f4 46%, #edf2f6 100%);
+}
+
+.workbench-page::before {
+  content: '';
+  position: fixed;
+  left: -120px;
+  top: -120px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(125, 198, 190, 0.26) 0%, rgba(125, 198, 190, 0) 72%);
+  pointer-events: none;
+}
+
+.workbench-page::after {
+  content: '';
+  position: fixed;
+  right: -160px;
+  top: 84px;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(122, 174, 216, 0.22) 0%, rgba(122, 174, 216, 0) 72%);
+  pointer-events: none;
 }
 
 .workbench-main {
-  padding: 20px;
+  position: relative;
+  z-index: 1;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 .hero-card {
+  position: relative;
+  overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.8fr);
-  gap: 18px;
-  padding: 24px;
-  border-radius: 28px;
+  gap: 22px;
+  padding: 30px;
+  border-radius: 32px;
   background:
-    linear-gradient(135deg, rgba(9, 37, 68, 0.96) 0%, rgba(19, 63, 113, 0.96) 52%, rgba(33, 87, 150, 0.92) 100%),
-    #0f2b51;
+    linear-gradient(135deg, rgba(62, 141, 147, 0.96) 0%, rgba(95, 162, 169, 0.94) 48%, rgba(169, 199, 208, 0.88) 100%),
+    #6aafb2;
+  border: 1px solid rgba(255, 255, 255, 0.48);
   color: #ffffff;
-  box-shadow: 0 20px 48px rgba(17, 41, 74, 0.16);
+  box-shadow: 0 26px 56px rgba(55, 96, 111, 0.18);
+}
+
+.hero-card::after {
+  content: '';
+  position: absolute;
+  right: -96px;
+  bottom: -124px;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 72%);
+  pointer-events: none;
 }
 
 .hero-copy {
@@ -506,25 +550,27 @@ onMounted(loadData)
   width: fit-content;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #c8dcff;
+  background: rgba(247, 253, 252, 0.18);
+  color: #f2fbfa;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   font-size: 12px;
   letter-spacing: 0.08em;
 }
 
 .hero-title {
   margin: 0;
-  font-size: 34px;
+  font-size: 38px;
   line-height: 1.2;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .hero-description {
   margin: 0;
-  max-width: 760px;
+  max-width: 680px;
   font-size: 15px;
   line-height: 1.75;
-  color: rgba(228, 239, 255, 0.84);
+  color: rgba(245, 251, 250, 0.9);
 }
 
 .hero-actions {
@@ -535,10 +581,12 @@ onMounted(loadData)
 }
 
 .hero-highlight {
-  padding: 20px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
+  padding: 22px;
+  border-radius: 26px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 250, 251, 0.8));
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -546,18 +594,20 @@ onMounted(loadData)
 
 .highlight-label {
   font-size: 13px;
-  color: #d0e2ff;
+  color: #5d7c84;
+  letter-spacing: 0.08em;
 }
 
 .highlight-value {
   font-size: 56px;
   line-height: 1;
   font-weight: 700;
+  color: #173246;
 }
 
 .highlight-meta {
   font-size: 13px;
-  color: rgba(224, 236, 255, 0.82);
+  color: #69818a;
 }
 
 .highlight-user {
@@ -566,28 +616,61 @@ onMounted(loadData)
   align-items: center;
   gap: 12px;
   padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid rgba(103, 126, 133, 0.14);
 }
 
 .highlight-avatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(58, 132, 246, 0.95);
+  background: linear-gradient(135deg, #57b0a4 0%, #7aafd5 100%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  box-shadow: 0 12px 20px rgba(86, 158, 165, 0.22);
 }
 
 .highlight-name {
   font-size: 14px;
   font-weight: 600;
+  color: #173246;
 }
 
 .highlight-id {
   font-size: 12px;
-  color: rgba(219, 232, 255, 0.76);
+  color: #728793;
+}
+
+.hero-actions :deep(.el-button) {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+.hero-actions :deep(.el-button--primary) {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(255, 255, 255, 0.94);
+  color: #1c5258;
+  box-shadow: 0 12px 24px rgba(63, 120, 124, 0.16);
+}
+
+.hero-actions :deep(.el-button--primary:hover) {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #184247;
+}
+
+.hero-actions :deep(.el-button:not(.el-button--primary)) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.hero-actions :deep(.el-button:not(.el-button--primary):hover) {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.26);
 }
 
 .metric-grid {
@@ -599,9 +682,10 @@ onMounted(loadData)
 .metric-card {
   padding: 18px;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(204, 219, 234, 0.9);
-  box-shadow: 0 12px 28px rgba(23, 45, 74, 0.05);
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(186, 206, 212, 0.78);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 36px rgba(42, 73, 81, 0.06);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -609,25 +693,25 @@ onMounted(loadData)
 
 .metric-kicker {
   font-size: 12px;
-  color: #6c819b;
+  color: #728894;
 }
 
 .metric-value {
   font-size: 34px;
   line-height: 1;
-  color: #173255;
+  color: #173246;
 }
 
 .metric-label {
   font-size: 15px;
   font-weight: 600;
-  color: #173255;
+  color: #173246;
 }
 
 .metric-note {
   font-size: 12px;
   line-height: 1.6;
-  color: #637b98;
+  color: #6f8591;
 }
 
 .main-grid {
@@ -645,9 +729,14 @@ onMounted(loadData)
 
 .surface-card {
   border: none;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: 0 16px 40px rgba(22, 43, 69, 0.08);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 42px rgba(35, 66, 74, 0.08);
+}
+
+.surface-card :deep(.el-card__body) {
+  padding-top: 18px;
 }
 
 .surface-card :deep(.el-card__header) {
@@ -665,20 +754,20 @@ onMounted(loadData)
 .section-title {
   font-size: 18px;
   font-weight: 700;
-  color: #183153;
+  color: #173246;
 }
 
 .section-subtitle {
   margin-top: 4px;
   font-size: 13px;
   line-height: 1.6;
-  color: #6a819d;
+  color: #718793;
 }
 
 .section-number {
   font-size: 28px;
   font-weight: 700;
-  color: #153d6d;
+  color: #2e7482;
 }
 
 .workflow-list {
@@ -690,15 +779,22 @@ onMounted(loadData)
 
 .workflow-item {
   width: 100%;
-  border: 1px solid #d9e5f1;
-  border-radius: 18px;
-  background: #ffffff;
+  border: 1px solid rgba(189, 207, 213, 0.82);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 251, 0.92));
   padding: 14px 16px;
   display: flex;
   align-items: center;
   gap: 14px;
   text-align: left;
   cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.workflow-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(88, 176, 164, 0.28);
+  box-shadow: 0 14px 28px rgba(51, 93, 100, 0.08);
 }
 
 .workflow-dot {
@@ -724,12 +820,12 @@ onMounted(loadData)
 .workflow-label {
   font-size: 14px;
   font-weight: 600;
-  color: #183153;
+  color: #173246;
 }
 
 .workflow-tip {
   font-size: 12px;
-  color: #6b819d;
+  color: #708792;
 }
 
 .action-grid {
@@ -739,10 +835,10 @@ onMounted(loadData)
 }
 
 .action-card {
-  border: 1px solid #dbe6f1;
+  border: 1px solid rgba(191, 208, 214, 0.78);
   border-radius: 22px;
   padding: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 249, 249, 0.92) 100%);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -753,24 +849,24 @@ onMounted(loadData)
 
 .action-card:hover {
   transform: translateY(-2px);
-  border-color: #a9c6ef;
-  box-shadow: 0 16px 28px rgba(22, 56, 95, 0.08);
+  border-color: rgba(88, 176, 164, 0.3);
+  box-shadow: 0 16px 30px rgba(43, 78, 86, 0.09);
 }
 
 .action-stat {
   font-size: 12px;
-  color: #5d7ea7;
+  color: #66909a;
 }
 
 .action-title {
   font-size: 18px;
-  color: #183153;
+  color: #173246;
 }
 
 .action-desc {
   font-size: 13px;
   line-height: 1.7;
-  color: #6f86a3;
+  color: #718792;
 }
 
 .asset-list {
@@ -781,9 +877,9 @@ onMounted(loadData)
 
 .asset-item {
   width: 100%;
-  border: 1px solid #dde7f1;
+  border: 1px solid rgba(191, 208, 214, 0.78);
   border-radius: 20px;
-  background: #ffffff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 251, 0.92));
   padding: 16px;
   display: flex;
   align-items: center;
@@ -791,6 +887,13 @@ onMounted(loadData)
   gap: 16px;
   text-align: left;
   cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.asset-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(88, 176, 164, 0.26);
+  box-shadow: 0 14px 28px rgba(47, 83, 91, 0.08);
 }
 
 .asset-main {
@@ -804,21 +907,21 @@ onMounted(loadData)
   width: fit-content;
   padding: 4px 10px;
   border-radius: 999px;
-  background: #edf5ff;
+  background: rgba(224, 243, 239, 0.92);
   font-size: 12px;
-  color: #2d5b92;
+  color: #2b6c72;
 }
 
 .asset-name {
   font-size: 16px;
   font-weight: 600;
-  color: #173255;
+  color: #173246;
 }
 
 .asset-secondary {
   font-size: 13px;
   line-height: 1.6;
-  color: #6b819d;
+  color: #708792;
 }
 
 .asset-meta {
@@ -831,7 +934,7 @@ onMounted(loadData)
 
 .asset-time {
   font-size: 12px;
-  color: #7790ac;
+  color: #78909a;
 }
 
 .spotlight-list {
@@ -842,19 +945,26 @@ onMounted(loadData)
 
 .spotlight-item {
   width: 100%;
-  border: 1px solid #dbe4ee;
+  border: 1px solid rgba(190, 207, 214, 0.8);
   border-radius: 22px;
-  background: #ffffff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 251, 0.94));
   overflow: hidden;
   display: flex;
   flex-direction: column;
   text-align: left;
   cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.spotlight-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(88, 176, 164, 0.26);
+  box-shadow: 0 18px 34px rgba(45, 80, 88, 0.1);
 }
 
 .spotlight-cover {
   height: 180px;
-  background: linear-gradient(135deg, #11345d 0%, #254d7a 100%);
+  background: linear-gradient(135deg, #5dabad 0%, #7aafd5 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -888,13 +998,13 @@ onMounted(loadData)
 .spotlight-name {
   font-size: 16px;
   font-weight: 600;
-  color: #173255;
+  color: #173246;
 }
 
 .spotlight-meta,
 .spotlight-time {
   font-size: 13px;
-  color: #6f86a3;
+  color: #728792;
 }
 
 @media (max-width: 1280px) {

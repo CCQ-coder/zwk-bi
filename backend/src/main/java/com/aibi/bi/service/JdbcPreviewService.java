@@ -25,6 +25,11 @@ public class JdbcPreviewService {
 
     private static final int PREVIEW_LIMIT = 20;
 
+    @FunctionalInterface
+    public interface ResultSetExtractor<T> {
+        T extract(ResultSet resultSet) throws SQLException;
+    }
+
     public DatasourceConnectionTestResponse testConnection(BiDatasource datasource) {
         try (Connection connection = openConnection(datasource)) {
             DatasourceConnectionTestResponse response = new DatasourceConnectionTestResponse();
@@ -39,20 +44,43 @@ public class JdbcPreviewService {
     }
 
     public DatasetPreviewResponse preview(BiDatasource datasource, String sqlText) {
+        return query(datasource, sqlText, PREVIEW_LIMIT);
+    }
+
+    public DatasetPreviewResponse query(BiDatasource datasource, String sqlText, Integer maxRows) {
+        return executeQuery(datasource, sqlText, maxRows, resultSet -> buildPreviewResponse(resultSet, maxRows));
+    }
+
+    public <T> T executeQuery(BiDatasource datasource, String sqlText, Integer maxRows, ResultSetExtractor<T> extractor) {
         validatePreviewSql(sqlText);
         try (Connection connection = openConnection(datasource);
-             PreparedStatement statement = connection.prepareStatement(sqlText.trim())) {
-            statement.setMaxRows(PREVIEW_LIMIT);
+             PreparedStatement statement = createPreparedStatement(connection, datasource, sqlText.trim(), maxRows)) {
             boolean hasResultSet = statement.execute();
             if (!hasResultSet) {
                 throw new IllegalArgumentException("预览 SQL 必须返回结果集");
             }
             try (ResultSet resultSet = statement.getResultSet()) {
-                return buildPreviewResponse(resultSet);
+                return extractor.extract(resultSet);
             }
         } catch (SQLException ex) {
             throw new IllegalArgumentException("SQL 预览失败: " + ex.getMessage(), ex);
         }
+    }
+
+    private PreparedStatement createPreparedStatement(Connection connection, BiDatasource datasource, String sqlText, Integer maxRows) throws SQLException {
+        PreparedStatement statement = connection.prepareStatement(sqlText, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+        if (maxRows != null && maxRows > 0) {
+            statement.setMaxRows(maxRows);
+        }
+        String type = datasourceType(datasource);
+        if ("MYSQL".equals(type)) {
+            statement.setFetchSize(Integer.MIN_VALUE);
+        } else if (maxRows != null && maxRows > 0) {
+            statement.setFetchSize(Math.min(maxRows, 1000));
+        } else {
+            statement.setFetchSize(500);
+        }
+        return statement;
     }
 
     public List<TableInfo> listTables(BiDatasource datasource) {
@@ -148,7 +176,7 @@ public class JdbcPreviewService {
         }
     }
 
-    private DatasetPreviewResponse buildPreviewResponse(ResultSet resultSet) throws SQLException {
+    private DatasetPreviewResponse buildPreviewResponse(ResultSet resultSet, Integer maxRows) throws SQLException {
         ResultSetMetaData metaData = resultSet.getMetaData();
         int columnCount = metaData.getColumnCount();
         List<String> columns = new ArrayList<>(columnCount);
@@ -157,7 +185,11 @@ public class JdbcPreviewService {
         }
 
         List<Map<String, Object>> rows = new ArrayList<>();
+        int safeMaxRows = maxRows == null || maxRows <= 0 ? Integer.MAX_VALUE : maxRows;
         while (resultSet.next()) {
+            if (rows.size() >= safeMaxRows) {
+                break;
+            }
             Map<String, Object> row = new LinkedHashMap<>();
             for (int index = 1; index <= columnCount; index++) {
                 row.put(columns.get(index - 1), resultSet.getObject(index));

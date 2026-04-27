@@ -106,6 +106,16 @@ const chartTypeGroups = [
             { label: '提醒', value: 'icon_alert_mark' },
             { label: '关闭', value: 'icon_close_mark' },
             { label: '设置', value: 'icon_settings_gear' },
+            { label: '双箭头', value: 'icon_chevron_double' },
+            { label: '轨道环', value: 'icon_orbit_ring' },
+            { label: '星芒标', value: 'icon_compass_star' },
+            { label: '数据仓', value: 'icon_database_stack' },
+            { label: '安全盾牌', value: 'icon_shield_guard' },
+            { label: '闪电', value: 'icon_lightning_bolt' },
+            { label: '地球网格', value: 'icon_globe_grid' },
+            { label: '雷达脉冲', value: 'icon_radar_pulse' },
+            { label: '立方线框', value: 'icon_cube_wire' },
+            { label: '波纹带', value: 'icon_wave_ribbon' },
         ],
     },
 ];
@@ -1054,6 +1064,12 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['suggestion-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-editor-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['table-column-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['preview-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['preview-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table']} */ ;
+/** @type {__VLS_StyleScopedClasses['preview-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-table__cell']} */ ;
 /** @type {__VLS_StyleScopedClasses['style-family-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['preset-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['preset-card']} */ ;

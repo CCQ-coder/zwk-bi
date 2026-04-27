@@ -162,16 +162,18 @@ onMounted(loadMenus)
 
 <style scoped>
 .top-nav {
-  height: 56px;
+  height: 68px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
-  padding: 0 16px;
-  background: #0f1d2f;
-  border-bottom: 1px solid rgba(126, 153, 185, 0.16);
-  box-shadow: 0 6px 18px rgba(8, 19, 33, 0.18);
-  color: #ffffff;
+  gap: 16px;
+  padding: 0 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(246, 249, 250, 0.8) 100%);
+  border-bottom: 1px solid rgba(111, 138, 148, 0.18);
+  box-shadow: 0 12px 28px rgba(38, 68, 75, 0.08);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: #173246;
   position: sticky;
   top: 0;
   z-index: 30;
@@ -185,8 +187,10 @@ onMounted(loadMenus)
 
 .nav-mobile-trigger {
   display: none;
-  color: #dbe8ff;
-  border-radius: 8px;
+  color: #55717d;
+  border-radius: 12px;
+  border: 1px solid rgba(116, 144, 154, 0.18);
+  background: rgba(255, 255, 255, 0.48);
 }
 
 .brand {
@@ -203,20 +207,23 @@ onMounted(loadMenus)
 .brand-mark {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #1f6feb;
+  background: linear-gradient(135deg, #55b0a3 0%, #7aaed5 100%);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.08em;
+  color: #ffffff;
+  box-shadow: 0 10px 18px rgba(84, 162, 160, 0.24);
 }
 
 .brand-text {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.08em;
+  color: #173246;
 }
 
 .nav-items {
@@ -233,29 +240,32 @@ onMounted(loadMenus)
 }
 
 .nav-btn {
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.78);
-  height: 34px;
+  border: 1px solid rgba(118, 144, 154, 0.12);
+  background: rgba(255, 255, 255, 0.36);
+  color: #607985;
+  height: 38px;
   padding: 0 14px;
-  border-radius: 8px;
+  border-radius: 999px;
   cursor: pointer;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .nav-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(154, 182, 216, 0.14);
+  color: #173246;
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(101, 162, 172, 0.24);
+  box-shadow: 0 10px 20px rgba(48, 89, 98, 0.08);
+  transform: translateY(-1px);
 }
 
 .nav-btn--active {
-  color: #ffffff;
-  border-color: rgba(106, 151, 210, 0.28);
-  background: rgba(47, 99, 164, 0.26);
+  color: #173246;
+  border-color: rgba(85, 176, 163, 0.28);
+  background: linear-gradient(180deg, rgba(227, 245, 241, 0.98), rgba(245, 251, 250, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .user-menu {
@@ -278,22 +288,25 @@ onMounted(loadMenus)
 .user-name {
   font-size: 13px;
   font-weight: 600;
+  color: #173246;
 }
 
 .user-avatar {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: rgba(43, 104, 183, 0.92);
+  background: linear-gradient(135deg, #57b0a4 0%, #7baed5 100%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
   font-weight: 700;
+  color: #ffffff;
+  box-shadow: 0 10px 18px rgba(83, 149, 161, 0.2);
 }
 
 .logout-btn {
-  color: rgba(215, 228, 245, 0.82);
+  color: #65808d;
 }
 
 .drawer-head {
@@ -304,7 +317,7 @@ onMounted(loadMenus)
 .drawer-brand {
   font-size: 16px;
   font-weight: 700;
-  color: #15355d;
+  color: #173246;
 }
 
 .drawer-menu {
@@ -320,25 +333,25 @@ onMounted(loadMenus)
   width: 100%;
   height: 42px;
   padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid #d9e6f4;
-  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid rgba(119, 145, 154, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 249, 249, 0.9));
   color: #23405f;
   cursor: pointer;
 }
 
 .drawer-menu-btn--active {
-  background: #eef6ff;
-  border-color: #b7d2f6;
-  color: #13528f;
+  background: linear-gradient(180deg, rgba(225, 245, 240, 0.98), rgba(240, 249, 247, 0.92));
+  border-color: rgba(85, 176, 163, 0.24);
+  color: #1b5e67;
   font-weight: 600;
 }
 
 .drawer-user-card {
   margin-top: 16px;
   padding: 12px;
-  border-radius: 12px;
-  background: #f5f9ff;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(242, 249, 248, 0.96), rgba(248, 251, 251, 0.92));
   display: flex;
   align-items: center;
   gap: 10px;
@@ -352,7 +365,7 @@ onMounted(loadMenus)
 .drawer-user-name {
   font-size: 14px;
   font-weight: 600;
-  color: #183153;
+  color: #173246;
 }
 
 @media (max-width: 900px) {

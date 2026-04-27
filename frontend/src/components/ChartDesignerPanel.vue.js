@@ -329,6 +329,14 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['props-tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['props-theme-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['props-theme-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['cdesigner-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['cdesigner-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['cdesigner-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-input__wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['cdesigner-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['cdesigner-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['el-tabs__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['cdesigner-wrap']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({

@@ -31,6 +31,8 @@ const staticChartTypeValues = [
     'icon_plus', 'icon_minus', 'icon_search', 'icon_focus_frame', 'icon_home_badge', 'icon_share_nodes',
     'icon_link_chain', 'icon_message_chat', 'icon_eye_watch', 'icon_lock_safe', 'icon_bell_notice', 'icon_user_profile',
     'icon_check_mark', 'icon_alert_mark', 'icon_close_mark', 'icon_settings_gear',
+    'icon_chevron_double', 'icon_orbit_ring', 'icon_compass_star', 'icon_database_stack', 'icon_shield_guard',
+    'icon_lightning_bolt', 'icon_globe_grid', 'icon_radar_pulse', 'icon_cube_wire', 'icon_wave_ribbon',
 ];
 const chartTypeOptions = [
     { label: '基础柱状图', value: 'bar' },

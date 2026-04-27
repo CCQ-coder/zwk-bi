@@ -278,7 +278,7 @@ import {
   isCanvasRenderableChartType,
   isStaticWidgetChartType,
   mergeComponentRequestFilters,
-  materializeChartData,
+  normalizeRuntimeChartData,
   normalizeComponentConfig,
 } from '../utils/component-config'
 import { echarts, type ECharts } from '../utils/echarts'
@@ -625,7 +625,7 @@ const renderChart = async (comp: DashboardComponent) => {
       configJson: comp.configJson,
       filters: mergeComponentRequestFilters(resolved.interaction.dataFilters),
     })
-    const materialized = materializeChartData(data.rawRows ?? [], data.columns ?? [], resolved.chart)
+    const materialized = normalizeRuntimeChartData(data, resolved.chart)
     let inst = chartInstances.get(comp.id)
     if (!inst) {
       inst = echarts.init(el)

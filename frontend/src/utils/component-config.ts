@@ -1082,6 +1082,56 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
     label: '设置',
     description: '用于系统设置和参数配置入口。',
   },
+  icon_chevron_double: {
+    ...STATIC_NO_FIELD_META,
+    label: '双箭头',
+    description: '用于流程方向、切换和连续引导提示。',
+  },
+  icon_orbit_ring: {
+    ...STATIC_NO_FIELD_META,
+    label: '轨道环',
+    description: '用于中心聚焦、环绕轨迹和核心节点装饰。',
+  },
+  icon_compass_star: {
+    ...STATIC_NO_FIELD_META,
+    label: '星芒标',
+    description: '用于中心定位、目标强调和徽章式点缀。',
+  },
+  icon_database_stack: {
+    ...STATIC_NO_FIELD_META,
+    label: '数据仓',
+    description: '用于数据中心、底座和仓储语义提示。',
+  },
+  icon_shield_guard: {
+    ...STATIC_NO_FIELD_META,
+    label: '安全盾牌',
+    description: '用于防护、权限和安全状态提示。',
+  },
+  icon_lightning_bolt: {
+    ...STATIC_NO_FIELD_META,
+    label: '闪电',
+    description: '用于速度、告警和瞬时动作强调。',
+  },
+  icon_globe_grid: {
+    ...STATIC_NO_FIELD_META,
+    label: '地球网格',
+    description: '用于全球网络、空间连接和外部链路表达。',
+  },
+  icon_radar_pulse: {
+    ...STATIC_NO_FIELD_META,
+    label: '雷达脉冲',
+    description: '用于扫描、侦测和动态捕捉装饰。',
+  },
+  icon_cube_wire: {
+    ...STATIC_NO_FIELD_META,
+    label: '立方线框',
+    description: '用于模块体量、容器和结构化提示。',
+  },
+  icon_wave_ribbon: {
+    ...STATIC_NO_FIELD_META,
+    label: '波纹带',
+    description: '用于流向、波动和连续状态装饰。',
+  },
 }
 
 export const COMPONENT_PRESETS: ComponentPreset[] = [
@@ -1124,6 +1174,8 @@ export const VECTOR_ICON_CHART_TYPES = new Set([
   'icon_plus', 'icon_minus', 'icon_search', 'icon_focus_frame', 'icon_home_badge', 'icon_share_nodes',
   'icon_link_chain', 'icon_message_chat', 'icon_eye_watch', 'icon_lock_safe', 'icon_bell_notice', 'icon_user_profile',
   'icon_check_mark', 'icon_alert_mark', 'icon_close_mark', 'icon_settings_gear',
+  'icon_chevron_double', 'icon_orbit_ring', 'icon_compass_star', 'icon_database_stack', 'icon_shield_guard',
+  'icon_lightning_bolt', 'icon_globe_grid', 'icon_radar_pulse', 'icon_cube_wire', 'icon_wave_ribbon',
 ])
 
 export const PURE_STATIC_CHART_TYPES = new Set([
@@ -1674,6 +1726,16 @@ export const chartTypeLabel = (type: string) => ({
   icon_alert_mark: '提醒',
   icon_close_mark: '关闭',
   icon_settings_gear: '设置',
+  icon_chevron_double: '双箭头',
+  icon_orbit_ring: '轨道环',
+  icon_compass_star: '星芒标',
+  icon_database_stack: '数据仓',
+  icon_shield_guard: '安全盾牌',
+  icon_lightning_bolt: '闪电',
+  icon_globe_grid: '地球网格',
+  icon_radar_pulse: '雷达脉冲',
+  icon_cube_wire: '立方线框',
+  icon_wave_ribbon: '波纹带',
 }[type] ?? (type || '未知类型'))
 
 const sumValues = (left: unknown, right: unknown) => {
@@ -1802,6 +1864,31 @@ export const materializeChartData = (
     rawRows,
     series: [{ name: chartConfig.yField, data: labels.map((label) => values.get(label) ?? 0) }],
   }
+}
+
+export const normalizeRuntimeChartData = (
+  data: ChartDataResult,
+  chartConfig: ComponentChartConfig
+): ChartDataResult => {
+  const rawRows = data.rawRows ?? []
+  const columns = data.columns ?? []
+  const labels = data.labels ?? []
+  const series = data.series ?? []
+  const hasServerAggregates = labels.length > 0 || series.length > 0
+  const hasHeatmapCells = chartConfig.chartType === 'heatmap' && rawRows.length > 0
+
+  if (hasServerAggregates || hasHeatmapCells) {
+    return {
+      chartType: data.chartType || chartConfig.chartType,
+      columns: columns.length ? columns : Object.keys(rawRows[0] ?? {}),
+      labels,
+      rawRows,
+      series,
+      filters: data.filters,
+    }
+  }
+
+  return materializeChartData(rawRows, columns, chartConfig)
 }
 
 export const buildComponentOption = (data: ChartDataResult, chartConfig: ComponentChartConfig, styleInput: ComponentStyleConfig) => {
