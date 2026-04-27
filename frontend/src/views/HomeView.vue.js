@@ -1,4 +1,4 @@
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { getChartList } from '../api/chart';
 import { getDashboardList } from '../api/dashboard';
@@ -6,23 +6,26 @@ import { getDatasetList } from '../api/dataset';
 import { getDatasourceList } from '../api/datasource';
 import TopNavBar from '../components/TopNavBar.vue';
 import { normalizeCanvasConfig, normalizeCoverConfig, normalizePublishConfig, parseReportConfig, } from '../utils/report-config';
-import { flattenAuthMenus, getAuthDisplayName, getAuthMenus } from '../utils/auth-session';
+import { flattenAuthMenus, getAuthMenus } from '../utils/auth-session';
 const SOURCE_KIND_LABELS = {
     DATABASE: '数据库',
     API: 'API 接口',
     TABLE: '表格文件',
     JSON_STATIC: '静态 JSON',
 };
+const RECENT_ADDED_WINDOW_DAYS = 7;
+const RECENT_SCREEN_PAGE_SIZE = 4;
+const RESOURCE_PAGE_SIZE = 6;
 const loading = ref(false);
 const router = useRouter();
 const datasourceList = ref([]);
 const datasetList = ref([]);
 const chartList = ref([]);
 const reportList = ref([]);
+const recentScreenPage = ref(1);
+const resourcePage = ref(1);
+const activeResourceCategory = ref('datasource');
 const componentCountMap = computed(() => Object.fromEntries(reportList.value.map((item) => [item.id, item.componentCount ?? 0])));
-const displayName = computed(() => getAuthDisplayName());
-const userId = computed(() => localStorage.getItem('bi_user_id') || '--');
-const avatarText = computed(() => displayName.value.slice(0, 1) || '用');
 const allowedPaths = computed(() => new Set(flattenAuthMenus(getAuthMenus()).map((item) => item.path).filter(Boolean)));
 const canAccess = (path) => !allowedPaths.value.size
     || allowedPaths.value.has(path)
@@ -58,104 +61,60 @@ const publishProgress = computed(() => {
         return 0;
     return Math.round((publishedReportCount.value / screens.value.length) * 100);
 });
-const primaryAction = computed(() => {
-    if (!datasourceList.value.length) {
-        return { label: '先接入第一个数据源', path: '/home/prepare/datasource' };
-    }
-    if (!datasetList.value.length) {
-        return { label: '继续创建数据集', path: '/home/prepare/dataset' };
-    }
-    const latestDraftScreen = screens.value.find((item) => getPublishStatus(item) === 'DRAFT');
-    if (latestDraftScreen) {
-        return { label: '继续编辑最近大屏', path: `/home/screen/edit/${latestDraftScreen.id}` };
-    }
-    return { label: '进入数据大屏工作区', path: '/home/screen' };
+const isRecentWithinWindow = (value) => {
+    if (!value)
+        return false;
+    const timestamp = new Date(value).getTime();
+    if (Number.isNaN(timestamp))
+        return false;
+    const now = Date.now();
+    const diff = now - timestamp;
+    return diff >= 0 && diff <= RECENT_ADDED_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+};
+const recentAddedDatasourceCount = computed(() => datasourceList.value.filter((item) => isRecentWithinWindow(item.createdAt)).length);
+const recentAddedDatasetCount = computed(() => datasetList.value.filter((item) => isRecentWithinWindow(item.createdAt)).length);
+const recentAddedChartCount = computed(() => chartList.value.filter((item) => isRecentWithinWindow(item.createdAt)).length);
+const recentAddedScreenCount = computed(() => screens.value.filter((item) => isRecentWithinWindow(item.createdAt)).length);
+const recentAddedTotal = computed(() => [
+    recentAddedDatasourceCount.value,
+    recentAddedDatasetCount.value,
+    recentAddedChartCount.value,
+    recentAddedScreenCount.value,
+].reduce((sum, item) => sum + item, 0));
+const recentAddedBars = computed(() => {
+    const rawItems = [
+        {
+            key: 'datasource',
+            label: '数据源',
+            value: recentAddedDatasourceCount.value,
+            accent: 'linear-gradient(180deg, #7dd0c6 0%, #55b0a3 100%)',
+        },
+        {
+            key: 'dataset',
+            label: '数据集',
+            value: recentAddedDatasetCount.value,
+            accent: 'linear-gradient(180deg, #90c7df 0%, #6ea8c7 100%)',
+        },
+        {
+            key: 'chart',
+            label: '图表组件',
+            value: recentAddedChartCount.value,
+            accent: 'linear-gradient(180deg, #98bbe7 0%, #5f97cf 100%)',
+        },
+        {
+            key: 'screen',
+            label: '数据大屏',
+            value: recentAddedScreenCount.value,
+            accent: 'linear-gradient(180deg, #87c8b6 0%, #65b29e 100%)',
+        },
+    ];
+    const maxValue = Math.max(...rawItems.map((item) => item.value), 1);
+    return rawItems.map((item) => ({
+        ...item,
+        percent: item.value > 0 ? Math.max(14, Math.round((item.value / maxValue) * 100)) : 0,
+    }));
 });
-const summaryMetrics = computed(() => [
-    {
-        label: '数据源',
-        kicker: '接入层',
-        value: datasourceList.value.length,
-        note: datasourceList.value.length ? '已连接数据库、接口或文件' : '还没有任何数据接入',
-    },
-    {
-        label: '数据集',
-        kicker: '加工层',
-        value: datasetList.value.length,
-        note: datasetList.value.length ? '可直接供图表与报表使用' : '还没有沉淀可复用数据集',
-    },
-    {
-        label: '图表组件',
-        kicker: '分析层',
-        value: chartList.value.length,
-        note: chartList.value.length ? '图表模板已可复用' : '还没有完成图表设计',
-    },
-    {
-        label: '数据大屏',
-        kicker: '展示层',
-        value: screens.value.length,
-        note: screens.value.length ? `${publishedReportCount.value} 个已发布` : '尚未搭建展示大屏',
-    },
-]);
-const onboardingSteps = computed(() => [
-    {
-        label: '接入至少一个数据源',
-        tip: datasourceList.value.length ? `${datasourceList.value.length} 个数据源已接入` : '支持数据库、API、表格和静态 JSON',
-        done: datasourceList.value.length > 0,
-        path: '/home/prepare/datasource',
-    },
-    {
-        label: '沉淀可复用数据集',
-        tip: datasetList.value.length ? `${datasetList.value.length} 个数据集可直接复用` : '把原始数据整理成业务字段模型',
-        done: datasetList.value.length > 0,
-        path: '/home/prepare/dataset',
-    },
-    {
-        label: '完成图表设计与组件装配',
-        tip: chartList.value.length ? `${chartList.value.length} 个图表组件已创建` : '先设计图表组件，再进入数据大屏',
-        done: chartList.value.length > 0,
-        path: '/home/prepare/components',
-    },
-    {
-        label: '发布至少一个报告',
-        tip: publishedReportCount.value ? `${publishedReportCount.value} 个数据大屏已发布` : '让数据大屏真正进入可分享状态',
-        done: publishedReportCount.value > 0,
-        path: '/home/screen',
-    },
-]);
-const completedOnboardingCount = computed(() => onboardingSteps.value.filter((item) => item.done).length);
-const onboardingProgress = computed(() => Math.round((completedOnboardingCount.value / onboardingSteps.value.length) * 100));
-const quickActions = computed(() => ([
-    {
-        key: 'datasource',
-        title: '接入数据源',
-        description: '创建数据库、API、表格或静态 JSON 数据源',
-        stat: `${datasourceList.value.length} 个已接入`,
-        path: '/home/prepare/datasource',
-    },
-    {
-        key: 'dataset',
-        title: '加工数据集',
-        description: '整理 SQL、字段和抽取逻辑，形成可复用数据模型',
-        stat: `${datasetList.value.length} 个数据集`,
-        path: '/home/prepare/dataset',
-    },
-    {
-        key: 'chart',
-        title: '设计图表组件',
-        description: '进入组件设计页面，沉淀图表资产供后续复用',
-        stat: `${chartList.value.length} 个图表`,
-        path: '/home/prepare/components',
-    },
-    {
-        key: 'screen',
-        title: '管理数据大屏',
-        description: '统一查看大屏封面、状态和进入编辑器',
-        stat: `${screens.value.length} 个大屏`,
-        path: '/home/screen',
-    },
-]).filter((item) => canAccess(item.path)));
-const recentAssets = computed(() => {
+const allResourceItems = computed(() => {
     const datasourceAssets = datasourceList.value.map((item) => ({
         id: `datasource-${item.id}`,
         name: item.name,
@@ -165,6 +124,7 @@ const recentAssets = computed(() => {
         statusLabel: SOURCE_KIND_LABELS[item.sourceKind],
         statusType: 'info',
         path: '/home/prepare/datasource',
+        category: 'datasource',
     }));
     const datasetAssets = datasetList.value.map((item) => ({
         id: `dataset-${item.id}`,
@@ -175,10 +135,20 @@ const recentAssets = computed(() => {
         statusLabel: '可建模',
         statusType: 'success',
         path: '/home/prepare/dataset',
+        category: 'dataset',
     }));
-    const reportAssets = reportList.value
-        .filter((item) => getReportScene(item) === 'screen')
-        .map((item) => ({
+    const chartAssets = chartList.value.map((item) => ({
+        id: `chart-${item.id}`,
+        name: item.name,
+        typeLabel: '图表组件',
+        secondary: item.datasetId ? `来源数据集 #${item.datasetId} · ${item.chartType}` : `${item.chartType} · 未绑定数据集`,
+        createdAt: item.createdAt,
+        statusLabel: item.chartType,
+        statusType: 'info',
+        path: '/home/prepare/components',
+        category: 'chart',
+    }));
+    const screenAssets = screens.value.map((item) => ({
         id: `screen-${item.id}`,
         name: item.name,
         typeLabel: '数据大屏',
@@ -187,10 +157,72 @@ const recentAssets = computed(() => {
         statusLabel: getPublishStatus(item) === 'PUBLISHED' ? '已发布' : '草稿',
         statusType: getPublishStatus(item) === 'PUBLISHED' ? 'success' : 'warning',
         path: `/home/screen/edit/${item.id}`,
+        category: 'screen',
     }));
-    return sortByCreatedAt([...datasourceAssets, ...datasetAssets, ...reportAssets]).slice(0, 8);
+    return sortByCreatedAt([...datasourceAssets, ...datasetAssets, ...chartAssets, ...screenAssets]);
 });
-const recentScreens = computed(() => screens.value.slice(0, 3));
+const resourceCategories = computed(() => {
+    const categories = [
+        {
+            key: 'datasource',
+            label: '数据源',
+            count: allResourceItems.value.filter((item) => item.category === 'datasource').length,
+            path: '/home/prepare/datasource',
+        },
+        {
+            key: 'dataset',
+            label: '数据集',
+            count: allResourceItems.value.filter((item) => item.category === 'dataset').length,
+            path: '/home/prepare/dataset',
+        },
+        {
+            key: 'chart',
+            label: '图表组件',
+            count: allResourceItems.value.filter((item) => item.category === 'chart').length,
+            path: '/home/prepare/components',
+        },
+        {
+            key: 'screen',
+            label: '数据大屏',
+            count: allResourceItems.value.filter((item) => item.category === 'screen').length,
+            path: '/home/screen',
+        },
+    ];
+    return categories.filter((item) => canAccess(item.path));
+});
+const activeResourceMeta = computed(() => resourceCategories.value.find((item) => item.key === activeResourceCategory.value) || null);
+const filteredResourceItems = computed(() => allResourceItems.value.filter((item) => item.category === activeResourceCategory.value));
+const pagedResourceItems = computed(() => {
+    const start = (resourcePage.value - 1) * RESOURCE_PAGE_SIZE;
+    return filteredResourceItems.value.slice(start, start + RESOURCE_PAGE_SIZE);
+});
+const pagedRecentScreens = computed(() => {
+    const start = (recentScreenPage.value - 1) * RECENT_SCREEN_PAGE_SIZE;
+    return screens.value.slice(start, start + RECENT_SCREEN_PAGE_SIZE);
+});
+watch(resourceCategories, (categories) => {
+    if (!categories.length) {
+        return;
+    }
+    if (!categories.some((item) => item.key === activeResourceCategory.value)) {
+        activeResourceCategory.value = categories[0].key;
+    }
+}, { immediate: true });
+watch(activeResourceCategory, () => {
+    resourcePage.value = 1;
+});
+watch(() => screens.value.length, (count) => {
+    const maxPage = Math.max(1, Math.ceil(count / RECENT_SCREEN_PAGE_SIZE));
+    if (recentScreenPage.value > maxPage) {
+        recentScreenPage.value = maxPage;
+    }
+}, { immediate: true });
+watch(() => filteredResourceItems.value.length, (count) => {
+    const maxPage = Math.max(1, Math.ceil(count / RESOURCE_PAGE_SIZE));
+    if (resourcePage.value > maxPage) {
+        resourcePage.value = maxPage;
+    }
+}, { immediate: true });
 const formatDate = (value) => {
     if (!value)
         return '刚刚';
@@ -235,38 +267,33 @@ let __VLS_components;
 let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['workbench-page']} */ ;
 /** @type {__VLS_StyleScopedClasses['workbench-page']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['el-button--primary']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['el-button']} */ ;
-/** @type {__VLS_StyleScopedClasses['el-button--primary']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['el-button']} */ ;
-/** @type {__VLS_StyleScopedClasses['el-button--primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__status-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
 /** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['workflow-item']} */ ;
-/** @type {__VLS_StyleScopedClasses['action-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-item']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-item']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-cover']} */ ;
-/** @type {__VLS_StyleScopedClasses['metric-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['main-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__cover']} */ ;
+/** @type {__VLS_StyleScopedClasses['content-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard--single']} */ ;
 /** @type {__VLS_StyleScopedClasses['workbench-main']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['metric-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['action-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['metric-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-item']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-card--dashboard']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-side__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__columns']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__cover']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__columns']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-cover']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item__meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__head']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item__meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['section-pagination']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -285,317 +312,147 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.main, __VLS_intrinsicElements.
     ...{ class: "workbench-main" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "hero-card" },
+    ...{ class: "overview-shell" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "hero-copy" },
+    ...{ class: "overview-card overview-card--dashboard" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-side__head overview-side__head--dashboard" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "overview-side__label" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-side__title" },
+});
+(__VLS_ctx.RECENT_ADDED_WINDOW_DAYS);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-side__caption" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "hero-eyebrow" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.h1, __VLS_intrinsicElements.h1)({
-    ...{ class: "hero-title" },
-});
-(__VLS_ctx.displayName);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "hero-description" },
+    ...{ class: "overview-side__badge" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "hero-actions" },
-});
-const __VLS_3 = {}.ElButton;
-/** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-// @ts-ignore
-const __VLS_4 = __VLS_asFunctionalComponent(__VLS_3, new __VLS_3({
-    ...{ 'onClick': {} },
-    type: "primary",
-    size: "large",
-}));
-const __VLS_5 = __VLS_4({
-    ...{ 'onClick': {} },
-    type: "primary",
-    size: "large",
-}, ...__VLS_functionalComponentArgsRest(__VLS_4));
-let __VLS_7;
-let __VLS_8;
-let __VLS_9;
-const __VLS_10 = {
-    onClick: (...[$event]) => {
-        __VLS_ctx.goTo(__VLS_ctx.primaryAction.path);
-    }
-};
-__VLS_6.slots.default;
-(__VLS_ctx.primaryAction.label);
-var __VLS_6;
-const __VLS_11 = {}.ElButton;
-/** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-// @ts-ignore
-const __VLS_12 = __VLS_asFunctionalComponent(__VLS_11, new __VLS_11({
-    ...{ 'onClick': {} },
-    size: "large",
-}));
-const __VLS_13 = __VLS_12({
-    ...{ 'onClick': {} },
-    size: "large",
-}, ...__VLS_functionalComponentArgsRest(__VLS_12));
-let __VLS_15;
-let __VLS_16;
-let __VLS_17;
-const __VLS_18 = {
-    onClick: (...[$event]) => {
-        __VLS_ctx.goTo('/home/prepare/datasource');
-    }
-};
-__VLS_14.slots.default;
-var __VLS_14;
-const __VLS_19 = {}.ElButton;
-/** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-// @ts-ignore
-const __VLS_20 = __VLS_asFunctionalComponent(__VLS_19, new __VLS_19({
-    ...{ 'onClick': {} },
-    size: "large",
-}));
-const __VLS_21 = __VLS_20({
-    ...{ 'onClick': {} },
-    size: "large",
-}, ...__VLS_functionalComponentArgsRest(__VLS_20));
-let __VLS_23;
-let __VLS_24;
-let __VLS_25;
-const __VLS_26 = {
-    onClick: (...[$event]) => {
-        __VLS_ctx.goTo('/home/screen');
-    }
-};
-__VLS_22.slots.default;
-var __VLS_22;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "hero-highlight" },
+    ...{ class: "overview-dashboard overview-dashboard--single" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "highlight-label" },
+    ...{ class: "overview-dashboard__summary-card" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "highlight-value" },
+    ...{ class: "overview-dashboard__summary-kicker" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__summary-value" },
+});
+(__VLS_ctx.recentAddedTotal);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__summary-meta" },
+});
+(__VLS_ctx.RECENT_ADDED_WINDOW_DAYS);
+(__VLS_ctx.recentAddedTotal);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__status-panel" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__status-head" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+(__VLS_ctx.publishProgress);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__status-value" },
+});
+(__VLS_ctx.publishedReportCount);
+(__VLS_ctx.screens.length);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__status-note" },
 });
 (__VLS_ctx.publishedReportCount);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "highlight-meta" },
-});
-(__VLS_ctx.screens.length);
-const __VLS_27 = {}.ElProgress;
-/** @type {[typeof __VLS_components.ElProgress, typeof __VLS_components.elProgress, ]} */ ;
-// @ts-ignore
-const __VLS_28 = __VLS_asFunctionalComponent(__VLS_27, new __VLS_27({
-    percentage: (__VLS_ctx.publishProgress),
-    strokeWidth: (10),
-    showText: (false),
-    color: "#58b5ab",
-}));
-const __VLS_29 = __VLS_28({
-    percentage: (__VLS_ctx.publishProgress),
-    strokeWidth: (10),
-    showText: (false),
-    color: "#58b5ab",
-}, ...__VLS_functionalComponentArgsRest(__VLS_28));
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "highlight-user" },
+    ...{ class: "overview-dashboard__status-track" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "highlight-avatar" },
+    ...{ class: "overview-dashboard__status-fill" },
+    ...{ style: ({ width: `${__VLS_ctx.publishProgress}%` }) },
 });
-(__VLS_ctx.avatarText);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__summary-grid" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__mini-fact" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+(__VLS_ctx.resourceCategories.length);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__mini-fact" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+(__VLS_ctx.recentAddedScreenCount);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__chart-card" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__chart-head" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "highlight-name" },
-});
-(__VLS_ctx.displayName);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "highlight-id" },
-});
-(__VLS_ctx.userId);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "metric-grid" },
-});
-for (const [metric] of __VLS_getVForSourceType((__VLS_ctx.summaryMetrics))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
-        key: (metric.label),
-        ...{ class: "metric-card" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "metric-kicker" },
-    });
-    (metric.kicker);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({
-        ...{ class: "metric-value" },
-    });
-    (metric.value);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "metric-label" },
-    });
-    (metric.label);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "metric-note" },
-    });
-    (metric.note);
-}
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "main-grid" },
+    ...{ class: "overview-dashboard__chart-title" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "main-column" },
+    ...{ class: "overview-dashboard__chart-subtitle" },
 });
-const __VLS_31 = {}.ElCard;
-/** @type {[typeof __VLS_components.ElCard, typeof __VLS_components.elCard, typeof __VLS_components.ElCard, typeof __VLS_components.elCard, ]} */ ;
-// @ts-ignore
-const __VLS_32 = __VLS_asFunctionalComponent(__VLS_31, new __VLS_31({
-    ...{ class: "surface-card" },
-    shadow: "never",
-}));
-const __VLS_33 = __VLS_32({
-    ...{ class: "surface-card" },
-    shadow: "never",
-}, ...__VLS_functionalComponentArgsRest(__VLS_32));
-__VLS_34.slots.default;
-{
-    const { header: __VLS_thisSlot } = __VLS_34.slots;
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-head" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-title" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-subtitle" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "section-number" },
-    });
-    (__VLS_ctx.completedOnboardingCount);
-    (__VLS_ctx.onboardingSteps.length);
-}
-const __VLS_35 = {}.ElProgress;
-/** @type {[typeof __VLS_components.ElProgress, typeof __VLS_components.elProgress, ]} */ ;
-// @ts-ignore
-const __VLS_36 = __VLS_asFunctionalComponent(__VLS_35, new __VLS_35({
-    percentage: (__VLS_ctx.onboardingProgress),
-    strokeWidth: (12),
-    showText: (false),
-    color: "#4b9f96",
-}));
-const __VLS_37 = __VLS_36({
-    percentage: (__VLS_ctx.onboardingProgress),
-    strokeWidth: (12),
-    showText: (false),
-    color: "#4b9f96",
-}, ...__VLS_functionalComponentArgsRest(__VLS_36));
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "workflow-list" },
+    ...{ class: "overview-dashboard__chart-unit" },
 });
-for (const [item] of __VLS_getVForSourceType((__VLS_ctx.onboardingSteps))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                __VLS_ctx.goTo(item.path);
-            } },
-        key: (item.label),
-        ...{ class: "workflow-item" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "workflow-dot" },
-        ...{ class: ({ 'workflow-dot--done': item.done }) },
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__columns" },
+});
+for (const [item] of __VLS_getVForSourceType((__VLS_ctx.recentAddedBars))) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        key: (item.key),
+        ...{ class: "overview-dashboard__column-item" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "workflow-copy" },
+        ...{ class: "overview-dashboard__column-value" },
+    });
+    (item.value);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "overview-dashboard__column-track" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "workflow-label" },
+        ...{ class: "overview-dashboard__column-bar" },
+        ...{ style: ({ height: `${item.percent}%`, background: item.accent }) },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "overview-dashboard__column-label" },
     });
     (item.label);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "workflow-tip" },
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "overview-dashboard__column-note" },
     });
-    (item.tip);
-    const __VLS_39 = {}.ElTag;
-    /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
-    // @ts-ignore
-    const __VLS_40 = __VLS_asFunctionalComponent(__VLS_39, new __VLS_39({
-        size: "small",
-        type: (item.done ? 'success' : 'warning'),
-    }));
-    const __VLS_41 = __VLS_40({
-        size: "small",
-        type: (item.done ? 'success' : 'warning'),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_40));
-    __VLS_42.slots.default;
-    (item.done ? '已完成' : '待处理');
-    var __VLS_42;
+    (__VLS_ctx.RECENT_ADDED_WINDOW_DAYS);
 }
-var __VLS_34;
-const __VLS_43 = {}.ElCard;
-/** @type {[typeof __VLS_components.ElCard, typeof __VLS_components.elCard, typeof __VLS_components.ElCard, typeof __VLS_components.elCard, ]} */ ;
-// @ts-ignore
-const __VLS_44 = __VLS_asFunctionalComponent(__VLS_43, new __VLS_43({
-    ...{ class: "surface-card" },
-    shadow: "never",
-}));
-const __VLS_45 = __VLS_44({
-    ...{ class: "surface-card" },
-    shadow: "never",
-}, ...__VLS_functionalComponentArgsRest(__VLS_44));
-__VLS_46.slots.default;
-{
-    const { header: __VLS_thisSlot } = __VLS_46.slots;
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-head" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-title" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-subtitle" },
-    });
-}
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "action-grid" },
+__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
+    ...{ class: "content-grid" },
 });
-for (const [action] of __VLS_getVForSourceType((__VLS_ctx.quickActions))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                __VLS_ctx.goTo(action.path);
-            } },
-        key: (action.key),
-        ...{ class: "action-card" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "action-stat" },
-    });
-    (action.stat);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({
-        ...{ class: "action-title" },
-    });
-    (action.title);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "action-desc" },
-    });
-    (action.description);
-}
-var __VLS_46;
-const __VLS_47 = {}.ElCard;
+const __VLS_3 = {}.ElCard;
 /** @type {[typeof __VLS_components.ElCard, typeof __VLS_components.elCard, typeof __VLS_components.ElCard, typeof __VLS_components.elCard, ]} */ ;
 // @ts-ignore
-const __VLS_48 = __VLS_asFunctionalComponent(__VLS_47, new __VLS_47({
-    ...{ class: "surface-card" },
+const __VLS_4 = __VLS_asFunctionalComponent(__VLS_3, new __VLS_3({
+    ...{ class: "surface-card recent-card" },
     shadow: "never",
 }));
-const __VLS_49 = __VLS_48({
-    ...{ class: "surface-card" },
+const __VLS_5 = __VLS_4({
+    ...{ class: "surface-card recent-card" },
     shadow: "never",
-}, ...__VLS_functionalComponentArgsRest(__VLS_48));
-__VLS_50.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_4));
+__VLS_6.slots.default;
 {
-    const { header: __VLS_thisSlot } = __VLS_50.slots;
+    const { header: __VLS_thisSlot } = __VLS_6.slots;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "section-head" },
     });
@@ -606,136 +463,44 @@ __VLS_50.slots.default;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "section-subtitle" },
     });
-}
-if (__VLS_ctx.recentAssets.length) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "asset-list" },
-    });
-    for (const [asset] of __VLS_getVForSourceType((__VLS_ctx.recentAssets))) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-            ...{ onClick: (...[$event]) => {
-                    if (!(__VLS_ctx.recentAssets.length))
-                        return;
-                    __VLS_ctx.goTo(asset.path);
-                } },
-            key: (asset.id),
-            ...{ class: "asset-item" },
-        });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "asset-main" },
-        });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-            ...{ class: "asset-type" },
-        });
-        (asset.typeLabel);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "asset-name" },
-        });
-        (asset.name);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "asset-secondary" },
-        });
-        (asset.secondary);
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "asset-meta" },
-        });
-        const __VLS_51 = {}.ElTag;
-        /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
-        // @ts-ignore
-        const __VLS_52 = __VLS_asFunctionalComponent(__VLS_51, new __VLS_51({
-            size: "small",
-            type: (asset.statusType),
-        }));
-        const __VLS_53 = __VLS_52({
-            size: "small",
-            type: (asset.statusType),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_52));
-        __VLS_54.slots.default;
-        (asset.statusLabel);
-        var __VLS_54;
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-            ...{ class: "asset-time" },
-        });
-        (__VLS_ctx.formatDate(asset.createdAt));
-    }
-}
-else {
-    const __VLS_55 = {}.ElEmpty;
-    /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
-    // @ts-ignore
-    const __VLS_56 = __VLS_asFunctionalComponent(__VLS_55, new __VLS_55({
-        description: "还没有可展示的资产，先从接入数据源开始",
-    }));
-    const __VLS_57 = __VLS_56({
-        description: "还没有可展示的资产，先从接入数据源开始",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_56));
-}
-var __VLS_50;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "side-column" },
-});
-const __VLS_59 = {}.ElCard;
-/** @type {[typeof __VLS_components.ElCard, typeof __VLS_components.elCard, typeof __VLS_components.ElCard, typeof __VLS_components.elCard, ]} */ ;
-// @ts-ignore
-const __VLS_60 = __VLS_asFunctionalComponent(__VLS_59, new __VLS_59({
-    ...{ class: "surface-card spotlight-card" },
-    shadow: "never",
-}));
-const __VLS_61 = __VLS_60({
-    ...{ class: "surface-card spotlight-card" },
-    shadow: "never",
-}, ...__VLS_functionalComponentArgsRest(__VLS_60));
-__VLS_62.slots.default;
-{
-    const { header: __VLS_thisSlot } = __VLS_62.slots;
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-head" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-title" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "section-subtitle" },
-    });
-    const __VLS_63 = {}.ElButton;
+    const __VLS_7 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_64 = __VLS_asFunctionalComponent(__VLS_63, new __VLS_63({
+    const __VLS_8 = __VLS_asFunctionalComponent(__VLS_7, new __VLS_7({
         ...{ 'onClick': {} },
         link: true,
     }));
-    const __VLS_65 = __VLS_64({
+    const __VLS_9 = __VLS_8({
         ...{ 'onClick': {} },
         link: true,
-    }, ...__VLS_functionalComponentArgsRest(__VLS_64));
-    let __VLS_67;
-    let __VLS_68;
-    let __VLS_69;
-    const __VLS_70 = {
+    }, ...__VLS_functionalComponentArgsRest(__VLS_8));
+    let __VLS_11;
+    let __VLS_12;
+    let __VLS_13;
+    const __VLS_14 = {
         onClick: (...[$event]) => {
             __VLS_ctx.goTo('/home/screen');
         }
     };
-    __VLS_66.slots.default;
-    var __VLS_66;
+    __VLS_10.slots.default;
+    var __VLS_10;
 }
-if (__VLS_ctx.recentScreens.length) {
+if (__VLS_ctx.pagedRecentScreens.length) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "spotlight-list" },
+        ...{ class: "recent-screen-list" },
     });
-    for (const [screen] of __VLS_getVForSourceType((__VLS_ctx.recentScreens))) {
+    for (const [screen] of __VLS_getVForSourceType((__VLS_ctx.pagedRecentScreens))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
             ...{ onClick: (...[$event]) => {
-                    if (!(__VLS_ctx.recentScreens.length))
+                    if (!(__VLS_ctx.pagedRecentScreens.length))
                         return;
                     __VLS_ctx.openScreen(screen.id);
                 } },
             key: (screen.id),
-            ...{ class: "spotlight-item" },
+            ...{ class: "recent-screen-item" },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "spotlight-cover" },
+            ...{ class: "recent-screen-item__cover" },
         });
         if (__VLS_ctx.getCoverUrl(screen)) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.img)({
@@ -745,136 +510,321 @@ if (__VLS_ctx.recentScreens.length) {
         }
         else {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "spotlight-cover-fallback" },
+                ...{ class: "recent-screen-item__cover-fallback" },
             });
         }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "spotlight-body" },
+            ...{ class: "recent-screen-item__body" },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "spotlight-head" },
+            ...{ class: "recent-screen-item__head" },
         });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-            ...{ class: "spotlight-name" },
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({
+            ...{ class: "recent-screen-item__name" },
         });
         (screen.name);
-        const __VLS_71 = {}.ElTag;
+        const __VLS_15 = {}.ElTag;
         /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
         // @ts-ignore
-        const __VLS_72 = __VLS_asFunctionalComponent(__VLS_71, new __VLS_71({
+        const __VLS_16 = __VLS_asFunctionalComponent(__VLS_15, new __VLS_15({
             size: "small",
             type: (__VLS_ctx.getPublishStatus(screen) === 'PUBLISHED' ? 'success' : 'info'),
         }));
-        const __VLS_73 = __VLS_72({
+        const __VLS_17 = __VLS_16({
             size: "small",
             type: (__VLS_ctx.getPublishStatus(screen) === 'PUBLISHED' ? 'success' : 'info'),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_72));
-        __VLS_74.slots.default;
+        }, ...__VLS_functionalComponentArgsRest(__VLS_16));
+        __VLS_18.slots.default;
         (__VLS_ctx.getPublishStatus(screen) === 'PUBLISHED' ? '已发布' : '草稿');
-        var __VLS_74;
+        var __VLS_18;
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "spotlight-meta" },
+            ...{ class: "recent-screen-item__meta" },
         });
         (__VLS_ctx.getComponentCount(screen.id));
         (__VLS_ctx.getCanvasLabel(screen));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "spotlight-time" },
+            ...{ class: "recent-screen-item__time" },
         });
         (__VLS_ctx.formatDate(screen.createdAt));
     }
 }
 else {
-    const __VLS_75 = {}.ElEmpty;
+    const __VLS_19 = {}.ElEmpty;
     /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
     // @ts-ignore
-    const __VLS_76 = __VLS_asFunctionalComponent(__VLS_75, new __VLS_75({
+    const __VLS_20 = __VLS_asFunctionalComponent(__VLS_19, new __VLS_19({
         description: "还没有数据大屏，先创建一个新的大屏",
     }));
-    const __VLS_77 = __VLS_76({
+    const __VLS_21 = __VLS_20({
         description: "还没有数据大屏，先创建一个新的大屏",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_76));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_20));
 }
-var __VLS_62;
+if (__VLS_ctx.screens.length > __VLS_ctx.RECENT_SCREEN_PAGE_SIZE) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "section-pagination" },
+    });
+    const __VLS_23 = {}.ElPagination;
+    /** @type {[typeof __VLS_components.ElPagination, typeof __VLS_components.elPagination, ]} */ ;
+    // @ts-ignore
+    const __VLS_24 = __VLS_asFunctionalComponent(__VLS_23, new __VLS_23({
+        currentPage: (__VLS_ctx.recentScreenPage),
+        layout: "prev, pager, next",
+        pageSize: (__VLS_ctx.RECENT_SCREEN_PAGE_SIZE),
+        total: (__VLS_ctx.screens.length),
+        background: true,
+    }));
+    const __VLS_25 = __VLS_24({
+        currentPage: (__VLS_ctx.recentScreenPage),
+        layout: "prev, pager, next",
+        pageSize: (__VLS_ctx.RECENT_SCREEN_PAGE_SIZE),
+        total: (__VLS_ctx.screens.length),
+        background: true,
+    }, ...__VLS_functionalComponentArgsRest(__VLS_24));
+}
+var __VLS_6;
+const __VLS_27 = {}.ElCard;
+/** @type {[typeof __VLS_components.ElCard, typeof __VLS_components.elCard, typeof __VLS_components.ElCard, typeof __VLS_components.elCard, ]} */ ;
+// @ts-ignore
+const __VLS_28 = __VLS_asFunctionalComponent(__VLS_27, new __VLS_27({
+    ...{ class: "surface-card resource-card" },
+    shadow: "never",
+}));
+const __VLS_29 = __VLS_28({
+    ...{ class: "surface-card resource-card" },
+    shadow: "never",
+}, ...__VLS_functionalComponentArgsRest(__VLS_28));
+__VLS_30.slots.default;
+{
+    const { header: __VLS_thisSlot } = __VLS_30.slots;
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "section-head" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "section-title" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "section-subtitle" },
+    });
+    if (__VLS_ctx.activeResourceMeta) {
+        const __VLS_31 = {}.ElButton;
+        /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+        // @ts-ignore
+        const __VLS_32 = __VLS_asFunctionalComponent(__VLS_31, new __VLS_31({
+            ...{ 'onClick': {} },
+            link: true,
+        }));
+        const __VLS_33 = __VLS_32({
+            ...{ 'onClick': {} },
+            link: true,
+        }, ...__VLS_functionalComponentArgsRest(__VLS_32));
+        let __VLS_35;
+        let __VLS_36;
+        let __VLS_37;
+        const __VLS_38 = {
+            onClick: (...[$event]) => {
+                if (!(__VLS_ctx.activeResourceMeta))
+                    return;
+                __VLS_ctx.goTo(__VLS_ctx.activeResourceMeta.path);
+            }
+        };
+        __VLS_34.slots.default;
+        var __VLS_34;
+    }
+}
+if (__VLS_ctx.resourceCategories.length) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "resource-toolbar" },
+    });
+    for (const [category] of __VLS_getVForSourceType((__VLS_ctx.resourceCategories))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!(__VLS_ctx.resourceCategories.length))
+                        return;
+                    __VLS_ctx.activeResourceCategory = category.key;
+                } },
+            key: (category.key),
+            ...{ class: "resource-tab" },
+            ...{ class: ({ 'resource-tab--active': __VLS_ctx.activeResourceCategory === category.key }) },
+            type: "button",
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (category.label);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "resource-tab__count" },
+        });
+        (category.count);
+    }
+}
+if (__VLS_ctx.pagedResourceItems.length) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "resource-list" },
+    });
+    for (const [item] of __VLS_getVForSourceType((__VLS_ctx.pagedResourceItems))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!(__VLS_ctx.pagedResourceItems.length))
+                        return;
+                    __VLS_ctx.goTo(item.path);
+                } },
+            key: (item.id),
+            ...{ class: "resource-item" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "resource-item__main" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "resource-item__type" },
+        });
+        (item.typeLabel);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "resource-item__name" },
+        });
+        (item.name);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "resource-item__secondary" },
+        });
+        (item.secondary);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "resource-item__meta" },
+        });
+        const __VLS_39 = {}.ElTag;
+        /** @type {[typeof __VLS_components.ElTag, typeof __VLS_components.elTag, typeof __VLS_components.ElTag, typeof __VLS_components.elTag, ]} */ ;
+        // @ts-ignore
+        const __VLS_40 = __VLS_asFunctionalComponent(__VLS_39, new __VLS_39({
+            size: "small",
+            type: (item.statusType),
+        }));
+        const __VLS_41 = __VLS_40({
+            size: "small",
+            type: (item.statusType),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_40));
+        __VLS_42.slots.default;
+        (item.statusLabel);
+        var __VLS_42;
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "resource-item__time" },
+        });
+        (__VLS_ctx.formatDate(item.createdAt));
+    }
+}
+else {
+    const __VLS_43 = {}.ElEmpty;
+    /** @type {[typeof __VLS_components.ElEmpty, typeof __VLS_components.elEmpty, ]} */ ;
+    // @ts-ignore
+    const __VLS_44 = __VLS_asFunctionalComponent(__VLS_43, new __VLS_43({
+        description: "当前分类下还没有可展示的资源",
+    }));
+    const __VLS_45 = __VLS_44({
+        description: "当前分类下还没有可展示的资源",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_44));
+}
+if (__VLS_ctx.filteredResourceItems.length > __VLS_ctx.RESOURCE_PAGE_SIZE) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "section-pagination" },
+    });
+    const __VLS_47 = {}.ElPagination;
+    /** @type {[typeof __VLS_components.ElPagination, typeof __VLS_components.elPagination, ]} */ ;
+    // @ts-ignore
+    const __VLS_48 = __VLS_asFunctionalComponent(__VLS_47, new __VLS_47({
+        currentPage: (__VLS_ctx.resourcePage),
+        layout: "prev, pager, next",
+        pageSize: (__VLS_ctx.RESOURCE_PAGE_SIZE),
+        total: (__VLS_ctx.filteredResourceItems.length),
+        background: true,
+    }));
+    const __VLS_49 = __VLS_48({
+        currentPage: (__VLS_ctx.resourcePage),
+        layout: "prev, pager, next",
+        pageSize: (__VLS_ctx.RESOURCE_PAGE_SIZE),
+        total: (__VLS_ctx.filteredResourceItems.length),
+        background: true,
+    }, ...__VLS_functionalComponentArgsRest(__VLS_48));
+}
+var __VLS_30;
 /** @type {__VLS_StyleScopedClasses['workbench-page']} */ ;
 /** @type {__VLS_StyleScopedClasses['workbench-main']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-copy']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-eyebrow']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-description']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-actions']} */ ;
-/** @type {__VLS_StyleScopedClasses['hero-highlight']} */ ;
-/** @type {__VLS_StyleScopedClasses['highlight-label']} */ ;
-/** @type {__VLS_StyleScopedClasses['highlight-value']} */ ;
-/** @type {__VLS_StyleScopedClasses['highlight-meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['highlight-user']} */ ;
-/** @type {__VLS_StyleScopedClasses['highlight-avatar']} */ ;
-/** @type {__VLS_StyleScopedClasses['highlight-name']} */ ;
-/** @type {__VLS_StyleScopedClasses['highlight-id']} */ ;
-/** @type {__VLS_StyleScopedClasses['metric-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['metric-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['metric-kicker']} */ ;
-/** @type {__VLS_StyleScopedClasses['metric-value']} */ ;
-/** @type {__VLS_StyleScopedClasses['metric-label']} */ ;
-/** @type {__VLS_StyleScopedClasses['metric-note']} */ ;
-/** @type {__VLS_StyleScopedClasses['main-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['main-column']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-card--dashboard']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-side__head']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-side__head--dashboard']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-side__label']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-side__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-side__caption']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-side__badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard--single']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-kicker']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-value']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__status-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__status-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__status-value']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__status-note']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__status-track']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__status-fill']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-subtitle']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-unit']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__columns']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__column-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__column-value']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__column-track']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__column-bar']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__column-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__column-note']} */ ;
+/** @type {__VLS_StyleScopedClasses['content-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-subtitle']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-number']} */ ;
-/** @type {__VLS_StyleScopedClasses['workflow-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['workflow-item']} */ ;
-/** @type {__VLS_StyleScopedClasses['workflow-dot']} */ ;
-/** @type {__VLS_StyleScopedClasses['workflow-copy']} */ ;
-/** @type {__VLS_StyleScopedClasses['workflow-label']} */ ;
-/** @type {__VLS_StyleScopedClasses['workflow-tip']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__cover']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__cover-fallback']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__body']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__head']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__name']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['recent-screen-item__time']} */ ;
+/** @type {__VLS_StyleScopedClasses['section-pagination']} */ ;
 /** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-subtitle']} */ ;
-/** @type {__VLS_StyleScopedClasses['action-grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['action-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['action-stat']} */ ;
-/** @type {__VLS_StyleScopedClasses['action-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['action-desc']} */ ;
-/** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-subtitle']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-item']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-main']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-type']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-name']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-secondary']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['asset-time']} */ ;
-/** @type {__VLS_StyleScopedClasses['side-column']} */ ;
-/** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-card']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-title']} */ ;
-/** @type {__VLS_StyleScopedClasses['section-subtitle']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-list']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-item']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-cover']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-cover-fallback']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-body']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-name']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-meta']} */ ;
-/** @type {__VLS_StyleScopedClasses['spotlight-time']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-toolbar']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-tab']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-tab__count']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item__main']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item__type']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item__name']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item__secondary']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item__meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-item__time']} */ ;
+/** @type {__VLS_StyleScopedClasses['section-pagination']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             TopNavBar: TopNavBar,
+            RECENT_ADDED_WINDOW_DAYS: RECENT_ADDED_WINDOW_DAYS,
+            RECENT_SCREEN_PAGE_SIZE: RECENT_SCREEN_PAGE_SIZE,
+            RESOURCE_PAGE_SIZE: RESOURCE_PAGE_SIZE,
             loading: loading,
-            displayName: displayName,
-            userId: userId,
-            avatarText: avatarText,
+            recentScreenPage: recentScreenPage,
+            resourcePage: resourcePage,
+            activeResourceCategory: activeResourceCategory,
             getPublishStatus: getPublishStatus,
             getCoverUrl: getCoverUrl,
             getCanvasLabel: getCanvasLabel,
@@ -882,14 +832,14 @@ const __VLS_self = (await import('vue')).defineComponent({
             screens: screens,
             publishedReportCount: publishedReportCount,
             publishProgress: publishProgress,
-            primaryAction: primaryAction,
-            summaryMetrics: summaryMetrics,
-            onboardingSteps: onboardingSteps,
-            completedOnboardingCount: completedOnboardingCount,
-            onboardingProgress: onboardingProgress,
-            quickActions: quickActions,
-            recentAssets: recentAssets,
-            recentScreens: recentScreens,
+            recentAddedScreenCount: recentAddedScreenCount,
+            recentAddedTotal: recentAddedTotal,
+            recentAddedBars: recentAddedBars,
+            resourceCategories: resourceCategories,
+            activeResourceMeta: activeResourceMeta,
+            filteredResourceItems: filteredResourceItems,
+            pagedResourceItems: pagedResourceItems,
+            pagedRecentScreens: pagedRecentScreens,
             formatDate: formatDate,
             goTo: goTo,
             openScreen: openScreen,

@@ -3,187 +3,256 @@
     <TopNavBar active="workbench" />
 
     <main class="workbench-main">
-      <section class="hero-card">
-        <div class="hero-copy">
-          <span class="hero-eyebrow">分析工作台</span>
-          <h1 class="hero-title">{{ displayName }}，继续推进你的数据产品</h1>
-          <p class="hero-description">
-            把数据接入、加工、组件设计和大屏发布放到一条可执行链路里，不再依赖首页假入口和弹窗式模块切换。
-          </p>
-          <div class="hero-actions">
-            <el-button type="primary" size="large" @click="goTo(primaryAction.path)">{{ primaryAction.label }}</el-button>
-            <el-button size="large" @click="goTo('/home/prepare/datasource')">接入数据源</el-button>
-            <el-button size="large" @click="goTo('/home/screen')">管理数据大屏</el-button>
-          </div>
-        </div>
-
-        <div class="hero-highlight">
-          <div class="highlight-label">发布完成度</div>
-          <div class="highlight-value">{{ publishedReportCount }}</div>
-          <div class="highlight-meta">已发布数据大屏 / 共 {{ screens.length }} 个数据大屏</div>
-          <el-progress :percentage="publishProgress" :stroke-width="10" :show-text="false" color="#58b5ab" />
-
-          <div class="highlight-user">
-            <span class="highlight-avatar">{{ avatarText }}</span>
+      <section class="overview-shell">
+        <div class="overview-card overview-card--dashboard">
+          <div class="overview-side__head overview-side__head--dashboard">
             <div>
-              <div class="highlight-name">{{ displayName }}</div>
-              <div class="highlight-id">账号 ID {{ userId }}</div>
+              <span class="overview-side__label">系统仪表盘</span>
+              <div class="overview-side__title">最近 {{ RECENT_ADDED_WINDOW_DAYS }} 天新增概览</div>
+              <div class="overview-side__caption">顶部改成紧凑仪表盘，同时展示最近新增资源和用户登录分析</div>
+            </div>
+            <span class="overview-side__badge">最近新增</span>
+          </div>
+
+          <div class="overview-dashboard overview-dashboard--single">
+            <div class="overview-dashboard__summary-card">
+              <div class="overview-dashboard__summary-kicker">新增总量</div>
+              <div class="overview-dashboard__summary-value">{{ recentAddedTotal }}</div>
+              <div class="overview-dashboard__summary-meta">最近 {{ RECENT_ADDED_WINDOW_DAYS }} 天共新增 {{ recentAddedTotal }} 个资源</div>
+
+              <div class="overview-dashboard__status-panel">
+                <div class="overview-dashboard__status-head">
+                  <span>大屏发布状态</span>
+                  <strong>{{ publishProgress }}%</strong>
+                </div>
+                <div class="overview-dashboard__status-value">{{ publishedReportCount }} / {{ screens.length }}</div>
+                <div class="overview-dashboard__status-note">当前已发布 {{ publishedReportCount }} 个数据大屏</div>
+                <div class="overview-dashboard__status-track">
+                  <span class="overview-dashboard__status-fill" :style="{ width: `${publishProgress}%` }"></span>
+                </div>
+              </div>
+
+              <div class="overview-dashboard__summary-grid">
+                <div class="overview-dashboard__mini-fact">
+                  <span>可见资源分类</span>
+                  <strong>{{ resourceCategories.length }}</strong>
+                </div>
+                <div class="overview-dashboard__mini-fact">
+                  <span>最近新增大屏</span>
+                  <strong>{{ recentAddedScreenCount }}</strong>
+                </div>
+                <div class="overview-dashboard__mini-fact">
+                  <span>活跃登录用户</span>
+                  <strong>{{ recentLoginActiveUserCount }}</strong>
+                </div>
+                <div class="overview-dashboard__mini-fact">
+                  <span>登录失败次数</span>
+                  <strong>{{ recentLoginFailCount }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="overview-dashboard__chart-card overview-dashboard__chart-card--recent">
+              <div class="overview-dashboard__chart-head">
+                <div>
+                  <div class="overview-dashboard__chart-title">最近新增个数</div>
+                  <div class="overview-dashboard__chart-subtitle">按资源分类统计最近新增数量</div>
+                </div>
+                <div class="overview-dashboard__chart-unit">单位：个</div>
+              </div>
+
+              <div class="overview-dashboard__columns">
+                <div v-for="item in recentAddedBars" :key="item.key" class="overview-dashboard__column-item">
+                  <div class="overview-dashboard__column-value">+{{ item.value }}</div>
+                  <div class="overview-dashboard__column-track">
+                    <span class="overview-dashboard__column-bar" :style="{ height: `${item.percent}%`, background: item.accent }"></span>
+                  </div>
+                  <div class="overview-dashboard__column-label">{{ item.label }}</div>
+                  <div class="overview-dashboard__column-note">最近 {{ RECENT_ADDED_WINDOW_DAYS }} 天</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="overview-dashboard__chart-card overview-dashboard__chart-card--login">
+              <div class="overview-dashboard__chart-head">
+                <div>
+                  <div class="overview-dashboard__chart-title">用户登录分析</div>
+                  <div class="overview-dashboard__chart-subtitle">
+                    {{ canLoadLoginLogs ? `最近 ${RECENT_ADDED_WINDOW_DAYS} 天登录成功 / 失败趋势` : '当前账号无登录日志查看权限' }}
+                  </div>
+                </div>
+                <div class="overview-dashboard__chart-unit">单位：次</div>
+              </div>
+
+              <template v-if="canLoadLoginLogs">
+                <div class="overview-dashboard__login-summary">
+                  <div class="overview-dashboard__login-fact">
+                    <span>登录成功</span>
+                    <strong>{{ recentLoginSuccessCount }}</strong>
+                  </div>
+                  <div class="overview-dashboard__login-fact">
+                    <span>登录失败</span>
+                    <strong>{{ recentLoginFailCount }}</strong>
+                  </div>
+                  <div class="overview-dashboard__login-fact">
+                    <span>活跃用户</span>
+                    <strong>{{ recentLoginActiveUserCount }}</strong>
+                  </div>
+                </div>
+
+                <div class="overview-dashboard__legend">
+                  <span class="overview-dashboard__legend-item"><i class="overview-dashboard__legend-dot overview-dashboard__legend-dot--success"></i>登录成功</span>
+                  <span class="overview-dashboard__legend-item"><i class="overview-dashboard__legend-dot overview-dashboard__legend-dot--fail"></i>登录失败</span>
+                </div>
+
+                <div class="overview-dashboard__login-columns">
+                  <div v-for="item in recentLoginTrend" :key="item.key" class="overview-dashboard__login-column-item">
+                    <div class="overview-dashboard__login-total">{{ item.total }}</div>
+                    <div class="overview-dashboard__login-track">
+                      <span
+                        v-if="item.failPercent > 0"
+                        class="overview-dashboard__login-segment overview-dashboard__login-segment--fail"
+                        :style="{ height: `${item.failPercent}%` }"
+                      ></span>
+                      <span
+                        v-if="item.successPercent > 0"
+                        class="overview-dashboard__login-segment overview-dashboard__login-segment--success"
+                        :style="{ height: `${item.successPercent}%` }"
+                      ></span>
+                    </div>
+                    <div class="overview-dashboard__login-label">{{ item.label }}</div>
+                  </div>
+                </div>
+              </template>
+
+              <div v-else class="overview-dashboard__login-empty">
+                登录日志仅管理员可见，当前仪表盘不加载用户登录分析数据。
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="metric-grid">
-        <article v-for="metric in summaryMetrics" :key="metric.label" class="metric-card">
-          <span class="metric-kicker">{{ metric.kicker }}</span>
-          <strong class="metric-value">{{ metric.value }}</strong>
-          <span class="metric-label">{{ metric.label }}</span>
-          <span class="metric-note">{{ metric.note }}</span>
-        </article>
-      </section>
-
-      <section class="main-grid">
-        <div class="main-column">
-          <el-card class="surface-card" shadow="never">
-            <template #header>
-              <div class="section-head">
-                <div>
-                  <div class="section-title">本轮待推进</div>
-                  <div class="section-subtitle">把接入、加工、构建和发布串成一条真实工作流</div>
-                </div>
-                <span class="section-number">{{ completedOnboardingCount }}/{{ onboardingSteps.length }}</span>
+      <section class="content-grid">
+        <el-card class="surface-card recent-card" shadow="never">
+          <template #header>
+            <div class="section-head">
+              <div>
+                <div class="section-title">最近编辑的大屏</div>
+                <div class="section-subtitle">按最近更新时间分页展示，直接进入大屏编辑页</div>
               </div>
-            </template>
-
-            <el-progress :percentage="onboardingProgress" :stroke-width="12" :show-text="false" color="#4b9f96" />
-
-            <div class="workflow-list">
-              <button
-                v-for="item in onboardingSteps"
-                :key="item.label"
-                class="workflow-item"
-                @click="goTo(item.path)"
-              >
-                <span class="workflow-dot" :class="{ 'workflow-dot--done': item.done }"></span>
-                <div class="workflow-copy">
-                  <span class="workflow-label">{{ item.label }}</span>
-                  <span class="workflow-tip">{{ item.tip }}</span>
-                </div>
-                <el-tag size="small" :type="item.done ? 'success' : 'warning'">{{ item.done ? '已完成' : '待处理' }}</el-tag>
-              </button>
+              <el-button link @click="goTo('/home/screen')">查看全部</el-button>
             </div>
-          </el-card>
+          </template>
 
-          <el-card class="surface-card" shadow="never">
-            <template #header>
-              <div class="section-head">
-                <div>
-                  <div class="section-title">快捷入口</div>
-                  <div class="section-subtitle">直接进入真实页面，而不是再用首页弹窗承载完整模块</div>
-                </div>
+          <div v-if="pagedRecentScreens.length" class="recent-screen-list">
+            <button
+              v-for="screen in pagedRecentScreens"
+              :key="screen.id"
+              class="recent-screen-item"
+              @click="openScreen(screen.id)"
+            >
+              <div class="recent-screen-item__cover">
+                <img v-if="getCoverUrl(screen)" :src="getCoverUrl(screen)" alt="大屏封面" />
+                <div v-else class="recent-screen-item__cover-fallback">未生成封面</div>
               </div>
-            </template>
 
-            <div class="action-grid">
-              <button
-                v-for="action in quickActions"
-                :key="action.key"
-                class="action-card"
-                @click="goTo(action.path)"
-              >
-                <span class="action-stat">{{ action.stat }}</span>
-                <strong class="action-title">{{ action.title }}</strong>
-                <span class="action-desc">{{ action.description }}</span>
-              </button>
-            </div>
-          </el-card>
-
-          <el-card class="surface-card" shadow="never">
-            <template #header>
-              <div class="section-head">
-                <div>
-                  <div class="section-title">最近资产</div>
-                  <div class="section-subtitle">优先展示最近真实改动的数据资产和报告资产</div>
+              <div class="recent-screen-item__body">
+                <div class="recent-screen-item__head">
+                  <strong class="recent-screen-item__name">{{ screen.name }}</strong>
+                  <el-tag size="small" :type="getPublishStatus(screen) === 'PUBLISHED' ? 'success' : 'info'">
+                    {{ getPublishStatus(screen) === 'PUBLISHED' ? '已发布' : '草稿' }}
+                  </el-tag>
                 </div>
+                <div class="recent-screen-item__meta">
+                  {{ getComponentCount(screen.id) }} 个组件 · {{ getCanvasLabel(screen) }}
+                </div>
+                <div class="recent-screen-item__time">最近更新 {{ formatDate(screen.createdAt) }}</div>
               </div>
-            </template>
+            </button>
+          </div>
+          <el-empty v-else description="还没有数据大屏，先创建一个新的大屏" />
 
-            <div v-if="recentAssets.length" class="asset-list">
-              <button
-                v-for="asset in recentAssets"
-                :key="asset.id"
-                class="asset-item"
-                @click="goTo(asset.path)"
-              >
-                <div class="asset-main">
-                  <span class="asset-type">{{ asset.typeLabel }}</span>
-                  <div class="asset-name">{{ asset.name }}</div>
-                  <div class="asset-secondary">{{ asset.secondary }}</div>
-                </div>
+          <div v-if="screens.length > RECENT_SCREEN_PAGE_SIZE" class="section-pagination">
+            <el-pagination
+              v-model:current-page="recentScreenPage"
+              layout="prev, pager, next"
+              :page-size="RECENT_SCREEN_PAGE_SIZE"
+              :total="screens.length"
+              background
+            />
+          </div>
+        </el-card>
 
-                <div class="asset-meta">
-                  <el-tag size="small" :type="asset.statusType">{{ asset.statusLabel }}</el-tag>
-                  <span class="asset-time">{{ formatDate(asset.createdAt) }}</span>
-                </div>
-              </button>
-            </div>
-            <el-empty v-else description="还没有可展示的资产，先从接入数据源开始" />
-          </el-card>
-        </div>
-
-        <div class="side-column">
-          <el-card class="surface-card spotlight-card" shadow="never">
-            <template #header>
-              <div class="section-head">
-                <div>
-                  <div class="section-title">最近大屏</div>
-                  <div class="section-subtitle">封面、状态和组件数直接可见</div>
-                </div>
-                <el-button link @click="goTo('/home/screen')">查看全部</el-button>
+        <el-card class="surface-card resource-card" shadow="never">
+          <template #header>
+            <div class="section-head">
+              <div>
+                <div class="section-title">系统资源</div>
+                <div class="section-subtitle">按分类分页查看数据源、数据集、图表组件和大屏资产</div>
               </div>
-            </template>
-
-            <div v-if="recentScreens.length" class="spotlight-list">
-              <button
-                v-for="screen in recentScreens"
-                :key="screen.id"
-                class="spotlight-item"
-                @click="openScreen(screen.id)"
-              >
-                <div class="spotlight-cover">
-                  <img v-if="getCoverUrl(screen)" :src="getCoverUrl(screen)" alt="大屏封面" />
-                  <div v-else class="spotlight-cover-fallback">未生成封面</div>
-                </div>
-
-                <div class="spotlight-body">
-                  <div class="spotlight-head">
-                    <span class="spotlight-name">{{ screen.name }}</span>
-                    <el-tag size="small" :type="getPublishStatus(screen) === 'PUBLISHED' ? 'success' : 'info'">
-                      {{ getPublishStatus(screen) === 'PUBLISHED' ? '已发布' : '草稿' }}
-                    </el-tag>
-                  </div>
-                  <div class="spotlight-meta">
-                    {{ getComponentCount(screen.id) }} 个组件 · {{ getCanvasLabel(screen) }}
-                  </div>
-                  <div class="spotlight-time">最近更新 {{ formatDate(screen.createdAt) }}</div>
-                </div>
-              </button>
+              <el-button v-if="activeResourceMeta" link @click="goTo(activeResourceMeta.path)">进入分类</el-button>
             </div>
-            <el-empty v-else description="还没有数据大屏，先创建一个新的大屏" />
-          </el-card>
-        </div>
+          </template>
+
+          <div v-if="resourceCategories.length" class="resource-toolbar">
+            <button
+              v-for="category in resourceCategories"
+              :key="category.key"
+              class="resource-tab"
+              :class="{ 'resource-tab--active': activeResourceCategory === category.key }"
+              type="button"
+              @click="activeResourceCategory = category.key"
+            >
+              <span>{{ category.label }}</span>
+              <span class="resource-tab__count">{{ category.count }}</span>
+            </button>
+          </div>
+
+          <div v-if="pagedResourceItems.length" class="resource-list">
+            <button
+              v-for="item in pagedResourceItems"
+              :key="item.id"
+              class="resource-item"
+              @click="goTo(item.path)"
+            >
+              <div class="resource-item__main">
+                <span class="resource-item__type">{{ item.typeLabel }}</span>
+                <div class="resource-item__name">{{ item.name }}</div>
+                <div class="resource-item__secondary">{{ item.secondary }}</div>
+              </div>
+
+              <div class="resource-item__meta">
+                <el-tag size="small" :type="item.statusType">{{ item.statusLabel }}</el-tag>
+                <span class="resource-item__time">{{ formatDate(item.createdAt) }}</span>
+              </div>
+            </button>
+          </div>
+          <el-empty v-else description="当前分类下还没有可展示的资源" />
+
+          <div v-if="filteredResourceItems.length > RESOURCE_PAGE_SIZE" class="section-pagination">
+            <el-pagination
+              v-model:current-page="resourcePage"
+              layout="prev, pager, next"
+              :page-size="RESOURCE_PAGE_SIZE"
+              :total="filteredResourceItems.length"
+              background
+            />
+          </div>
+        </el-card>
       </section>
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getChartList, type Chart } from '../api/chart'
 import { getDashboardList, type Dashboard } from '../api/dashboard'
 import { getDatasetList, type Dataset } from '../api/dataset'
 import { getDatasourceList, type Datasource, type DatasourceSourceKind } from '../api/datasource'
+import request from '../api/request'
 import TopNavBar from '../components/TopNavBar.vue'
 import {
   normalizeCanvasConfig,
@@ -192,9 +261,10 @@ import {
   parseReportConfig,
   type PublishStatus,
 } from '../utils/report-config'
-import { flattenAuthMenus, getAuthDisplayName, getAuthMenus } from '../utils/auth-session'
+import { flattenAuthMenus, getAuthMenus, getAuthRole } from '../utils/auth-session'
 
 type AssetStatusType = 'success' | 'info' | 'warning'
+type ResourceCategoryKey = 'datasource' | 'dataset' | 'chart' | 'screen'
 
 interface WorkspaceAsset {
   id: string
@@ -205,14 +275,37 @@ interface WorkspaceAsset {
   statusLabel: string
   statusType: AssetStatusType
   path: string
+  category: ResourceCategoryKey
 }
 
-interface QuickAction {
-  key: string
-  title: string
-  description: string
-  stat: string
+interface ResourceCategory {
+  key: ResourceCategoryKey
+  label: string
+  count: number
   path: string
+}
+
+interface DashboardBarItem {
+  key: ResourceCategoryKey
+  label: string
+  value: number
+  percent: number
+  accent: string
+}
+
+interface LoginAuditLog {
+  id: number
+  username: string
+  action: string
+  createdAt: string
+}
+
+interface LoginTrendItem {
+  key: string
+  label: string
+  total: number
+  successPercent: number
+  failPercent: number
 }
 
 const SOURCE_KIND_LABELS: Record<DatasourceSourceKind, string> = {
@@ -222,6 +315,10 @@ const SOURCE_KIND_LABELS: Record<DatasourceSourceKind, string> = {
   JSON_STATIC: '静态 JSON',
 }
 
+const RECENT_ADDED_WINDOW_DAYS = 7
+const RECENT_SCREEN_PAGE_SIZE = 4
+const RESOURCE_PAGE_SIZE = 6
+
 const loading = ref(false)
 const router = useRouter()
 
@@ -229,13 +326,14 @@ const datasourceList = ref<Datasource[]>([])
 const datasetList = ref<Dataset[]>([])
 const chartList = ref<Chart[]>([])
 const reportList = ref<Dashboard[]>([])
+const loginLogs = ref<LoginAuditLog[]>([])
+const recentScreenPage = ref(1)
+const resourcePage = ref(1)
+const activeResourceCategory = ref<ResourceCategoryKey>('datasource')
+
 const componentCountMap = computed<Record<number, number>>(() => Object.fromEntries(
   reportList.value.map((item) => [item.id, item.componentCount ?? 0])
 ))
-
-const displayName = computed(() => getAuthDisplayName())
-const userId = computed(() => localStorage.getItem('bi_user_id') || '--')
-const avatarText = computed(() => displayName.value.slice(0, 1) || '用')
 
 const allowedPaths = computed(() => new Set(
   flattenAuthMenus(getAuthMenus()).map((item) => item.path).filter(Boolean)
@@ -244,6 +342,8 @@ const allowedPaths = computed(() => new Set(
 const canAccess = (path: string) => !allowedPaths.value.size
   || allowedPaths.value.has(path)
   || Array.from(allowedPaths.value).some((item) => path.startsWith(`${item}/`))
+
+const canLoadLoginLogs = computed(() => getAuthRole() === 'ADMIN' && canAccess('/home/system/login-logs'))
 
 const getReportScene = (report: Dashboard): 'dashboard' | 'screen' => {
   const config = parseReportConfig(report.configJson)
@@ -282,109 +382,113 @@ const publishProgress = computed(() => {
   return Math.round((publishedReportCount.value / screens.value.length) * 100)
 })
 
-const primaryAction = computed(() => {
-  if (!datasourceList.value.length) {
-    return { label: '先接入第一个数据源', path: '/home/prepare/datasource' }
-  }
-  if (!datasetList.value.length) {
-    return { label: '继续创建数据集', path: '/home/prepare/dataset' }
-  }
-  const latestDraftScreen = screens.value.find((item) => getPublishStatus(item) === 'DRAFT')
-  if (latestDraftScreen) {
-    return { label: '继续编辑最近大屏', path: `/home/screen/edit/${latestDraftScreen.id}` }
-  }
-  return { label: '进入数据大屏工作区', path: '/home/screen' }
+const isRecentWithinWindow = (value?: string) => {
+  if (!value) return false
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return false
+  const now = Date.now()
+  const diff = now - timestamp
+  return diff >= 0 && diff <= RECENT_ADDED_WINDOW_DAYS * 24 * 60 * 60 * 1000
+}
+
+const recentAddedDatasourceCount = computed(() => datasourceList.value.filter((item) => isRecentWithinWindow(item.createdAt)).length)
+const recentAddedDatasetCount = computed(() => datasetList.value.filter((item) => isRecentWithinWindow(item.createdAt)).length)
+const recentAddedChartCount = computed(() => chartList.value.filter((item) => isRecentWithinWindow(item.createdAt)).length)
+const recentAddedScreenCount = computed(() => screens.value.filter((item) => isRecentWithinWindow(item.createdAt)).length)
+const recentAddedTotal = computed(() => [
+  recentAddedDatasourceCount.value,
+  recentAddedDatasetCount.value,
+  recentAddedChartCount.value,
+  recentAddedScreenCount.value,
+].reduce((sum, item) => sum + item, 0))
+
+const recentLoginLogs = computed(() => loginLogs.value.filter((item) => isRecentWithinWindow(item.createdAt)))
+const recentLoginSuccessCount = computed(() => recentLoginLogs.value.filter((item) => item.action === 'LOGIN_SUCCESS').length)
+const recentLoginFailCount = computed(() => recentLoginLogs.value.filter((item) => item.action === 'LOGIN_FAIL').length)
+const recentLoginActiveUserCount = computed(() => new Set(
+  recentLoginLogs.value.map((item) => item.username).filter(Boolean)
+).size)
+
+const recentAddedBars = computed<DashboardBarItem[]>(() => {
+  const rawItems = [
+    {
+      key: 'datasource' as const,
+      label: '数据源',
+      value: recentAddedDatasourceCount.value,
+      accent: 'linear-gradient(180deg, #7dd0c6 0%, #55b0a3 100%)',
+    },
+    {
+      key: 'dataset' as const,
+      label: '数据集',
+      value: recentAddedDatasetCount.value,
+      accent: 'linear-gradient(180deg, #90c7df 0%, #6ea8c7 100%)',
+    },
+    {
+      key: 'chart' as const,
+      label: '图表组件',
+      value: recentAddedChartCount.value,
+      accent: 'linear-gradient(180deg, #98bbe7 0%, #5f97cf 100%)',
+    },
+    {
+      key: 'screen' as const,
+      label: '数据大屏',
+      value: recentAddedScreenCount.value,
+      accent: 'linear-gradient(180deg, #87c8b6 0%, #65b29e 100%)',
+    },
+  ]
+
+  const maxValue = Math.max(...rawItems.map((item) => item.value), 1)
+
+  return rawItems.map((item) => ({
+    ...item,
+    percent: item.value > 0 ? Math.max(14, Math.round((item.value / maxValue) * 100)) : 0,
+  }))
 })
 
-const summaryMetrics = computed(() => [
-  {
-    label: '数据源',
-    kicker: '接入层',
-    value: datasourceList.value.length,
-    note: datasourceList.value.length ? '已连接数据库、接口或文件' : '还没有任何数据接入',
-  },
-  {
-    label: '数据集',
-    kicker: '加工层',
-    value: datasetList.value.length,
-    note: datasetList.value.length ? '可直接供图表与报表使用' : '还没有沉淀可复用数据集',
-  },
-  {
-    label: '图表组件',
-    kicker: '分析层',
-    value: chartList.value.length,
-    note: chartList.value.length ? '图表模板已可复用' : '还没有完成图表设计',
-  },
-  {
-    label: '数据大屏',
-    kicker: '展示层',
-    value: screens.value.length,
-    note: screens.value.length ? `${publishedReportCount.value} 个已发布` : '尚未搭建展示大屏',
-  },
-])
+const recentLoginTrend = computed<LoginTrendItem[]>(() => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
-const onboardingSteps = computed(() => [
-  {
-    label: '接入至少一个数据源',
-    tip: datasourceList.value.length ? `${datasourceList.value.length} 个数据源已接入` : '支持数据库、API、表格和静态 JSON',
-    done: datasourceList.value.length > 0,
-    path: '/home/prepare/datasource',
-  },
-  {
-    label: '沉淀可复用数据集',
-    tip: datasetList.value.length ? `${datasetList.value.length} 个数据集可直接复用` : '把原始数据整理成业务字段模型',
-    done: datasetList.value.length > 0,
-    path: '/home/prepare/dataset',
-  },
-  {
-    label: '完成图表设计与组件装配',
-    tip: chartList.value.length ? `${chartList.value.length} 个图表组件已创建` : '先设计图表组件，再进入数据大屏',
-    done: chartList.value.length > 0,
-    path: '/home/prepare/components',
-  },
-  {
-    label: '发布至少一个报告',
-    tip: publishedReportCount.value ? `${publishedReportCount.value} 个数据大屏已发布` : '让数据大屏真正进入可分享状态',
-    done: publishedReportCount.value > 0,
-    path: '/home/screen',
-  },
-])
+  const buckets = Array.from({ length: RECENT_ADDED_WINDOW_DAYS }, (_, index) => {
+    const date = new Date(today)
+    date.setDate(today.getDate() - (RECENT_ADDED_WINDOW_DAYS - 1 - index))
+    return {
+      key: date.toISOString().slice(0, 10),
+      label: `${date.getMonth() + 1}/${date.getDate()}`,
+      success: 0,
+      fail: 0,
+      total: 0,
+    }
+  })
 
-const completedOnboardingCount = computed(() => onboardingSteps.value.filter((item) => item.done).length)
-const onboardingProgress = computed(() => Math.round((completedOnboardingCount.value / onboardingSteps.value.length) * 100))
+  const bucketMap = new Map(buckets.map((item) => [item.key, item]))
 
-const quickActions = computed<QuickAction[]>(() => ([
-  {
-    key: 'datasource',
-    title: '接入数据源',
-    description: '创建数据库、API、表格或静态 JSON 数据源',
-    stat: `${datasourceList.value.length} 个已接入`,
-    path: '/home/prepare/datasource',
-  },
-  {
-    key: 'dataset',
-    title: '加工数据集',
-    description: '整理 SQL、字段和抽取逻辑，形成可复用数据模型',
-    stat: `${datasetList.value.length} 个数据集`,
-    path: '/home/prepare/dataset',
-  },
-  {
-    key: 'chart',
-    title: '设计图表组件',
-    description: '进入组件设计页面，沉淀图表资产供后续复用',
-    stat: `${chartList.value.length} 个图表`,
-    path: '/home/prepare/components',
-  },
-  {
-    key: 'screen',
-    title: '管理数据大屏',
-    description: '统一查看大屏封面、状态和进入编辑器',
-    stat: `${screens.value.length} 个大屏`,
-    path: '/home/screen',
-  },
-]).filter((item) => canAccess(item.path)))
+  recentLoginLogs.value.forEach((item) => {
+    const date = new Date(item.createdAt)
+    if (Number.isNaN(date.getTime())) return
+    date.setHours(0, 0, 0, 0)
+    const bucket = bucketMap.get(date.toISOString().slice(0, 10))
+    if (!bucket) return
+    if (item.action === 'LOGIN_SUCCESS') {
+      bucket.success += 1
+    } else if (item.action === 'LOGIN_FAIL') {
+      bucket.fail += 1
+    }
+    bucket.total = bucket.success + bucket.fail
+  })
 
-const recentAssets = computed<WorkspaceAsset[]>(() => {
+  const maxTotal = Math.max(...buckets.map((item) => item.total), 1)
+
+  return buckets.map((item) => ({
+    key: item.key,
+    label: item.label,
+    total: item.total,
+    successPercent: item.success > 0 ? Math.round((item.success / maxTotal) * 100) : 0,
+    failPercent: item.fail > 0 ? Math.round((item.fail / maxTotal) * 100) : 0,
+  }))
+})
+
+const allResourceItems = computed<WorkspaceAsset[]>(() => {
   const datasourceAssets: WorkspaceAsset[] = datasourceList.value.map((item) => ({
     id: `datasource-${item.id}`,
     name: item.name,
@@ -394,6 +498,7 @@ const recentAssets = computed<WorkspaceAsset[]>(() => {
     statusLabel: SOURCE_KIND_LABELS[item.sourceKind],
     statusType: 'info',
     path: '/home/prepare/datasource',
+    category: 'datasource',
   }))
 
   const datasetAssets: WorkspaceAsset[] = datasetList.value.map((item) => ({
@@ -405,25 +510,105 @@ const recentAssets = computed<WorkspaceAsset[]>(() => {
     statusLabel: '可建模',
     statusType: 'success',
     path: '/home/prepare/dataset',
+    category: 'dataset',
   }))
 
-  const reportAssets: WorkspaceAsset[] = reportList.value
-    .filter((item) => getReportScene(item) === 'screen')
-    .map((item) => ({
-      id: `screen-${item.id}`,
-      name: item.name,
-      typeLabel: '数据大屏',
-      secondary: `${getComponentCount(item.id)} 个组件 · ${getCanvasLabel(item)}`,
-      createdAt: item.createdAt,
-      statusLabel: getPublishStatus(item) === 'PUBLISHED' ? '已发布' : '草稿',
-      statusType: getPublishStatus(item) === 'PUBLISHED' ? 'success' : 'warning',
-      path: `/home/screen/edit/${item.id}`,
-    }))
+  const chartAssets: WorkspaceAsset[] = chartList.value.map((item) => ({
+    id: `chart-${item.id}`,
+    name: item.name,
+    typeLabel: '图表组件',
+    secondary: item.datasetId ? `来源数据集 #${item.datasetId} · ${item.chartType}` : `${item.chartType} · 未绑定数据集`,
+    createdAt: item.createdAt,
+    statusLabel: item.chartType,
+    statusType: 'info',
+    path: '/home/prepare/components',
+    category: 'chart',
+  }))
 
-  return sortByCreatedAt([...datasourceAssets, ...datasetAssets, ...reportAssets]).slice(0, 8)
+  const screenAssets: WorkspaceAsset[] = screens.value.map((item) => ({
+    id: `screen-${item.id}`,
+    name: item.name,
+    typeLabel: '数据大屏',
+    secondary: `${getComponentCount(item.id)} 个组件 · ${getCanvasLabel(item)}`,
+    createdAt: item.createdAt,
+    statusLabel: getPublishStatus(item) === 'PUBLISHED' ? '已发布' : '草稿',
+    statusType: getPublishStatus(item) === 'PUBLISHED' ? 'success' : 'warning',
+    path: `/home/screen/edit/${item.id}`,
+    category: 'screen',
+  }))
+
+  return sortByCreatedAt([...datasourceAssets, ...datasetAssets, ...chartAssets, ...screenAssets])
 })
 
-const recentScreens = computed(() => screens.value.slice(0, 3))
+const resourceCategories = computed<ResourceCategory[]>(() => {
+  const categories: ResourceCategory[] = [
+    {
+      key: 'datasource',
+      label: '数据源',
+      count: allResourceItems.value.filter((item) => item.category === 'datasource').length,
+      path: '/home/prepare/datasource',
+    },
+    {
+      key: 'dataset',
+      label: '数据集',
+      count: allResourceItems.value.filter((item) => item.category === 'dataset').length,
+      path: '/home/prepare/dataset',
+    },
+    {
+      key: 'chart',
+      label: '图表组件',
+      count: allResourceItems.value.filter((item) => item.category === 'chart').length,
+      path: '/home/prepare/components',
+    },
+    {
+      key: 'screen',
+      label: '数据大屏',
+      count: allResourceItems.value.filter((item) => item.category === 'screen').length,
+      path: '/home/screen',
+    },
+  ]
+
+  return categories.filter((item) => canAccess(item.path))
+})
+
+const activeResourceMeta = computed(() => resourceCategories.value.find((item) => item.key === activeResourceCategory.value) || null)
+const filteredResourceItems = computed(() => allResourceItems.value.filter((item) => item.category === activeResourceCategory.value))
+const pagedResourceItems = computed(() => {
+  const start = (resourcePage.value - 1) * RESOURCE_PAGE_SIZE
+  return filteredResourceItems.value.slice(start, start + RESOURCE_PAGE_SIZE)
+})
+
+const pagedRecentScreens = computed(() => {
+  const start = (recentScreenPage.value - 1) * RECENT_SCREEN_PAGE_SIZE
+  return screens.value.slice(start, start + RECENT_SCREEN_PAGE_SIZE)
+})
+
+watch(resourceCategories, (categories) => {
+  if (!categories.length) {
+    return
+  }
+  if (!categories.some((item) => item.key === activeResourceCategory.value)) {
+    activeResourceCategory.value = categories[0].key
+  }
+}, { immediate: true })
+
+watch(activeResourceCategory, () => {
+  resourcePage.value = 1
+})
+
+watch(() => screens.value.length, (count) => {
+  const maxPage = Math.max(1, Math.ceil(count / RECENT_SCREEN_PAGE_SIZE))
+  if (recentScreenPage.value > maxPage) {
+    recentScreenPage.value = maxPage
+  }
+}, { immediate: true })
+
+watch(() => filteredResourceItems.value.length, (count) => {
+  const maxPage = Math.max(1, Math.ceil(count / RESOURCE_PAGE_SIZE))
+  if (resourcePage.value > maxPage) {
+    resourcePage.value = maxPage
+  }
+}, { immediate: true })
 
 const formatDate = (value?: string) => {
   if (!value) return '刚刚'
@@ -448,17 +633,23 @@ const openScreen = (id: number) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const [datasources, datasets, charts, dashboards] = await Promise.all([
+    const loginLogsPromise: Promise<LoginAuditLog[]> = canLoadLoginLogs.value
+      ? request.get('/audit-logs/login').catch(() => [] as LoginAuditLog[])
+      : Promise.resolve([] as LoginAuditLog[])
+
+    const [datasources, datasets, charts, dashboards, logs] = await Promise.all([
       getDatasourceList(),
       getDatasetList(),
       getChartList(),
       getDashboardList(),
+      loginLogsPromise,
     ])
 
     datasourceList.value = datasources
     datasetList.value = datasets
     chartList.value = charts
     reportList.value = dashboards
+    loginLogs.value = logs
   } finally {
     loading.value = false
   }
@@ -508,229 +699,421 @@ onMounted(loadData)
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
-.hero-card {
+.overview-shell {
+  display: block;
+}
+
+.overview-card {
   position: relative;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.8fr);
-  gap: 22px;
-  padding: 30px;
-  border-radius: 32px;
-  background:
-    linear-gradient(135deg, rgba(62, 141, 147, 0.96) 0%, rgba(95, 162, 169, 0.94) 48%, rgba(169, 199, 208, 0.88) 100%),
-    #6aafb2;
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  color: #ffffff;
-  box-shadow: 0 26px 56px rgba(55, 96, 111, 0.18);
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  box-shadow: 0 26px 56px rgba(55, 96, 111, 0.16);
 }
 
-.hero-card::after {
-  content: '';
-  position: absolute;
-  right: -96px;
-  bottom: -124px;
-  width: 360px;
-  height: 360px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 72%);
-  pointer-events: none;
-}
-
-.hero-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.hero-eyebrow {
-  display: inline-flex;
-  width: fit-content;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(247, 253, 252, 0.18);
-  color: #f2fbfa;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-}
-
-.hero-title {
-  margin: 0;
-  font-size: 38px;
-  line-height: 1.2;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.hero-description {
-  margin: 0;
-  max-width: 680px;
-  font-size: 15px;
-  line-height: 1.75;
-  color: rgba(245, 251, 250, 0.9);
-}
-
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.hero-highlight {
-  padding: 22px;
-  border-radius: 26px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 250, 251, 0.8));
-  border: 1px solid rgba(255, 255, 255, 0.52);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+.overview-card--dashboard {
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 250, 250, 0.84));
   backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.highlight-label {
-  font-size: 13px;
-  color: #5d7c84;
-  letter-spacing: 0.08em;
-}
-
-.highlight-value {
-  font-size: 56px;
-  line-height: 1;
-  font-weight: 700;
-  color: #173246;
-}
-
-.highlight-meta {
-  font-size: 13px;
-  color: #69818a;
-}
-
-.highlight-user {
-  margin-top: auto;
+.overview-side__head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(103, 126, 133, 0.14);
 }
 
-.highlight-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #57b0a4 0%, #7aafd5 100%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.overview-side__head--dashboard {
+  align-items: flex-start;
+}
+
+.overview-side__label {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: #6a818b;
+}
+
+.overview-side__title {
+  margin-top: 8px;
+  font-size: 26px;
+  line-height: 1.18;
   font-weight: 700;
-  box-shadow: 0 12px 20px rgba(86, 158, 165, 0.22);
-}
-
-.highlight-name {
-  font-size: 14px;
-  font-weight: 600;
   color: #173246;
 }
 
-.highlight-id {
+.overview-side__caption {
+  margin-top: 6px;
   font-size: 12px;
-  color: #728793;
+  line-height: 1.6;
+  color: #80949d;
 }
 
-.hero-actions :deep(.el-button) {
-  height: 44px;
-  padding: 0 18px;
-  border-radius: 14px;
+.overview-side__badge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(226, 244, 241, 0.94);
+  color: #1d666b;
+  font-size: 12px;
   font-weight: 600;
 }
 
-.hero-actions :deep(.el-button--primary) {
-  background: rgba(255, 255, 255, 0.94);
-  border-color: rgba(255, 255, 255, 0.94);
-  color: #1c5258;
-  box-shadow: 0 12px 24px rgba(63, 120, 124, 0.16);
+.overview-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(249, 252, 253, 0.96), rgba(242, 247, 248, 0.92));
+  border: 1px solid rgba(207, 219, 224, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
-.hero-actions :deep(.el-button--primary:hover) {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: #184247;
-}
-
-.hero-actions :deep(.el-button:not(.el-button--primary)) {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-}
-
-.hero-actions :deep(.el-button:not(.el-button--primary):hover) {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.26);
-}
-
-.metric-grid {
+.overview-dashboard--single {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: minmax(248px, 0.72fr) minmax(0, 0.96fr) minmax(0, 1.04fr);
   gap: 14px;
 }
 
-.metric-card {
-  padding: 18px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.74);
-  border: 1px solid rgba(186, 206, 212, 0.78);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 18px 36px rgba(42, 73, 81, 0.06);
+.overview-dashboard__summary-card,
+.overview-dashboard__chart-card {
+  padding: 16px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 250, 251, 0.82));
+  border: 1px solid rgba(210, 220, 226, 0.84);
+}
+
+.overview-dashboard__chart-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
-.metric-kicker {
+.overview-dashboard__summary-kicker {
   font-size: 12px;
-  color: #728894;
+  color: #708792;
+  letter-spacing: 0.08em;
 }
 
-.metric-value {
-  font-size: 34px;
+.overview-dashboard__summary-value {
+  margin-top: 10px;
+  font-size: 48px;
   line-height: 1;
+  font-weight: 700;
   color: #173246;
 }
 
-.metric-label {
-  font-size: 15px;
-  font-weight: 600;
-  color: #173246;
-}
-
-.metric-note {
-  font-size: 12px;
-  line-height: 1.6;
+.overview-dashboard__summary-meta {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.7;
   color: #6f8591;
 }
 
-.main-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.86fr);
-  gap: 18px;
+.overview-dashboard__status-panel {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(240, 247, 248, 0.96), rgba(248, 251, 252, 0.9));
+  border: 1px solid rgba(205, 217, 223, 0.82);
 }
 
-.main-column,
-.side-column {
+.overview-dashboard__status-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #708792;
+}
+
+.overview-dashboard__status-head strong {
+  font-size: 20px;
+  color: #173246;
+}
+
+.overview-dashboard__status-value {
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #173246;
+}
+
+.overview-dashboard__status-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #7a8f99;
+}
+
+.overview-dashboard__status-track {
+  margin-top: 12px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(221, 230, 234, 0.8);
+  overflow: hidden;
+}
+
+.overview-dashboard__status-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #58b5ab 0%, #7ab6d6 100%);
+}
+
+.overview-dashboard__summary-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.overview-dashboard__mini-fact {
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(248, 252, 252, 0.94), rgba(239, 246, 246, 0.92));
+  border: 1px solid rgba(186, 206, 212, 0.6);
+}
+
+.overview-dashboard__mini-fact span {
+  display: block;
+  font-size: 12px;
+  color: #718793;
+}
+
+.overview-dashboard__mini-fact strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 20px;
+  color: #173246;
+}
+
+.overview-dashboard__chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.overview-dashboard__chart-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #173246;
+}
+
+.overview-dashboard__chart-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #768b96;
+}
+
+.overview-dashboard__chart-unit {
+  font-size: 12px;
+  color: #7b909b;
+}
+
+.overview-dashboard__columns {
+  margin-top: 18px;
+  min-height: 220px;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  align-items: end;
+}
+
+.overview-dashboard__column-item {
+  width: 78px;
+  max-width: 78px;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.overview-dashboard__column-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #173246;
+}
+
+.overview-dashboard__column-track {
+  width: 68px;
+  height: 160px;
+  padding: 8px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(240, 246, 248, 0.94), rgba(232, 240, 243, 0.82));
+  border: 1px solid rgba(211, 221, 226, 0.84);
+  display: flex;
+  align-items: flex-end;
+}
+
+.overview-dashboard__column-bar {
+  display: block;
+  width: 100%;
+  min-height: 12px;
+  border-radius: 16px 16px 14px 14px;
+  box-shadow: 0 12px 20px rgba(103, 164, 185, 0.18);
+}
+
+.overview-dashboard__column-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #173246;
+  text-align: center;
+}
+
+.overview-dashboard__column-note {
+  font-size: 11px;
+  color: #78909a;
+  text-align: center;
+}
+
+.overview-dashboard__login-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.overview-dashboard__login-fact {
+  padding: 12px;
+  border: 1px solid rgba(209, 220, 225, 0.84);
+  background: linear-gradient(180deg, rgba(248, 252, 253, 0.94), rgba(242, 247, 248, 0.88));
+}
+
+.overview-dashboard__login-fact span {
+  display: block;
+  font-size: 12px;
+  color: #728792;
+}
+
+.overview-dashboard__login-fact strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+  color: #173246;
+}
+
+.overview-dashboard__legend {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #728792;
+}
+
+.overview-dashboard__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.overview-dashboard__legend-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+}
+
+.overview-dashboard__legend-dot--success {
+  background: linear-gradient(180deg, #69c6b6 0%, #4fb2a2 100%);
+}
+
+.overview-dashboard__legend-dot--fail {
+  background: linear-gradient(180deg, #7ca8d5 0%, #5f8ec7 100%);
+}
+
+.overview-dashboard__login-columns {
+  margin-top: 18px;
+  min-height: 220px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.overview-dashboard__login-column-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.overview-dashboard__login-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: #173246;
+}
+
+.overview-dashboard__login-track {
+  width: 34px;
+  height: 150px;
+  padding: 6px;
+  border: 1px solid rgba(211, 221, 226, 0.84);
+  background: linear-gradient(180deg, rgba(240, 246, 248, 0.94), rgba(232, 240, 243, 0.82));
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.overview-dashboard__login-segment {
+  display: block;
+  width: 100%;
+  min-height: 6px;
+}
+
+.overview-dashboard__login-segment--success {
+  background: linear-gradient(180deg, #69c6b6 0%, #4fb2a2 100%);
+}
+
+.overview-dashboard__login-segment--fail {
+  background: linear-gradient(180deg, #7ca8d5 0%, #5f8ec7 100%);
+}
+
+.overview-dashboard__login-label {
+  font-size: 12px;
+  color: #728792;
+  text-align: center;
+}
+
+.overview-dashboard__login-empty {
+  margin-top: 18px;
+  min-height: 220px;
+  border: 1px dashed rgba(204, 216, 222, 0.9);
+  background: linear-gradient(180deg, rgba(248, 252, 253, 0.88), rgba(242, 247, 248, 0.84));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #7c9099;
+  text-align: center;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
   gap: 18px;
 }
 
 .surface-card {
   border: none;
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(16px);
   box-shadow: 0 18px 42px rgba(35, 66, 74, 0.08);
 }
@@ -764,146 +1147,139 @@ onMounted(loadData)
   color: #718793;
 }
 
-.section-number {
-  font-size: 28px;
-  font-weight: 700;
-  color: #2e7482;
-}
-
-.workflow-list {
-  margin-top: 16px;
+.recent-screen-list,
+.resource-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-.workflow-item {
+.recent-screen-item,
+.resource-item {
   width: 100%;
-  border: 1px solid rgba(189, 207, 213, 0.82);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 251, 0.92));
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.workflow-item:hover {
-  transform: translateY(-2px);
-  border-color: rgba(88, 176, 164, 0.28);
-  box-shadow: 0 14px 28px rgba(51, 93, 100, 0.08);
-}
-
-.workflow-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #ffbf66;
-  flex: none;
-}
-
-.workflow-dot--done {
-  background: #22a385;
-}
-
-.workflow-copy {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.workflow-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #173246;
-}
-
-.workflow-tip {
-  font-size: 12px;
-  color: #708792;
-}
-
-.action-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.action-card {
   border: 1px solid rgba(191, 208, 214, 0.78);
   border-radius: 22px;
-  padding: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 249, 249, 0.92) 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.action-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(88, 176, 164, 0.3);
-  box-shadow: 0 16px 30px rgba(43, 78, 86, 0.09);
-}
-
-.action-stat {
-  font-size: 12px;
-  color: #66909a;
-}
-
-.action-title {
-  font-size: 18px;
-  color: #173246;
-}
-
-.action-desc {
-  font-size: 13px;
-  line-height: 1.7;
-  color: #718792;
-}
-
-.asset-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.asset-item {
-  width: 100%;
-  border: 1px solid rgba(191, 208, 214, 0.78);
-  border-radius: 20px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 251, 0.92));
-  padding: 16px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 16px;
   text-align: left;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
-.asset-item:hover {
+.recent-screen-item {
+  padding: 14px;
+  align-items: center;
+}
+
+.resource-item {
+  padding: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recent-screen-item:hover,
+.resource-item:hover {
   transform: translateY(-2px);
   border-color: rgba(88, 176, 164, 0.26);
   box-shadow: 0 14px 28px rgba(47, 83, 91, 0.08);
 }
 
-.asset-main {
+.recent-screen-item__cover {
+  width: 180px;
+  height: 104px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #5dabad 0%, #7aafd5 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.recent-screen-item__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.recent-screen-item__cover-fallback {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+}
+
+.recent-screen-item__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recent-screen-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recent-screen-item__name {
+  font-size: 17px;
+  color: #173246;
+}
+
+.recent-screen-item__meta,
+.recent-screen-item__time {
+  font-size: 13px;
+  color: #728792;
+}
+
+.resource-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.resource-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(188, 205, 212, 0.72);
+  background: rgba(245, 249, 249, 0.92);
+  color: #5f7b86;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.resource-tab--active {
+  border-color: rgba(85, 176, 163, 0.28);
+  background: linear-gradient(180deg, rgba(227, 245, 241, 0.98), rgba(245, 251, 250, 0.92));
+  color: #173246;
+}
+
+.resource-tab__count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.resource-item__main {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.asset-type {
+.resource-item__type {
   width: fit-content;
   padding: 4px 10px;
   border-radius: 999px;
@@ -912,19 +1288,19 @@ onMounted(loadData)
   color: #2b6c72;
 }
 
-.asset-name {
+.resource-item__name {
   font-size: 16px;
   font-weight: 600;
   color: #173246;
 }
 
-.asset-secondary {
+.resource-item__secondary {
   font-size: 13px;
   line-height: 1.6;
   color: #708792;
 }
 
-.asset-meta {
+.resource-item__meta {
   flex: none;
   display: flex;
   flex-direction: column;
@@ -932,88 +1308,28 @@ onMounted(loadData)
   gap: 8px;
 }
 
-.asset-time {
+.resource-item__time {
   font-size: 12px;
   color: #78909a;
 }
 
-.spotlight-list {
+.section-pagination {
+  margin-top: 18px;
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  justify-content: flex-end;
 }
 
-.spotlight-item {
-  width: 100%;
-  border: 1px solid rgba(190, 207, 214, 0.8);
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 251, 0.94));
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.spotlight-item:hover {
-  transform: translateY(-2px);
-  border-color: rgba(88, 176, 164, 0.26);
-  box-shadow: 0 18px 34px rgba(45, 80, 88, 0.1);
-}
-
-.spotlight-cover {
-  height: 180px;
-  background: linear-gradient(135deg, #5dabad 0%, #7aafd5 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.spotlight-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.spotlight-cover-fallback {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 14px;
-}
-
-.spotlight-body {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.spotlight-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.spotlight-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #173246;
-}
-
-.spotlight-meta,
-.spotlight-time {
-  font-size: 13px;
-  color: #728792;
-}
-
-@media (max-width: 1280px) {
-  .metric-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+@media (max-width: 1380px) {
+  .content-grid {
+    grid-template-columns: 1fr;
   }
 
-  .main-grid {
-    grid-template-columns: 1fr;
+  .overview-dashboard--single {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview-dashboard__summary-card {
+    grid-column: 1 / -1;
   }
 }
 
@@ -1022,43 +1338,69 @@ onMounted(loadData)
     padding: 14px;
   }
 
-  .hero-card {
-    grid-template-columns: 1fr;
+  .overview-card--dashboard {
     padding: 18px;
   }
 
-  .hero-title {
-    font-size: 28px;
+  .overview-side__title {
+    font-size: 24px;
   }
 
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .overview-dashboard__columns {
+    min-height: 0;
+    justify-content: space-between;
   }
 
-  .action-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .metric-grid {
+  .overview-dashboard__login-summary {
     grid-template-columns: 1fr;
   }
 
-  .hero-actions,
-  .asset-item,
-  .spotlight-head,
-  .section-head {
+  .overview-dashboard__login-columns {
+    justify-content: space-between;
+  }
+
+  .recent-screen-item {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .asset-meta {
+  .recent-screen-item__cover {
+    width: 100%;
+    height: 180px;
+  }
+}
+
+@media (max-width: 640px) {
+  .overview-dashboard__summary-grid,
+  .overview-dashboard--single {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-dashboard__summary-card {
+    grid-column: auto;
+  }
+
+  .overview-dashboard__columns,
+  .overview-dashboard__login-columns {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .section-head,
+  .resource-item,
+  .resource-item__meta,
+  .recent-screen-item__head,
+  .overview-dashboard__chart-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .resource-item__meta {
     align-items: flex-start;
   }
 
-  .spotlight-cover {
-    height: 150px;
+  .section-pagination {
+    justify-content: center;
   }
 }
 </style>

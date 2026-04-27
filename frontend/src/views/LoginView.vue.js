@@ -114,8 +114,6 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['scene-star']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-star']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-star']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-nav__btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-nav__btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-dot']} */ ;
@@ -151,7 +149,6 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['login-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['login-stage']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-panel']} */ ;
-/** @type {__VLS_StyleScopedClasses['scene-features']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-kicker']} */ ;
 /** @type {__VLS_StyleScopedClasses['auth-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['auth-title']} */ ;
@@ -294,57 +291,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)(
 (__VLS_ctx.platformSlogan);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "scene-spacer" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "scene-features" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "scene-features__eyebrow" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "scene-features__list" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "feat" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "feat__dot" },
-    'aria-hidden': "true",
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "feat__title" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "feat__desc" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "feat" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "feat__dot feat__dot--violet" },
-    'aria-hidden': "true",
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "feat__title" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "feat__desc" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "feat" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "feat__dot feat__dot--sky" },
-    'aria-hidden': "true",
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "feat__title" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "feat__desc" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.footer, __VLS_intrinsicElements.footer)({
     ...{ class: "scene-ft" },
@@ -760,23 +706,6 @@ var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['scene-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-sub']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-spacer']} */ ;
-/** @type {__VLS_StyleScopedClasses['scene-features']} */ ;
-/** @type {__VLS_StyleScopedClasses['scene-features__eyebrow']} */ ;
-/** @type {__VLS_StyleScopedClasses['scene-features__list']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__dot']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__title']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__desc']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__dot']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__dot--violet']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__title']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__desc']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__dot']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__dot--sky']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__title']} */ ;
-/** @type {__VLS_StyleScopedClasses['feat__desc']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-ft']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-copy-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['scene-nav']} */ ;

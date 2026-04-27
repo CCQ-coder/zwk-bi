@@ -1,13 +1,28 @@
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowRight, Operation } from '@element-plus/icons-vue';
+import { ArrowRight, Expand, Fold, Operation, SwitchButton } from '@element-plus/icons-vue';
 import { getCurrentMenus } from '../api/menu';
 import { clearAuthSession, getAuthDisplayName, getAuthMenus, hasAuthSession, saveAuthMenus, } from '../utils/auth-session';
 const __VLS_props = defineProps();
+const NAV_COLLAPSED_STORAGE_KEY = 'bi_shell_nav_collapsed';
+const MENU_HINTS = {
+    '/home': '总览与最近大屏',
+    '/home/screen': '进入大屏工作区',
+    '/home/publish/groups': '发布与面板管理',
+    '/home/publish/panels': '发布与面板管理',
+    '/home/prepare': '接入与加工资源',
+    '/home/prepare/datasource': '接入与加工资源',
+    '/home/prepare/dataset': '接入与加工资源',
+    '/home/prepare/components': '接入与加工资源',
+    '/home/prepare/extract': '接入与加工资源',
+    '/home/modeling': '模型设计与管理',
+    '/home/system': '系统设置与权限',
+};
 const router = useRouter();
 const route = useRoute();
 const menus = ref(getAuthMenus());
 const drawerVisible = ref(false);
+const navCollapsed = ref(localStorage.getItem(NAV_COLLAPSED_STORAGE_KEY) === '1');
 const displayName = computed(() => getAuthDisplayName());
 const avatarText = computed(() => displayName.value.slice(0, 1) || '用');
 const sortMenus = (items) => [...items]
@@ -45,9 +60,21 @@ const navMenus = computed(() => sortMenus(menus.value.filter((item) => !item.par
         activePaths: collectActivePaths(item),
     };
 }).filter((item) => Boolean(item)));
+const applyShellBodyClass = () => {
+    const body = document.body;
+    body.classList.toggle('bi-shell-nav-expanded', !navCollapsed.value);
+    body.classList.toggle('bi-shell-nav-collapsed', navCollapsed.value);
+};
+const clearShellBodyClass = () => {
+    document.body.classList.remove('bi-shell-nav-expanded', 'bi-shell-nav-collapsed');
+};
+const getMenuHint = (path) => MENU_HINTS[path] || '进入对应模块';
 const go = (path) => {
     drawerVisible.value = false;
     router.push(path);
+};
+const toggleCollapse = () => {
+    navCollapsed.value = !navCollapsed.value;
 };
 const isMenuActive = (menu) => menu.activePaths.some((path) => isPathActive(path));
 const loadMenus = async () => {
@@ -65,63 +92,71 @@ const loadMenus = async () => {
 const logout = () => {
     drawerVisible.value = false;
     clearAuthSession();
+    clearShellBodyClass();
     router.push('/login');
 };
-onMounted(loadMenus);
+watch(navCollapsed, (value) => {
+    localStorage.setItem(NAV_COLLAPSED_STORAGE_KEY, value ? '1' : '0');
+    applyShellBodyClass();
+}, { immediate: true });
+onMounted(async () => {
+    applyShellBodyClass();
+    await loadMenus();
+});
+onBeforeUnmount(() => {
+    clearShellBodyClass();
+});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
-/** @type {__VLS_StyleScopedClasses['nav-items']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['top-nav']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav--collapsed']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item--active']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item--active']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav--collapsed']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__user']} */ ;
+/** @type {__VLS_StyleScopedClasses['drawer-menu-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['bi-shell-nav-expanded']} */ ;
+/** @type {__VLS_StyleScopedClasses['bi-shell-nav-collapsed']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-mobile-trigger']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-items']} */ ;
-/** @type {__VLS_StyleScopedClasses['user-copy']} */ ;
-/** @type {__VLS_StyleScopedClasses['logout-btn']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
-__VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElements.header)({
-    ...{ class: "top-nav" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "nav-brand-block" },
-});
-const __VLS_0 = {}.ElButton;
-/** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-// @ts-ignore
-const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-    ...{ 'onClick': {} },
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.drawerVisible = true;
+        } },
     ...{ class: "nav-mobile-trigger" },
-    text: true,
-}));
-const __VLS_2 = __VLS_1({
-    ...{ 'onClick': {} },
-    ...{ class: "nav-mobile-trigger" },
-    text: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_1));
-let __VLS_4;
-let __VLS_5;
-let __VLS_6;
-const __VLS_7 = {
-    onClick: (...[$event]) => {
-        __VLS_ctx.drawerVisible = true;
-    }
-};
-__VLS_3.slots.default;
-const __VLS_8 = {}.ElIcon;
+    type: "button",
+    'aria-label': "打开导航菜单",
+});
+const __VLS_0 = {}.ElIcon;
 /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
 // @ts-ignore
-const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({}));
-const __VLS_10 = __VLS_9({}, ...__VLS_functionalComponentArgsRest(__VLS_9));
-__VLS_11.slots.default;
-const __VLS_12 = {}.Operation;
+const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({}));
+const __VLS_2 = __VLS_1({}, ...__VLS_functionalComponentArgsRest(__VLS_1));
+__VLS_3.slots.default;
+const __VLS_4 = {}.Operation;
 /** @type {[typeof __VLS_components.Operation, ]} */ ;
 // @ts-ignore
-const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({}));
-const __VLS_14 = __VLS_13({}, ...__VLS_functionalComponentArgsRest(__VLS_13));
-var __VLS_11;
+const __VLS_5 = __VLS_asFunctionalComponent(__VLS_4, new __VLS_4({}));
+const __VLS_6 = __VLS_5({}, ...__VLS_functionalComponentArgsRest(__VLS_5));
 var __VLS_3;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
+    ...{ class: "side-nav" },
+    ...{ class: ({ 'side-nav--collapsed': __VLS_ctx.navCollapsed }) },
+    'aria-label': "系统导航",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "side-nav__top" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (...[$event]) => {
             __VLS_ctx.go('/home');
@@ -132,11 +167,36 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
     ...{ class: "brand-mark" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "brand-text" },
+if (!__VLS_ctx.navCollapsed) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "brand-copy" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "brand-text" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "brand-sub" },
+    });
+}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.toggleCollapse) },
+    ...{ class: "side-nav__toggle" },
+    type: "button",
+    'aria-label': (__VLS_ctx.navCollapsed ? '展开侧边栏' : '收起侧边栏'),
 });
+const __VLS_8 = {}.ElIcon;
+/** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
+// @ts-ignore
+const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({}));
+const __VLS_10 = __VLS_9({}, ...__VLS_functionalComponentArgsRest(__VLS_9));
+__VLS_11.slots.default;
+const __VLS_12 = ((__VLS_ctx.navCollapsed ? __VLS_ctx.Expand : __VLS_ctx.Fold));
+// @ts-ignore
+const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({}));
+const __VLS_14 = __VLS_13({}, ...__VLS_functionalComponentArgsRest(__VLS_13));
+var __VLS_11;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.nav, __VLS_intrinsicElements.nav)({
-    ...{ class: "nav-items" },
+    ...{ class: "side-nav__menu" },
     'aria-label': "主导航",
 });
 for (const [menu] of __VLS_getVForSourceType((__VLS_ctx.navMenus))) {
@@ -145,49 +205,70 @@ for (const [menu] of __VLS_getVForSourceType((__VLS_ctx.navMenus))) {
                 __VLS_ctx.go(menu.path);
             } },
         key: (menu.id),
-        ...{ class: "nav-btn" },
-        ...{ class: ({ 'nav-btn--active': __VLS_ctx.isMenuActive(menu) }) },
+        ...{ class: "side-nav__item" },
+        ...{ class: ({ 'side-nav__item--active': __VLS_ctx.isMenuActive(menu) }) },
+        title: (__VLS_ctx.navCollapsed ? menu.name : undefined),
     });
-    (menu.name);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "side-nav__item-mark" },
+    });
+    (menu.name.slice(0, 1));
+    if (!__VLS_ctx.navCollapsed) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "side-nav__item-copy" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "side-nav__item-label" },
+        });
+        (menu.name);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "side-nav__item-tip" },
+        });
+        (__VLS_ctx.getMenuHint(menu.path));
+    }
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "user-menu" },
+    ...{ class: "side-nav__footer" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "user-meta" },
+    ...{ class: "side-nav__user" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
     ...{ class: "user-avatar" },
 });
 (__VLS_ctx.avatarText);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "user-copy" },
+if (!__VLS_ctx.navCollapsed) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "side-nav__user-copy" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "side-nav__user-name" },
+    });
+    (__VLS_ctx.displayName);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "side-nav__user-role" },
+    });
+}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.logout) },
+    ...{ class: "side-nav__logout" },
+    type: "button",
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "user-name" },
-});
-(__VLS_ctx.displayName);
-const __VLS_16 = {}.ElButton;
-/** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+const __VLS_16 = {}.ElIcon;
+/** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
 // @ts-ignore
-const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({
-    ...{ 'onClick': {} },
-    link: true,
-    ...{ class: "logout-btn" },
-}));
-const __VLS_18 = __VLS_17({
-    ...{ 'onClick': {} },
-    link: true,
-    ...{ class: "logout-btn" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_17));
-let __VLS_20;
-let __VLS_21;
-let __VLS_22;
-const __VLS_23 = {
-    onClick: (__VLS_ctx.logout)
-};
+const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({}));
+const __VLS_18 = __VLS_17({}, ...__VLS_functionalComponentArgsRest(__VLS_17));
 __VLS_19.slots.default;
+const __VLS_20 = {}.SwitchButton;
+/** @type {[typeof __VLS_components.SwitchButton, ]} */ ;
+// @ts-ignore
+const __VLS_21 = __VLS_asFunctionalComponent(__VLS_20, new __VLS_20({}));
+const __VLS_22 = __VLS_21({}, ...__VLS_functionalComponentArgsRest(__VLS_21));
 var __VLS_19;
+if (!__VLS_ctx.navCollapsed) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+}
 const __VLS_24 = {}.ElDrawer;
 /** @type {[typeof __VLS_components.ElDrawer, typeof __VLS_components.elDrawer, typeof __VLS_components.ElDrawer, typeof __VLS_components.elDrawer, ]} */ ;
 // @ts-ignore
@@ -209,8 +290,24 @@ __VLS_27.slots.default;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "drawer-head" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "drawer-brand" },
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                __VLS_ctx.go('/home');
+            } },
+        ...{ class: "brand brand--drawer" },
+        type: "button",
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "brand-mark" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "brand-copy" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "brand-text" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "brand-sub" },
     });
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -225,8 +322,13 @@ for (const [menu] of __VLS_getVForSourceType((__VLS_ctx.navMenus))) {
         ...{ class: "drawer-menu-btn" },
         ...{ class: ({ 'drawer-menu-btn--active': __VLS_ctx.isMenuActive(menu) }) },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "drawer-menu-copy" },
+    });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (menu.name);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
+    (__VLS_ctx.getMenuHint(menu.path));
     const __VLS_28 = {}.ElIcon;
     /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
     // @ts-ignore
@@ -254,6 +356,9 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "drawer-user-name" },
 });
 (__VLS_ctx.displayName);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "drawer-user-role" },
+});
 const __VLS_36 = {}.ElButton;
 /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
 // @ts-ignore
@@ -276,41 +381,62 @@ const __VLS_43 = {
 __VLS_39.slots.default;
 var __VLS_39;
 var __VLS_27;
-/** @type {__VLS_StyleScopedClasses['top-nav']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-brand-block']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-mobile-trigger']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__top']} */ ;
 /** @type {__VLS_StyleScopedClasses['brand']} */ ;
 /** @type {__VLS_StyleScopedClasses['brand-mark']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['brand-text']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-items']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav-btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['user-menu']} */ ;
-/** @type {__VLS_StyleScopedClasses['user-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-sub']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__toggle']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__menu']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item-mark']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item-label']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item-tip']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__footer']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__user']} */ ;
 /** @type {__VLS_StyleScopedClasses['user-avatar']} */ ;
-/** @type {__VLS_StyleScopedClasses['user-copy']} */ ;
-/** @type {__VLS_StyleScopedClasses['user-name']} */ ;
-/** @type {__VLS_StyleScopedClasses['logout-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__user-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__user-name']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__user-role']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__logout']} */ ;
 /** @type {__VLS_StyleScopedClasses['nav-drawer']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-head']} */ ;
-/** @type {__VLS_StyleScopedClasses['drawer-brand']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand--drawer']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-mark']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['brand-sub']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-menu-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['drawer-menu-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-user-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['user-avatar']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-user-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-user-name']} */ ;
+/** @type {__VLS_StyleScopedClasses['drawer-user-role']} */ ;
 /** @type {__VLS_StyleScopedClasses['logout-btn']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             ArrowRight: ArrowRight,
+            Expand: Expand,
+            Fold: Fold,
             Operation: Operation,
+            SwitchButton: SwitchButton,
             drawerVisible: drawerVisible,
+            navCollapsed: navCollapsed,
             displayName: displayName,
             avatarText: avatarText,
             navMenus: navMenus,
+            getMenuHint: getMenuHint,
             go: go,
+            toggleCollapse: toggleCollapse,
             isMenuActive: isMenuActive,
             logout: logout,
         };

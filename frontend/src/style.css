@@ -13,7 +13,10 @@
   --el-color-primary-light-8: #d5f0eb;
   --el-color-primary-light-9: #ecf8f5;
   --el-color-primary-dark-2: #217d72;
-  --el-border-radius-base: 12px;
+  --el-border-radius-base: 0px;
+  --el-border-radius-small: 0px;
+  --el-border-radius-round: 0px;
+  --el-border-radius-circle: 0px;
   font-family: "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
   color: var(--text-primary);
   background: var(--bg-color);
@@ -33,6 +36,10 @@ body {
 
 #app {
   min-height: 100vh;
+}
+
+#app :where(*, *::before, *::after) {
+  border-radius: 0 !important;
 }
 
 .bi-page {

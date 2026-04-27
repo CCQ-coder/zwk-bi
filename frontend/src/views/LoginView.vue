@@ -51,34 +51,6 @@
 
           <div class="scene-spacer"></div>
 
-          <!-- Feature list -->
-          <div class="scene-features">
-            <div class="scene-features__eyebrow">平台能力</div>
-            <div class="scene-features__list">
-              <div class="feat">
-                <span class="feat__dot" aria-hidden="true"></span>
-                <div>
-                  <p class="feat__title">多维分析</p>
-                  <p class="feat__desc">多数据源接入，洞察业务趋势</p>
-                </div>
-              </div>
-              <div class="feat">
-                <span class="feat__dot feat__dot--violet" aria-hidden="true"></span>
-                <div>
-                  <p class="feat__title">可视化看板</p>
-                  <p class="feat__desc">丰富图表组件，直观呈现数据</p>
-                </div>
-              </div>
-              <div class="feat">
-                <span class="feat__dot feat__dot--sky" aria-hidden="true"></span>
-                <div>
-                  <p class="feat__title">安全可靠</p>
-                  <p class="feat__desc">企业级权限管理与数据隔离</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <footer class="scene-ft">
             <span class="scene-copy-text">{{ copyright }}</span>
             <nav class="scene-nav" aria-label="切换背景">
@@ -609,73 +581,6 @@ onUnmounted(() => {
 }
 
 .scene-spacer { flex: 1; }
-
-/* Feature list */
-.scene-features {
-  align-self: flex-start;
-  width: min(410px, 100%);
-  flex-shrink: 0;
-  margin-bottom: 18px;
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(245, 249, 255, 0.26) 0%, rgba(208, 223, 248, 0.18) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow: 0 16px 32px rgba(10, 36, 76, 0.12);
-  backdrop-filter: blur(14px);
-}
-
-.scene-features__eyebrow {
-  margin-bottom: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  color: rgba(255, 255, 255, 0.76);
-  text-transform: uppercase;
-}
-
-.scene-features__list {
-  display: flex;
-  flex-direction: column;
-}
-
-.feat {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 0;
-}
-
-.feat + .feat {
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.feat__dot {
-  width: 8px;
-  height: 8px;
-  min-width: 8px;
-  margin-top: 7px;
-  border-radius: 50%;
-  background: #60a5fa;
-  flex-shrink: 0;
-}
-
-.feat__dot--violet { background: #a78bfa; }
-.feat__dot--sky    { background: #38bdf8; }
-
-.feat__title {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.96);
-  margin: 0 0 2px;
-  line-height: 1.2;
-}
-
-.feat__desc {
-  margin: 0;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.76);
-  line-height: 1.5;
-}
 
 /* Scene footer */
 .scene-ft {
