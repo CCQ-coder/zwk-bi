@@ -1,10 +1,15 @@
 import request from './request';
 export const getDatasourceList = () => request.get('/datasources');
+export const getDatasourceGroups = () => request.get('/datasources/groups');
 export const createDatasource = (data) => request.post('/datasources', data);
+export const createDatasourceGroup = (name) => request.post('/datasources/groups', { name });
 export const updateDatasource = (id, data) => request.put(`/datasources/${id}`, data);
+export const renameDatasourceGroup = (id, name) => request.put(`/datasources/groups/${id}`, { name });
 export const deleteDatasource = (id) => request.delete(`/datasources/${id}`);
+export const deleteDatasourceGroup = (id) => request.delete(`/datasources/groups/${id}`);
 export const testDatasourceConnection = (data) => request.post('/datasources/test-connection', data);
 export const getDatasourceTables = (id) => request.get(`/datasources/${id}/tables`);
 export const getDatasourcePreviewData = (id) => request.get(`/datasources/${id}/preview-data`);
+export const previewDatasourceDraft = (data) => request.post('/datasources/preview', data);
 export const getTableColumns = (id, table) => request.get(`/datasources/${id}/columns`, { params: { table } });
 export const previewExtract = (data) => request.post('/datasources/extract/preview', data);

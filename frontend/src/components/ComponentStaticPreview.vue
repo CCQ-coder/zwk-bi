@@ -534,6 +534,31 @@ const themeName = computed(() => {
   pointer-events: none;
 }
 
+.decor-shell--decor_border_frame,
+.decor-shell--decor_border_corner,
+.decor-shell--decor_border_glow,
+.decor-shell--decor_border_grid,
+.decor-shell--decor_border_stream,
+.decor-shell--decor_border_pulse,
+.decor-shell--decor_border_bracket,
+.decor-shell--decor_border_circuit,
+.decor-shell--decor_border_panel {
+  background: transparent;
+  box-shadow: none;
+}
+
+.decor-shell--decor_border_frame::before,
+.decor-shell--decor_border_corner::before,
+.decor-shell--decor_border_glow::before,
+.decor-shell--decor_border_grid::before,
+.decor-shell--decor_border_stream::before,
+.decor-shell--decor_border_pulse::before,
+.decor-shell--decor_border_bracket::before,
+.decor-shell--decor_border_circuit::before,
+.decor-shell--decor_border_panel::before {
+  display: none;
+}
+
 .decor-corner {
   position: absolute;
   width: 28px;
@@ -678,10 +703,7 @@ const themeName = computed(() => {
 
 .decor-shell--decor_border_panel {
   border-color: rgba(104, 194, 255, 0.18);
-  background:
-    linear-gradient(180deg, rgba(7, 20, 36, 0.92), rgba(7, 20, 36, 0.48)),
-    radial-gradient(circle at 100% 0%, rgba(132, 231, 255, 0.22), transparent 42%);
-  box-shadow: inset 0 0 22px rgba(77, 179, 255, 0.1), 0 0 18px rgba(77, 179, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(77, 179, 255, 0.08);
 }
 
 .decor-shell--decor_border_panel::after {

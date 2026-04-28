@@ -100,7 +100,7 @@
       <!-- 背景板（幕布） -->
       <div v-if="overlayStyle" :style="overlayStyle" />
       <div
-        v-for="component in components"
+        v-for="component in renderedComponents"
         :key="component.id"
         class="preview-card"
         :style="getCardStyle(component)"
@@ -239,6 +239,11 @@ const chartLoading = ref(false)
 const filterCollapsed = ref(props.scene === 'screen')
 const dashboard = ref<Dashboard | null>(null)
 const components = ref<DashboardComponent[]>([])
+const renderedComponents = computed(() => [...components.value].sort((left, right) => {
+  const zIndexDelta = (left.zIndex ?? 0) - (right.zIndex ?? 0)
+  if (zIndexDelta !== 0) return zIndexDelta
+  return left.id - right.id
+}))
 const charts = ref<Chart[]>([])
 const chartMap = computed(() => new Map(charts.value.map((item) => [item.id, item])))
 const componentDataMap = ref(new Map<number, ChartDataResult>())
@@ -439,6 +444,7 @@ const getCardStyle = (component: DashboardComponent) => {
     top: `${component.posY - offsetTop}px`,
     width: `${component.width}px`,
     height: `${component.height}px`,
+    zIndex: String(Math.max(1, component.zIndex ?? 1)),
     opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
     boxShadow: shadow,
     padding: style.padding != null && style.padding > 0 ? `${style.padding}px` : undefined,

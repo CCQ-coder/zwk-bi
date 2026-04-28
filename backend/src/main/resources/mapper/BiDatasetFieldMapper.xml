@@ -9,11 +9,12 @@
         <result column="field_name" property="fieldName"/>
         <result column="field_type" property="fieldType"/>
         <result column="field_label" property="fieldLabel"/>
+        <result column="is_filterable" property="filterable"/>
         <result column="created_at" property="createdAt"/>
     </resultMap>
 
     <select id="listByDatasetId" resultMap="BiDatasetFieldMap" parameterType="long">
-        SELECT id, dataset_id, field_name, field_type, field_label, created_at
+        SELECT id, dataset_id, field_name, field_type, field_label, is_filterable, created_at
         FROM bi_dataset_field
         WHERE dataset_id = #{datasetId}
         ORDER BY id ASC
@@ -25,10 +26,10 @@
     </delete>
 
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO bi_dataset_field (dataset_id, field_name, field_type, field_label)
+        INSERT INTO bi_dataset_field (dataset_id, field_name, field_type, field_label, is_filterable)
         VALUES
         <foreach collection="list" item="item" separator=",">
-            (#{item.datasetId}, #{item.fieldName}, #{item.fieldType}, #{item.fieldLabel})
+            (#{item.datasetId}, #{item.fieldName}, #{item.fieldType}, #{item.fieldLabel}, #{item.filterable})
         </foreach>
     </insert>
 </mapper>

@@ -3,6 +3,7 @@ package com.aibi.bi.controller;
 import com.aibi.bi.common.ApiResponse;
 import com.aibi.bi.auth.RequireRoles;
 import com.aibi.bi.domain.BiDatasource;
+import com.aibi.bi.domain.BiDatasourceGroup;
 import com.aibi.bi.model.request.CreateDatasourceRequest;
 import com.aibi.bi.model.request.DatasourceConnectionTestRequest;
 import com.aibi.bi.model.request.ExtractPreviewRequest;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/datasources")
@@ -38,6 +40,11 @@ public class DatasourceController {
     @GetMapping
     public ApiResponse<List<BiDatasource>> list() {
         return ApiResponse.ok(datasourceService.list());
+    }
+
+    @GetMapping("/groups")
+    public ApiResponse<List<BiDatasourceGroup>> listGroups() {
+        return ApiResponse.ok(datasourceService.listGroups());
     }
 
     @GetMapping("/{id}")
@@ -55,6 +62,13 @@ public class DatasourceController {
         return ApiResponse.ok(datasourceService.create(request));
     }
 
+    @PostMapping("/groups")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<BiDatasourceGroup> createGroup(@RequestBody Map<String, Object> body) {
+        String name = body.get("name") == null ? null : body.get("name").toString();
+        return ApiResponse.ok(datasourceService.createGroup(name));
+    }
+
     @PostMapping("/test-connection")
     @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<DatasourceConnectionTestResponse> testConnection(
@@ -68,11 +82,25 @@ public class DatasourceController {
         return ApiResponse.ok(datasourceService.previewExtract(request));
     }
 
+    @PostMapping("/preview")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<com.aibi.bi.model.response.DatasetPreviewResponse> previewDraft(
+            @RequestBody DatasourceConnectionTestRequest request) {
+        return ApiResponse.ok(datasourceService.previewDraft(request));
+    }
+
     @PutMapping("/{id}")
     @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<BiDatasource> update(@PathVariable Long id,
                                              @Valid @RequestBody UpdateDatasourceRequest request) {
         return ApiResponse.ok(datasourceService.update(id, request));
+    }
+
+    @PutMapping("/groups/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<BiDatasourceGroup> renameGroup(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String name = body.get("name") == null ? null : body.get("name").toString();
+        return ApiResponse.ok(datasourceService.renameGroup(id, name));
     }
 
     @GetMapping("/{id}/tables")
@@ -95,6 +123,13 @@ public class DatasourceController {
     @RequireRoles({"ADMIN", "ANALYST"})
     public ApiResponse<Void> delete(@PathVariable Long id) {
         datasourceService.delete(id);
+        return ApiResponse.ok(null);
+    }
+
+    @DeleteMapping("/groups/{id}")
+    @RequireRoles({"ADMIN", "ANALYST"})
+    public ApiResponse<Void> deleteGroup(@PathVariable Long id) {
+        datasourceService.deleteGroup(id);
         return ApiResponse.ok(null);
     }
 }

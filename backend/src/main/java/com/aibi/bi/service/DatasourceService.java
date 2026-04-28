@@ -1,6 +1,8 @@
 package com.aibi.bi.service;
 
 import com.aibi.bi.domain.BiDatasource;
+import com.aibi.bi.domain.BiDatasourceGroup;
+import com.aibi.bi.mapper.BiDatasourceGroupMapper;
 import com.aibi.bi.mapper.BiDatasourceMapper;
 import com.aibi.bi.mapper.BiDatasetMapper;
 import com.aibi.bi.model.request.CreateDatasourceRequest;
@@ -43,16 +45,19 @@ public class DatasourceService {
     private static final Set<String> API_METHODS = Set.of("GET", "POST", "PUT", "PATCH");
     private static final int PREVIEW_LIMIT = 20;
 
+    private final BiDatasourceGroupMapper biDatasourceGroupMapper;
     private final BiDatasourceMapper biDatasourceMapper;
     private final BiDatasetMapper biDatasetMapper;
     private final JdbcPreviewService jdbcPreviewService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
-    public DatasourceService(BiDatasourceMapper biDatasourceMapper,
+    public DatasourceService(BiDatasourceGroupMapper biDatasourceGroupMapper,
+                             BiDatasourceMapper biDatasourceMapper,
                              BiDatasetMapper biDatasetMapper,
                              JdbcPreviewService jdbcPreviewService,
                              ObjectMapper objectMapper) {
+        this.biDatasourceGroupMapper = biDatasourceGroupMapper;
         this.biDatasourceMapper = biDatasourceMapper;
         this.biDatasetMapper = biDatasetMapper;
         this.jdbcPreviewService = jdbcPreviewService;
@@ -67,13 +72,44 @@ public class DatasourceService {
         return biDatasourceMapper.listAll();
     }
 
+    public List<BiDatasourceGroup> listGroups() {
+        return biDatasourceGroupMapper.listAll();
+    }
+
     public BiDatasource getById(Long id) {
         return biDatasourceMapper.findById(id);
+    }
+
+    public BiDatasourceGroup createGroup(String name) {
+        BiDatasourceGroup group = new BiDatasourceGroup();
+        group.setName(trimRequired(name, "分组名称不能为空"));
+        group.setSortOrder(0);
+        biDatasourceGroupMapper.insert(group);
+        return group;
+    }
+
+    public BiDatasourceGroup renameGroup(Long id, String name) {
+        BiDatasourceGroup group = biDatasourceGroupMapper.findById(id);
+        if (group == null) {
+            throw new IllegalArgumentException("Datasource group not found: " + id);
+        }
+        group.setName(trimRequired(name, "分组名称不能为空"));
+        biDatasourceGroupMapper.update(group);
+        return group;
+    }
+
+    public void deleteGroup(Long id) {
+        BiDatasourceGroup group = biDatasourceGroupMapper.findById(id);
+        if (group == null) {
+            throw new IllegalArgumentException("Datasource group not found: " + id);
+        }
+        biDatasourceGroupMapper.deleteById(id);
     }
 
     public BiDatasource create(CreateDatasourceRequest request) {
         BiDatasource entity = new BiDatasource();
         entity.setName(trimRequired(request.getName(), "数据源名称不能为空"));
+        entity.setGroupId(normalizeGroupId(request.getGroupId()));
         applyDatasourceRequest(
                 entity,
                 request.getSourceKind(),
@@ -94,6 +130,7 @@ public class DatasourceService {
     public BiDatasource update(Long id, UpdateDatasourceRequest request) {
         BiDatasource entity = requireDatasource(id);
         entity.setName(trimRequired(request.getName(), "数据源名称不能为空"));
+        entity.setGroupId(normalizeGroupId(request.getGroupId()));
         applyDatasourceRequest(
                 entity,
                 request.getSourceKind(),
@@ -144,6 +181,28 @@ public class DatasourceService {
             }
             default -> throw new IllegalArgumentException("不支持的数据源类型: " + sourceKind);
         };
+    }
+
+    public DatasetPreviewResponse previewDraft(DatasourceConnectionTestRequest request) {
+        BiDatasource temp = new BiDatasource();
+        temp.setName("preview");
+        applyDatasourceRequest(
+                temp,
+                request.getSourceKind(),
+                request.getDatasourceType(),
+                "DIRECT",
+                request.getHost(),
+                request.getPort(),
+                request.getDatabaseName(),
+                request.getUsername(),
+                request.getPassword(),
+                request.getConfigJson(),
+                false
+        );
+        if (isDatabaseDatasource(temp)) {
+            throw new IllegalArgumentException("数据库数据源请在数据集或页面 SQL 中预览");
+        }
+        return previewDatasource(temp, null, null);
     }
 
     public DatasetPreviewResponse previewDatasourceData(Long id) {
@@ -205,18 +264,33 @@ public class DatasourceService {
         }
 
         int limit = request.getLimit() == null ? 20 : Math.max(1, Math.min(request.getLimit(), 500));
-        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(table);
+        int offset = request.getOffset() == null ? 0 : Math.max(0, request.getOffset());
+        StringBuilder whereSegment = new StringBuilder();
         if (!whereClause.isBlank()) {
-            sql.append(" WHERE ").append(whereClause);
+            whereSegment.append(" WHERE ").append(whereClause);
         }
-        sql.append(" LIMIT ").append(limit);
+
+        String countSql = "SELECT COUNT(1) FROM " + table + whereSegment;
+        long totalRows = jdbcPreviewService.executeQuery(entity, countSql, 1, resultSet -> {
+            if (!resultSet.next()) {
+                return 0L;
+            }
+            return resultSet.getLong(1);
+        });
+
+        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(table);
+        sql.append(whereSegment);
+        sql.append(" LIMIT ").append(limit).append(" OFFSET ").append(offset);
 
         DatasetPreviewResponse preview = jdbcPreviewService.preview(entity, sql.toString());
         ExtractPreviewResponse response = new ExtractPreviewResponse();
         response.setSqlText(sql.toString());
         response.setColumns(preview.getColumns());
         response.setRows(preview.getRows());
-        response.setRowCount(preview.getRowCount());
+        response.setRowCount(preview.getRows() == null ? 0 : preview.getRows().size());
+        response.setTotalRows(totalRows);
+        response.setLimit(limit);
+        response.setOffset(offset);
         return response;
     }
 
@@ -243,6 +317,16 @@ public class DatasourceService {
 
     public boolean isDatabaseDatasource(BiDatasource datasource) {
         return "DATABASE".equals(resolveSourceKind(datasource));
+    }
+
+    private Long normalizeGroupId(Long groupId) {
+        if (groupId == null) {
+            return null;
+        }
+        if (biDatasourceGroupMapper.findById(groupId) == null) {
+            throw new IllegalArgumentException("Datasource group not found: " + groupId);
+        }
+        return groupId;
     }
 
     private void applyDatasourceRequest(BiDatasource entity,
@@ -341,7 +425,7 @@ public class DatasourceService {
                 throw new IllegalArgumentException("API 未返回可解析内容");
             }
             JsonNode root = objectMapper.readTree(bodyText);
-            return buildPreviewResponse(resolveResultNode(root, resultPath), maxRows);
+            return buildPreviewResponse(resolveApiResultNode(root, resultPath), maxRows);
         } catch (IllegalArgumentException ex) {
             throw ex;
         } catch (InterruptedException ex) {
@@ -658,6 +742,43 @@ public class DatasourceService {
             }
         }
         return current;
+    }
+
+    private JsonNode resolveApiResultNode(JsonNode root, String resultPath) {
+        if (StringUtils.hasText(resultPath)) {
+            return resolveResultNode(root, resultPath);
+        }
+        if (root == null || root.isNull() || root.isMissingNode() || !root.isObject()) {
+            return root;
+        }
+
+        JsonNode directRows = findFirstArrayNode(root, "rows", "list", "records", "items");
+        if (directRows != null) {
+            return directRows;
+        }
+
+        JsonNode dataNode = root.path("data");
+        if (dataNode.isArray()) {
+            return dataNode;
+        }
+        if (dataNode.isObject()) {
+            JsonNode nestedRows = findFirstArrayNode(dataNode, "rows", "list", "records", "items");
+            if (nestedRows != null) {
+                return nestedRows;
+            }
+        }
+
+        return root;
+    }
+
+    private JsonNode findFirstArrayNode(JsonNode objectNode, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            JsonNode candidate = objectNode.path(fieldName);
+            if (candidate.isArray()) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private DatasetPreviewResponse buildPreviewResponse(JsonNode node, Integer maxRows) {

@@ -786,12 +786,13 @@ const getComponentStatusText = (component) => {
         return '预览受限';
     return '可预览';
 };
-const layeredComponents = computed(() => [...components.value].sort((left, right) => {
-    const zIndexDelta = (right.zIndex ?? 0) - (left.zIndex ?? 0);
+const renderedComponents = computed(() => [...components.value].sort((left, right) => {
+    const zIndexDelta = (left.zIndex ?? 0) - (right.zIndex ?? 0);
     if (zIndexDelta !== 0)
         return zIndexDelta;
-    return right.id - left.id;
+    return left.id - right.id;
 }));
+const layeredComponents = computed(() => [...renderedComponents.value].reverse());
 const marqueeStyle = computed(() => {
     const left = Math.min(marqueeSelection.startX, marqueeSelection.currentX);
     const top = Math.min(marqueeSelection.startY, marqueeSelection.currentY);
@@ -5174,7 +5175,7 @@ else {
             ...{ class: "resize-handle resize-handle--sw" },
         });
     }
-    for (const [component] of __VLS_getVForSourceType((__VLS_ctx.components))) {
+    for (const [component] of __VLS_getVForSourceType((__VLS_ctx.renderedComponents))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ onMousedown: (...[$event]) => {
                     if (!!(!__VLS_ctx.currentDashboard))
@@ -6950,6 +6951,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             getComponentChartConfig: getComponentChartConfig,
             getComponentDisplayName: getComponentDisplayName,
             getComponentStatusText: getComponentStatusText,
+            renderedComponents: renderedComponents,
             layeredComponents: layeredComponents,
             marqueeStyle: marqueeStyle,
             canvasWorkWidth: canvasWorkWidth,

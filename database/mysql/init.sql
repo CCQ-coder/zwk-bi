@@ -26,10 +26,18 @@ CREATE TABLE IF NOT EXISTS sys_user_role (
   CONSTRAINT fk_sys_user_role_role FOREIGN KEY (role_id) REFERENCES sys_role(id)
 );
 
+CREATE TABLE IF NOT EXISTS bi_datasource_group (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据源分组';
+
 -- BI datasource table
 CREATE TABLE IF NOT EXISTS bi_datasource (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(128) NOT NULL,
+  group_id BIGINT DEFAULT NULL COMMENT '所属分组',
   source_kind VARCHAR(32) NOT NULL DEFAULT 'DATABASE',
   datasource_type VARCHAR(32) NOT NULL DEFAULT 'MYSQL',
   connect_mode VARCHAR(16) NOT NULL DEFAULT 'DIRECT',
@@ -39,7 +47,8 @@ CREATE TABLE IF NOT EXISTS bi_datasource (
   db_username VARCHAR(128) NOT NULL DEFAULT '',
   db_password VARCHAR(256) NOT NULL DEFAULT '',
   config_json TEXT NOT NULL DEFAULT ('{}'),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_bi_datasource_group FOREIGN KEY (group_id) REFERENCES bi_datasource_group(id) ON DELETE SET NULL
 );
 
 -- BI dataset folder table
@@ -69,6 +78,7 @@ CREATE TABLE IF NOT EXISTS bi_dataset_field (
   field_name VARCHAR(128) NOT NULL,
   field_type VARCHAR(32) NOT NULL DEFAULT 'string',
   field_label VARCHAR(128) NOT NULL DEFAULT '',
+  is_filterable TINYINT(1) NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_bi_dataset_field_dataset FOREIGN KEY (dataset_id) REFERENCES bi_dataset(id)
 );
@@ -446,133 +456,133 @@ INNER JOIN bi_chart c ON c.name = '茶饮订单明细表'
 WHERE d.name = '茶饮经营分析';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 7, 0, 10, 2, 5, '{}'
+SELECT d.id, c.id, 7, 0, 10, 2, 40, '{}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板标题'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 0, 2, 7, 9, 0, '{}'
+SELECT d.id, c.id, 0, 2, 7, 9, 1, '{}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板左侧边框'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 7, 2, 10, 9, 0, '{}'
+SELECT d.id, c.id, 7, 2, 10, 9, 1, '{}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板中部边框'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 17, 2, 7, 9, 0, '{}'
+SELECT d.id, c.id, 17, 2, 7, 9, 1, '{}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板右侧边框'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 0, 11, 8, 7, 0, '{}'
+SELECT d.id, c.id, 0, 11, 8, 7, 1, '{}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板底部左边框'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 8, 11, 8, 7, 0, '{}'
+SELECT d.id, c.id, 8, 11, 8, 7, 1, '{}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板底部中边框'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 16, 11, 8, 7, 0, '{}'
+SELECT d.id, c.id, 16, 11, 8, 7, 1, '{}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板底部右边框'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 1, 3, 5, 3, 2,
+SELECT d.id, c.id, 1, 3, 5, 3, 20,
 '{"chart":{"name":"雪山狼犬档案","datasetId":12,"chartType":"text_block","xField":"动物","yField":"简介","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"雪山狼犬","titleColor":"#eef8ff","bgColor":"rgba(7,23,42,0.62)","borderShow":true,"borderColor":"rgba(92,218,255,0.32)","borderWidth":1,"cardRadius":18,"shadowShow":true,"shadowColor":"rgba(0,169,255,0.18)","shadowBlur":18},"interaction":{"dataFilters":[{"field":"模块","value":"档案卡"},{"field":"动物","value":"雪山狼犬"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-雪山狼犬档案'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 1, 7, 2, 2, 2,
+SELECT d.id, c.id, 1, 7, 2, 2, 20,
 '{"chart":{"name":"犬类体重","datasetId":12,"chartType":"metric_indicator","xField":"指标","yField":"数值","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"体重 KG","titleColor":"#dcefff","metricValueColor":"#67dbff","bgColor":"rgba(7,23,42,0.58)","borderShow":true,"borderColor":"rgba(92,218,255,0.28)","borderWidth":1,"cardRadius":16},"interaction":{"dataFilters":[{"field":"模块","value":"指标"},{"field":"动物","value":"雪山狼犬"},{"field":"指标","value":"体重kg"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-雪山狼犬体重'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 3, 7, 2, 2, 2,
+SELECT d.id, c.id, 3, 7, 2, 2, 20,
 '{"chart":{"name":"犬类速度","datasetId":12,"chartType":"metric_indicator","xField":"指标","yField":"数值","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"速度 KM/H","titleColor":"#dcefff","metricValueColor":"#4fe6ff","bgColor":"rgba(7,23,42,0.58)","borderShow":true,"borderColor":"rgba(92,218,255,0.28)","borderWidth":1,"cardRadius":16},"interaction":{"dataFilters":[{"field":"模块","value":"指标"},{"field":"动物","value":"雪山狼犬"},{"field":"指标","value":"奔跑速度"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-雪山狼犬速度'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 5, 7, 2, 2, 2,
+SELECT d.id, c.id, 5, 7, 2, 2, 20,
 '{"chart":{"name":"犬类嗅觉","datasetId":12,"chartType":"metric_indicator","xField":"指标","yField":"数值","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"嗅觉 PTS","titleColor":"#dcefff","metricValueColor":"#8aefff","bgColor":"rgba(7,23,42,0.58)","borderShow":true,"borderColor":"rgba(92,218,255,0.28)","borderWidth":1,"cardRadius":16},"interaction":{"dataFilters":[{"field":"模块","value":"指标"},{"field":"动物","value":"雪山狼犬"},{"field":"指标","value":"嗅觉评分"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-雪山狼犬嗅觉'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 18, 3, 5, 3, 2,
+SELECT d.id, c.id, 18, 3, 5, 3, 20,
 '{"chart":{"name":"月影灵猫档案","datasetId":12,"chartType":"text_block","xField":"动物","yField":"简介","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"月影灵猫","titleColor":"#fff2cf","bgColor":"rgba(29,20,12,0.55)","borderShow":true,"borderColor":"rgba(255,202,104,0.3)","borderWidth":1,"cardRadius":18,"shadowShow":true,"shadowColor":"rgba(255,182,80,0.14)","shadowBlur":18},"interaction":{"dataFilters":[{"field":"模块","value":"档案卡"},{"field":"动物","value":"月影灵猫"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-月影灵猫档案'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 18, 7, 2, 2, 2,
+SELECT d.id, c.id, 18, 7, 2, 2, 20,
 '{"chart":{"name":"猫类体重","datasetId":12,"chartType":"metric_indicator","xField":"指标","yField":"数值","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"体重 KG","titleColor":"#fff1ce","metricValueColor":"#ffd675","bgColor":"rgba(29,20,12,0.52)","borderShow":true,"borderColor":"rgba(255,202,104,0.28)","borderWidth":1,"cardRadius":16},"interaction":{"dataFilters":[{"field":"模块","value":"指标"},{"field":"动物","value":"月影灵猫"},{"field":"指标","value":"体重kg"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-月影灵猫体重'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 20, 7, 2, 2, 2,
+SELECT d.id, c.id, 20, 7, 2, 2, 20,
 '{"chart":{"name":"猫类跳跃","datasetId":12,"chartType":"metric_indicator","xField":"指标","yField":"数值","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"跳跃 CM","titleColor":"#fff1ce","metricValueColor":"#ffcb6b","bgColor":"rgba(29,20,12,0.52)","borderShow":true,"borderColor":"rgba(255,202,104,0.28)","borderWidth":1,"cardRadius":16},"interaction":{"dataFilters":[{"field":"模块","value":"指标"},{"field":"动物","value":"月影灵猫"},{"field":"指标","value":"跳跃高度"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-月影灵猫跳跃'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 22, 7, 2, 2, 2,
+SELECT d.id, c.id, 22, 7, 2, 2, 20,
 '{"chart":{"name":"猫类夜视","datasetId":12,"chartType":"metric_indicator","xField":"指标","yField":"数值","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"夜视 PTS","titleColor":"#fff1ce","metricValueColor":"#fff0a1","bgColor":"rgba(29,20,12,0.52)","borderShow":true,"borderColor":"rgba(255,202,104,0.28)","borderWidth":1,"cardRadius":16},"interaction":{"dataFilters":[{"field":"模块","value":"指标"},{"field":"动物","value":"月影灵猫"},{"field":"指标","value":"夜视指数"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-月影灵猫夜视'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 8, 3, 8, 4, 2,
+SELECT d.id, c.id, 8, 3, 8, 4, 20,
 '{"chart":{"name":"生态位占比","datasetId":12,"chartType":"doughnut","xField":"生态位","yField":"数值","groupField":"","sourceMode":"DATASET"},"style":{"theme":"深海荧光","bgColor":"rgba(0,0,0,0)","showLegend":true,"showLabel":true,"legendPos":"bottom"},"interaction":{"dataFilters":[{"field":"模块","value":"生态位占比"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-生态位占比'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 8, 7, 8, 3, 2,
+SELECT d.id, c.id, 8, 7, 8, 3, 20,
 '{"chart":{"name":"感知能力排行","datasetId":12,"chartType":"table_rank","xField":"能力","yField":"得分","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"感知能力排行","titleColor":"#eef8ff","metricValueColor":"#67dbff","bgColor":"rgba(7,23,42,0.08)","cardRadius":16},"interaction":{"dataFilters":[{"field":"模块","value":"感知排行"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-感知能力排行'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 1, 12, 6, 5, 2,
+SELECT d.id, c.id, 1, 12, 6, 5, 20,
 '{"chart":{"name":"雪山狼犬节律","datasetId":12,"chartType":"business_trend","xField":"时段","yField":"活跃指数","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"雪山狼犬节律","titleColor":"#eef8ff","metricValueColor":"#67dbff","bgColor":"rgba(0,0,0,0)"},"interaction":{"dataFilters":[{"field":"模块","value":"活动趋势"},{"field":"动物","value":"雪山狼犬"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-雪山狼犬节律'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 9, 12, 6, 5, 2,
+SELECT d.id, c.id, 9, 12, 6, 5, 20,
 '{"chart":{"name":"动物综合评分","datasetId":12,"chartType":"bar","xField":"动物","yField":"综合值","groupField":"","sourceMode":"DATASET"},"style":{"theme":"海湾晨光","bgColor":"rgba(0,0,0,0)","showLegend":false,"showLabel":true,"showGrid":false,"barRadius":12,"barMaxWidth":28},"interaction":{"dataFilters":[{"field":"模块","value":"综合评分"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-综合评分'
 WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
-SELECT d.id, c.id, 17, 12, 6, 5, 2,
+SELECT d.id, c.id, 17, 12, 6, 5, 20,
 '{"chart":{"name":"月影灵猫节律","datasetId":12,"chartType":"business_trend","xField":"时段","yField":"活跃指数","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"月影灵猫节律","titleColor":"#fff1ce","metricValueColor":"#ffd675","bgColor":"rgba(0,0,0,0)"},"interaction":{"dataFilters":[{"field":"模块","value":"活动趋势"},{"field":"动物","value":"月影灵猫"}]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-月影灵猫节律'

@@ -64,13 +64,42 @@
               <span class="info-val">{{ selectedDataset.createdAt }}</span>
             </div>
           </div>
+          <div class="detail-section">
+            <div class="preview-hd">
+              <span>已配置筛选字段</span>
+              <span class="detail-meta">共 {{ configuredFilterFields.length }} 个</span>
+            </div>
+            <div v-if="configuredFilterFields.length" class="detail-filter-grid">
+              <div v-for="field in paginatedConfiguredFilterFields" :key="field.fieldName" class="detail-filter-card">
+                <div class="detail-filter-card__head">
+                  <strong>{{ field.fieldName }}</strong>
+                  <el-tag size="small" effect="plain">{{ field.fieldType }}</el-tag>
+                </div>
+                <div class="detail-filter-card__meta">显示名称：{{ field.fieldLabel || field.fieldName }}</div>
+              </div>
+            </div>
+            <div v-else class="preview-empty preview-empty--compact">当前数据集还没有配置筛选字段</div>
+            <el-pagination
+              v-if="configuredFilterFields.length > detailFilterPageSize"
+              v-model:current-page="detailFilterPage"
+              v-model:page-size="detailFilterPageSize"
+              class="detail-pagination"
+              background
+              layout="total, sizes, prev, pager, next"
+              :page-sizes="[6, 12, 24]"
+              :total="configuredFilterFields.length"
+            />
+          </div>
           <!-- 数据预览 -->
           <div class="preview-section">
             <div class="preview-hd">
               <span>数据预览</span>
-              <el-button size="small" :loading="previewLoading" @click="loadPreview">刷新预览</el-button>
+              <div class="detail-actions-inline">
+                <span v-if="preview.columns.length" class="detail-meta">当前显示 {{ paginatedPreviewRows.length }} / {{ preview.rows.length }} 行样例</span>
+                <el-button size="small" :loading="previewLoading" @click="loadPreview">刷新预览</el-button>
+              </div>
             </div>
-            <el-table v-if="preview.columns.length" :data="preview.rows" border max-height="320" size="small">
+            <el-table v-if="preview.columns.length" :data="paginatedPreviewRows" border max-height="320" size="small">
               <el-table-column
                 v-for="col in preview.columns"
                 :key="col"
@@ -81,6 +110,16 @@
               />
             </el-table>
             <div v-else class="preview-empty">点击「刷新预览」查看数据</div>
+            <el-pagination
+              v-if="preview.columns.length && preview.rows.length > detailPreviewPageSize"
+              v-model:current-page="detailPreviewPage"
+              v-model:page-size="detailPreviewPageSize"
+              class="detail-pagination"
+              background
+              layout="total, sizes, prev, pager, next"
+              :page-sizes="[5, 10, 20]"
+              :total="preview.rows.length"
+            />
           </div>
         </template>
 
@@ -101,11 +140,12 @@
         <!-- 左侧：表浏览器 -->
         <div class="table-browser">
           <div class="browser-header">
-            <span>数据表浏览</span>
-            <el-button link type="primary" :loading="tablesLoading" @click="refreshTables">刷新</el-button>
+            <span>{{ showTableBrowser ? '数据表浏览' : '数据源说明' }}</span>
+            <el-button v-if="showTableBrowser" link type="primary" :loading="tablesLoading" @click="refreshTables">刷新</el-button>
           </div>
 
           <el-input
+            v-if="showTableBrowser"
             v-model="tableSearch"
             placeholder="搜索表名"
             size="small"
@@ -113,8 +153,9 @@
             style="margin-bottom: 8px"
           />
 
-          <div v-if="tablesLoading" class="browser-tip">加载中...</div>
+          <div v-if="showTableBrowser && tablesLoading" class="browser-tip">加载中...</div>
           <div v-else-if="!form.datasourceId" class="browser-tip">当前为演示数据集，可直接编写静态 SQL 标识，无需选择数据源。</div>
+          <div v-else-if="!showTableBrowser" class="browser-tip">当前数据源类型为 {{ formDatasourceKindLabel }}，数据集会直接复用该数据源的返回结果，无需浏览数据表，通常也不需要额外填写 SQL。</div>
           <div v-else-if="!filteredTables.length" class="browser-tip">暂无数据表</div>
           <div v-else class="table-list">
             <div
@@ -130,7 +171,7 @@
             </div>
           </div>
 
-          <template v-if="selectedTable">
+          <template v-if="showTableBrowser && selectedTable">
             <div class="column-header">
               <span>{{ selectedTable }} 的字段</span>
               <el-button link type="primary" size="small" @click="generateSql">生成 SELECT SQL</el-button>
@@ -173,21 +214,53 @@
                 <el-option
                   v-for="ds in datasources"
                   :key="ds.id"
-                  :label="`${ds.name} (${ds.datasourceType || 'DATABASE'})`"
+                  :label="`${ds.name} (${sourceKindLabel(resolveSourceKind(ds))})`"
                   :value="ds.id"
                 />
               </el-select>
-              <div class="preview-empty" style="margin-top:6px;text-align:left">数据库数据集请选择数据库型数据源；演示 / 静态数据集可留空，直接使用内置静态数据标识。</div>
+              <div class="preview-empty" style="margin-top:6px;text-align:left">数据集现在支持数据库、API 接口、表格和 JSON 静态数据。数据库 / 演示数据集需要填写 SQL 或静态标识，其余类型会直接复用数据源返回结果。</div>
             </el-form-item>
-            <el-form-item label="SQL" prop="sqlText">
+            <el-form-item :label="sqlFieldLabel" prop="sqlText">
               <el-input
                 v-model="form.sqlText"
                 type="textarea"
                 :rows="8"
-                placeholder="请输入查询 SQL，或在左侧点击表名后点击「生成 SELECT SQL」"
+                :disabled="isReadonlySqlField"
+                :placeholder="sqlFieldPlaceholder"
               />
             </el-form-item>
           </el-form>
+
+          <div v-if="availableFilterFields.length" class="filter-panel">
+            <div class="preview-header">
+              <span>筛选字段配置</span>
+              <span>已选 {{ selectedFilterFieldCount }} 个</span>
+            </div>
+            <div class="filter-panel-tip">勾选需要暴露给筛选控件的字段。建议先执行预览，再根据样例值选择真正需要参与筛选的字段。</div>
+            <el-checkbox-group v-model="selectedFilterFieldNames" class="filter-field-list">
+              <el-checkbox
+                v-for="field in availableFilterFields"
+                :key="field.fieldName"
+                :label="field.fieldName"
+                class="filter-field-card"
+              >
+                <div class="filter-field-card__head">
+                  <strong>{{ field.fieldName }}</strong>
+                  <el-tag size="small" effect="plain">{{ field.fieldType }}</el-tag>
+                </div>
+                <div class="filter-field-card__meta">
+                  {{ field.samples.length ? `样例：${field.samples.join(' / ')}` : '执行预览后可查看样例值' }}
+                </div>
+              </el-checkbox>
+            </el-checkbox-group>
+          </div>
+          <div v-else class="filter-panel filter-panel--empty">
+            <div class="preview-header">
+              <span>筛选字段配置</span>
+              <span>待生成字段</span>
+            </div>
+            <div class="filter-panel-tip">先执行一次预览，系统会根据当前数据结果生成字段列表，然后再勾选需要参与筛选的字段。</div>
+          </div>
 
           <div v-if="formPreview.columns.length" class="preview-panel">
             <div class="preview-header">
@@ -209,7 +282,7 @@
       </div>
 
       <template #footer>
-        <el-button :loading="previewBtnLoading" @click="handlePreview">预览 SQL</el-button>
+        <el-button :loading="previewBtnLoading" @click="handlePreview">{{ requiresSqlText ? '预览 SQL' : '预览数据' }}</el-button>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
       </template>
@@ -240,12 +313,14 @@ import {
   createDatasetFolder,
   deleteDataset,
   deleteDatasetFolder,
+  getDatasetFields,
   getDatasetFolderTree,
   getDatasetPreviewData,
   previewDatasetSql,
   renameDatasetFolder,
   updateDataset,
   type Dataset,
+  type DatasetField,
   type DatasetFolder,
   type DatasetForm,
   type DatasetPreviewResult
@@ -256,6 +331,7 @@ import {
   getTableColumns,
   type ColumnMeta,
   type Datasource,
+  type DatasourceSourceKind,
   type TableInfo
 } from '../api/datasource'
 
@@ -358,8 +434,13 @@ const treeLoading = ref(false)
 const datasources = ref<Datasource[]>([])
 const selectedDatasetId = ref<number | null>(null)
 const selectedDataset = ref<Dataset | null>(null)
+const selectedDatasetFields = ref<DatasetField[]>([])
 const preview = reactive<DatasetPreviewResult>({ columns: [], rows: [], rowCount: 0 })
 const previewLoading = ref(false)
+const detailFilterPage = ref(1)
+const detailFilterPageSize = ref(6)
+const detailPreviewPage = ref(1)
+const detailPreviewPageSize = ref(5)
 
 // Dialog state
 const dialogVisible = ref(false)
@@ -369,6 +450,8 @@ const editId = ref<number | null>(null)
 const pendingFolderId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 const formPreview = reactive<DatasetPreviewResult>({ columns: [], rows: [], rowCount: 0 })
+const datasetFields = ref<DatasetField[]>([])
+const selectedFilterFieldNames = ref<string[]>([])
 
 // Table browser state
 const tables = ref<TableInfo[]>([])
@@ -426,16 +509,96 @@ const emptyForm = (): DatasetForm => ({
   folderId: null
 })
 
+const SOURCE_KIND_LABELS: Record<DatasourceSourceKind, string> = {
+  DATABASE: '数据库',
+  API: 'API 接口',
+  TABLE: '表格',
+  JSON_STATIC: 'JSON 静态数据',
+}
+
 const form = reactive<DatasetForm>(emptyForm())
+
+const availableFilterFields = computed(() => {
+  const fieldMap = new Map(datasetFields.value.map((field) => [field.fieldName, field]))
+  const orderedNames = formPreview.columns.length
+    ? formPreview.columns
+    : datasetFields.value.map((field) => field.fieldName)
+  const seen = new Set<string>()
+
+  return orderedNames
+    .map((fieldName) => fieldName.trim())
+    .filter((fieldName) => {
+      if (!fieldName || seen.has(fieldName)) {
+        return false
+      }
+      seen.add(fieldName)
+      return true
+    })
+    .map((fieldName) => ({
+      fieldName,
+      fieldType: fieldMap.get(fieldName)?.fieldType ?? inferPreviewFieldType(fieldName),
+      samples: collectFieldSamples(fieldName),
+    }))
+})
+
+const selectedFilterFieldCount = computed(() => {
+  const allowed = new Set(availableFilterFields.value.map((field) => field.fieldName))
+  return selectedFilterFieldNames.value.filter((fieldName) => allowed.has(fieldName)).length
+})
+
+const configuredFilterFields = computed(() => selectedDatasetFields.value.filter((field) => field.filterable))
+
+const paginatedConfiguredFilterFields = computed(() => {
+  const start = (detailFilterPage.value - 1) * detailFilterPageSize.value
+  return configuredFilterFields.value.slice(start, start + detailFilterPageSize.value)
+})
+
+const paginatedPreviewRows = computed(() => {
+  const start = (detailPreviewPage.value - 1) * detailPreviewPageSize.value
+  return preview.rows.slice(start, start + detailPreviewPageSize.value)
+})
 
 const resolveDatasourceValue = (value: number | string | null | undefined) => {
   const normalized = Number(value)
   return Number.isFinite(normalized) && normalized > 0 ? normalized : null
 }
 
+const resolveSourceKind = (datasource?: Datasource | null): DatasourceSourceKind => datasource?.sourceKind || 'DATABASE'
+const sourceKindLabel = (kind: DatasourceSourceKind) => SOURCE_KIND_LABELS[kind] || kind
+const isDatabaseDatasource = (datasource?: Datasource | null) => resolveSourceKind(datasource) === 'DATABASE'
+
+const formDatasource = computed(() => {
+  const datasourceId = resolveDatasourceValue(form.datasourceId)
+  return datasourceId ? datasources.value.find((item) => item.id === datasourceId) ?? null : null
+})
+
+const showTableBrowser = computed(() => !!formDatasource.value && isDatabaseDatasource(formDatasource.value))
+const requiresSqlText = computed(() => !formDatasource.value || isDatabaseDatasource(formDatasource.value))
+const isReadonlySqlField = computed(() => !!formDatasource.value && !isDatabaseDatasource(formDatasource.value))
+const formDatasourceKindLabel = computed(() => formDatasource.value ? sourceKindLabel(resolveSourceKind(formDatasource.value)) : '演示数据集')
+const sqlFieldLabel = computed(() => requiresSqlText.value ? 'SQL' : '附加 SQL（可选）')
+const sqlFieldPlaceholder = computed(() => {
+  if (!formDatasource.value) {
+    return '请输入演示数据标识，例如 demo_sales_monthly'
+  }
+  if (isDatabaseDatasource(formDatasource.value)) {
+    return '请输入查询 SQL，或在左侧点击表名后点击「生成 SELECT SQL」'
+  }
+  return `当前数据源为${formDatasourceKindLabel.value}，将直接复用数据源结果，通常无需填写`
+})
+
 const rules: FormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  sqlText: [{ required: true, message: '请输入 SQL', trigger: 'blur' }]
+  sqlText: [{
+    validator: (_rule, value, callback) => {
+      if (!requiresSqlText.value || String(value ?? '').trim()) {
+        callback()
+        return
+      }
+      callback(new Error(formDatasource.value ? '请输入 SQL' : '请输入演示数据标识'))
+    },
+    trigger: 'blur'
+  }]
 }
 
 const loadTree = async () => {
@@ -446,30 +609,58 @@ const loadTree = async () => {
       getDatasourceList()
     ])
     folderTree.value = tree
-    datasources.value = datasourceList.filter((item) => (item.sourceKind || 'DATABASE') === 'DATABASE')
+    datasources.value = datasourceList
   } finally {
     treeLoading.value = false
   }
 }
 
-const handleSelectDataset = async (id: number) => {
-  selectedDatasetId.value = id
-  const ds = allDatasetsFlat.value.find(d => d.id === id)
-  selectedDataset.value = ds ?? null
-  Object.assign(preview, { columns: [], rows: [], rowCount: 0 })
+const syncSelectedDatasetFromTree = () => {
+  selectedDataset.value = selectedDatasetId.value == null
+    ? null
+    : allDatasetsFlat.value.find((dataset) => dataset.id === selectedDatasetId.value) ?? null
 }
 
-const loadPreview = async () => {
-  if (!selectedDataset.value) return
+const loadSelectedDatasetFields = async (datasetId: number | null) => {
+  selectedDatasetFields.value = []
+  detailFilterPage.value = 1
+  if (!datasetId) return
+  try {
+    selectedDatasetFields.value = await getDatasetFields(datasetId)
+  } catch {
+    selectedDatasetFields.value = []
+  }
+}
+
+const loadPreviewForDataset = async (datasetId: number | null, showError = true) => {
+  Object.assign(preview, { columns: [], rows: [], rowCount: 0 })
+  detailPreviewPage.value = 1
+  if (!datasetId) return
+
   previewLoading.value = true
   try {
-    const result = await getDatasetPreviewData(selectedDataset.value.id)
+    const result = await getDatasetPreviewData(datasetId)
     Object.assign(preview, result)
   } catch {
-    ElMessage.error('预览失败')
+    if (showError) {
+      ElMessage.error('预览失败')
+    }
   } finally {
     previewLoading.value = false
   }
+}
+
+const handleSelectDataset = async (id: number) => {
+  selectedDatasetId.value = id
+  syncSelectedDatasetFromTree()
+  await Promise.all([
+    loadSelectedDatasetFields(id),
+    loadPreviewForDataset(id, false)
+  ])
+}
+
+const loadPreview = async () => {
+  await loadPreviewForDataset(selectedDataset.value?.id ?? null)
 }
 
 const loadTables = async (dsId: number) => {
@@ -477,6 +668,8 @@ const loadTables = async (dsId: number) => {
   selectedTable.value = ''
   tableColumns.value = []
   if (!dsId) return
+  const datasource = datasources.value.find((item) => item.id === dsId)
+  if (!datasource || !isDatabaseDatasource(datasource)) return
   tablesLoading.value = true
   try {
     tables.value = await getDatasourceTables(dsId)
@@ -489,7 +682,7 @@ const loadTables = async (dsId: number) => {
 
 const refreshTables = () => {
   const datasourceId = resolveDatasourceValue(form.datasourceId)
-  if (datasourceId) loadTables(datasourceId)
+  if (datasourceId && showTableBrowser.value) loadTables(datasourceId)
 }
 
 const onDatasourceChange = (val: number | string) => {
@@ -500,6 +693,11 @@ const onDatasourceChange = (val: number | string) => {
     tableColumns.value = []
     return
   }
+  const datasource = datasources.value.find((item) => item.id === datasourceId)
+  if (!datasource || !isDatabaseDatasource(datasource)) {
+    form.sqlText = ''
+    return
+  }
   loadTables(datasourceId)
 }
 
@@ -508,6 +706,7 @@ const selectTable = async (tableName: string) => {
   tableColumns.value = []
   const datasourceId = resolveDatasourceValue(form.datasourceId)
   if (!datasourceId) return
+  if (!showTableBrowser.value) return
   columnsLoading.value = true
   try {
     tableColumns.value = await getTableColumns(datasourceId, tableName)
@@ -524,11 +723,57 @@ const generateSql = () => {
   form.sqlText = `SELECT ${cols}\nFROM ${selectedTable.value}`
 }
 
+const inferPreviewFieldType = (fieldName: string) => {
+  for (const row of formPreview.rows) {
+    const value = row[fieldName]
+    if (value == null) continue
+    if (typeof value === 'number') return 'number'
+    if (typeof value === 'boolean') return 'boolean'
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return 'datetime'
+    return 'string'
+  }
+  return 'string'
+}
+
+const collectFieldSamples = (fieldName: string) => {
+  const samples = new Set<string>()
+  for (const row of formPreview.rows) {
+    const value = row[fieldName]
+    if (value == null) continue
+    const text = String(value).trim()
+    if (!text) continue
+    samples.add(text)
+    if (samples.size >= 3) break
+  }
+  return Array.from(samples)
+}
+
+const loadDatasetFieldConfig = async (datasetId: number | null) => {
+  datasetFields.value = []
+  selectedFilterFieldNames.value = []
+  if (!datasetId) return
+  try {
+    const fields = await getDatasetFields(datasetId)
+    datasetFields.value = fields
+    selectedFilterFieldNames.value = fields.filter((field) => field.filterable).map((field) => field.fieldName)
+  } catch {
+    datasetFields.value = []
+    selectedFilterFieldNames.value = []
+  }
+}
+
+const resolveSelectedFilterFieldNames = () => {
+  const allowed = new Set(availableFilterFields.value.map((field) => field.fieldName))
+  return selectedFilterFieldNames.value.filter((fieldName) => allowed.has(fieldName))
+}
+
 const openCreate = (folderId: number | null) => {
   editId.value = null
   Object.assign(form, emptyForm())
   form.folderId = folderId
   Object.assign(formPreview, { columns: [], rows: [], rowCount: 0 })
+  datasetFields.value = []
+  selectedFilterFieldNames.value = []
   tables.value = []
   selectedTable.value = ''
   tableColumns.value = []
@@ -536,18 +781,20 @@ const openCreate = (folderId: number | null) => {
   dialogVisible.value = true
 }
 
-const openEdit = (row: Dataset) => {
+const openEdit = async (row: Dataset) => {
   editId.value = row.id
   form.name = row.name
   form.datasourceId = resolveDatasourceValue(row.datasourceId) ?? ''
   form.sqlText = row.sqlText
   form.folderId = row.folderId
   Object.assign(formPreview, { columns: [], rows: [], rowCount: 0 })
+  await loadDatasetFieldConfig(row.id)
   selectedTable.value = ''
   tableColumns.value = []
   tableSearch.value = ''
   dialogVisible.value = true
-  if (row.datasourceId) loadTables(Number(row.datasourceId))
+  const datasource = datasources.value.find((item) => item.id === Number(row.datasourceId))
+  if (row.datasourceId && datasource && isDatabaseDatasource(datasource)) loadTables(Number(row.datasourceId))
 }
 
 const handleSubmit = async () => {
@@ -557,18 +804,21 @@ const handleSubmit = async () => {
     const payload: DatasetForm = {
       name: form.name,
       datasourceId: resolveDatasourceValue(form.datasourceId),
-      sqlText: form.sqlText,
+      sqlText: requiresSqlText.value ? form.sqlText.trim() : '',
       folderId: form.folderId,
+      filterFieldNames: resolveSelectedFilterFieldNames(),
     }
+    const saved = editId.value
+      ? await updateDataset(editId.value, payload)
+      : await createDataset(payload)
     if (editId.value) {
-      await updateDataset(editId.value, payload)
       ElMessage.success('更新成功')
     } else {
-      await createDataset(payload)
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false
     await loadTree()
+    await handleSelectDataset(saved.id)
   } finally {
     saving.value = false
   }
@@ -581,20 +831,26 @@ const handleDeleteDataset = async (id: number) => {
   if (selectedDatasetId.value === id) {
     selectedDatasetId.value = null
     selectedDataset.value = null
+    selectedDatasetFields.value = []
+    detailFilterPage.value = 1
+    detailPreviewPage.value = 1
   }
   await loadTree()
 }
 
 const handlePreview = async () => {
-  await formRef.value?.validateField(['sqlText'])
+  if (requiresSqlText.value) {
+    await formRef.value?.validateField(['sqlText'])
+  }
   previewBtnLoading.value = true
   try {
     const result = await previewDatasetSql({
       datasourceId: resolveDatasourceValue(form.datasourceId),
-      sqlText: form.sqlText
+      sqlText: requiresSqlText.value ? form.sqlText.trim() : ''
     })
     Object.assign(formPreview, result)
-    ElMessage.success('SQL 预览成功')
+    selectedFilterFieldNames.value = resolveSelectedFilterFieldNames()
+    ElMessage.success(requiresSqlText.value ? 'SQL 预览成功' : '数据预览成功')
   } finally {
     previewBtnLoading.value = false
   }
@@ -823,6 +1079,13 @@ onMounted(loadTree)
   align-items: center;
 }
 
+.detail-actions-inline {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .content-empty {
   display: flex;
   justify-content: center;
@@ -868,6 +1131,60 @@ onMounted(loadTree)
   flex: 1;
 }
 
+.detail-section {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fcfdff;
+}
+
+.detail-meta {
+  font-size: 12px;
+  font-weight: 400;
+  color: #909399;
+}
+
+.detail-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detail-filter-card {
+  padding: 10px 12px;
+  border: 1px solid #e6ebf5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.detail-filter-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detail-filter-card__head strong {
+  min-width: 0;
+  color: #303133;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.detail-filter-card__meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.detail-pagination {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
 .preview-section {
   border-top: 1px solid #ebeef5;
   padding-top: 12px;
@@ -888,6 +1205,10 @@ onMounted(loadTree)
   padding: 32px;
   color: #c0c4cc;
   font-size: 13px;
+}
+
+.preview-empty--compact {
+  padding: 18px 8px;
 }
 
 /* ---- dialog styles ---- */
@@ -1027,5 +1348,76 @@ onMounted(loadTree)
   margin-bottom: 8px;
   color: #606266;
   font-size: 13px;
+}
+
+.filter-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.filter-panel--empty {
+  background: #fafafa;
+}
+
+.filter-panel-tip {
+  margin-bottom: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #909399;
+}
+
+.filter-field-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.filter-field-card {
+  margin-right: 0;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.filter-field-card :deep(.el-checkbox__label) {
+  width: 100%;
+  padding-left: 10px;
+}
+
+.filter-field-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.filter-field-card__head strong {
+  min-width: 0;
+  color: #303133;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.filter-field-card__meta {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #909399;
+  word-break: break-word;
+}
+
+@media (max-width: 960px) {
+  .filter-field-list {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-filter-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

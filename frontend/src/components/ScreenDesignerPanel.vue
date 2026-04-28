@@ -494,7 +494,7 @@
                 <span class="resize-handle resize-handle--sw" @mousedown.stop.prevent="startCurtainResize($event, 'sw')" />
               </div>
               <div
-                v-for="component in components"
+                v-for="component in renderedComponents"
                 :key="component.id"
                 v-memo="getStageCardMemo(component)"
                 :ref="(el) => setStageCardRef(el as HTMLElement | null, component.id)"
@@ -1701,11 +1701,12 @@ const getComponentStatusText = (component: DashboardComponent) => {
   if (!isStaticWidget(component) && !isRenderableChart(component)) return '预览受限'
   return '可预览'
 }
-const layeredComponents = computed(() => [...components.value].sort((left, right) => {
-  const zIndexDelta = (right.zIndex ?? 0) - (left.zIndex ?? 0)
+const renderedComponents = computed(() => [...components.value].sort((left, right) => {
+  const zIndexDelta = (left.zIndex ?? 0) - (right.zIndex ?? 0)
   if (zIndexDelta !== 0) return zIndexDelta
-  return right.id - left.id
+  return left.id - right.id
 }))
+const layeredComponents = computed(() => [...renderedComponents.value].reverse())
 const marqueeStyle = computed(() => {
   const left = Math.min(marqueeSelection.startX, marqueeSelection.currentX)
   const top = Math.min(marqueeSelection.startY, marqueeSelection.currentY)
@@ -6309,6 +6310,7 @@ onBeforeUnmount(() => {
   display: -webkit-box;
   margin-top: 6px;
   overflow: hidden;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   color: #6f8792;

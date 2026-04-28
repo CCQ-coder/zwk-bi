@@ -2,6 +2,8 @@ package com.aibi.bi.model.request;
 
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.List;
+
 public class CreateDatasetRequest {
 
     @NotBlank(message = "name is required")
@@ -10,10 +12,11 @@ public class CreateDatasetRequest {
     // Nullable — null means "demo dataset" (no real datasource)
     private Long datasourceId;
 
-    @NotBlank(message = "sqlText is required")
     private String sqlText;
 
     private Long folderId;
+
+    private List<String> filterFieldNames;
 
     public String getName() {
         return name;
@@ -45,5 +48,13 @@ public class CreateDatasetRequest {
 
     public void setFolderId(Long folderId) {
         this.folderId = folderId;
+    }
+
+    public List<String> getFilterFieldNames() {
+        return filterFieldNames;
+    }
+
+    public void setFilterFieldNames(List<String> filterFieldNames) {
+        this.filterFieldNames = filterFieldNames;
     }
 }

@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public class BiDatasource {
     private Long id;
     private String name;
+    private Long groupId;
     private String sourceKind;
     private String datasourceType;
     private String connectMode;
@@ -32,6 +33,14 @@ public class BiDatasource {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public Long getGroupId() {
+        return groupId;
+    }
+
+    public void setGroupId(Long groupId) {
+        this.groupId = groupId;
     }
 
     public String getSourceKind() {

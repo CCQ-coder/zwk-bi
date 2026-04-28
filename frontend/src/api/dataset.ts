@@ -23,6 +23,7 @@ export interface DatasetForm {
   datasourceId: number | '' | null
   sqlText: string
   folderId?: number | null
+  filterFieldNames?: string[]
 }
 
 export interface DatasetPreviewResult {
@@ -37,6 +38,7 @@ export interface DatasetField {
   fieldName: string
   fieldType: string
   fieldLabel: string
+  filterable: boolean
   createdAt: string
 }
 

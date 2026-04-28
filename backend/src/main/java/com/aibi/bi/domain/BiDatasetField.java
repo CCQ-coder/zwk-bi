@@ -8,6 +8,7 @@ public class BiDatasetField {
     private String fieldName;
     private String fieldType;
     private String fieldLabel;
+    private Boolean filterable;
     private LocalDateTime createdAt;
 
     public Long getId() {
@@ -48,6 +49,14 @@ public class BiDatasetField {
 
     public void setFieldLabel(String fieldLabel) {
         this.fieldLabel = fieldLabel;
+    }
+
+    public Boolean getFilterable() {
+        return filterable;
+    }
+
+    public void setFilterable(Boolean filterable) {
+        this.filterable = filterable;
     }
 
     public LocalDateTime getCreatedAt() {

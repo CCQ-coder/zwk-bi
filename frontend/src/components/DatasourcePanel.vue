@@ -7,7 +7,10 @@
             <div class="sidebar-title">数据源</div>
             <div class="sidebar-subtitle">统一管理数据库、API、表格和 JSON 静态数据源</div>
           </div>
-          <el-button type="primary" size="small" :icon="Plus" @click="openCreate">新建</el-button>
+          <div class="sidebar-actions">
+            <el-button circle size="small" :icon="FolderAdd" @click="openCreateGroup" />
+            <el-button type="primary" size="small" :icon="Plus" @click="openCreate(activeGroupDraftId)">新建</el-button>
+          </div>
         </div>
 
         <el-input
@@ -16,6 +19,52 @@
           placeholder="搜索数据源名称"
           clearable
         />
+
+        <div class="group-section">
+          <div class="group-section-head">
+            <span>分组筛选</span>
+            <span class="group-section-meta">{{ datasourceGroups.length }} 个分组</span>
+          </div>
+          <div class="group-list">
+            <button
+              type="button"
+              class="group-chip"
+              :class="{ 'group-chip--active': selectedGroupFilter === 'ALL' }"
+              @click="selectedGroupFilter = 'ALL'"
+            >
+              <span>全部</span>
+              <strong>{{ datasources.length }}</strong>
+            </button>
+            <button
+              type="button"
+              class="group-chip"
+              :class="{ 'group-chip--active': selectedGroupFilter === 'UNGROUPED' }"
+              @click="selectedGroupFilter = 'UNGROUPED'"
+            >
+              <span>未分组</span>
+              <strong>{{ ungroupedDatasourceCount }}</strong>
+            </button>
+            <div v-for="group in datasourceGroups" :key="group.id" class="group-row">
+              <button
+                type="button"
+                class="group-chip group-chip--row"
+                :class="{ 'group-chip--active': selectedGroupFilter === group.id }"
+                @click="selectedGroupFilter = group.id"
+              >
+                <span>{{ group.name }}</span>
+                <strong>{{ datasourceCountByGroup(group.id) }}</strong>
+              </button>
+              <div class="group-row-actions">
+                <el-button link size="small" :icon="Edit" @click.stop="openRenameGroup(group)" />
+                <el-popconfirm title="确认删除此分组？删除后其中数据源会转为未分组。" @confirm="handleDeleteGroup(group.id)">
+                  <template #reference>
+                    <el-button link size="small" type="danger" :icon="Delete" @click.stop />
+                  </template>
+                </el-popconfirm>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div class="datasource-list" v-loading="loading">
           <button
@@ -113,7 +162,7 @@
                       <div class="section-head section-head--compact">
                         <div>
                           <div class="section-title">{{ selectedTable }}</div>
-                          <div class="section-subtitle">字段和样例数据最多展示 20 行。</div>
+                          <div class="section-subtitle">字段固定展示，样例数据支持分页浏览全部结果。</div>
                         </div>
                       </div>
 
@@ -127,8 +176,11 @@
                         </div>
                       </div>
 
+                      <div class="preview-summary">当前页 {{ extractPreview.rows.length }} 行 / 全部 {{ extractPreviewTotalRows }} 行</div>
+
                       <el-table
                         v-if="extractPreview.columns.length"
+                        v-loading="extractPreviewLoading"
                         :data="extractPreview.rows"
                         border
                         size="small"
@@ -144,6 +196,18 @@
                           show-overflow-tooltip
                         />
                       </el-table>
+                      <el-pagination
+                        v-if="extractPreviewTotalRows > extractPreviewPageSize"
+                        v-model:current-page="extractPreviewPage"
+                        v-model:page-size="extractPreviewPageSize"
+                        class="table-detail-pagination"
+                        background
+                        layout="total, sizes, prev, pager, next"
+                        :page-sizes="[20, 50, 100]"
+                        :total="extractPreviewTotalRows"
+                        @current-change="handleExtractPreviewPageChange"
+                        @size-change="handleExtractPreviewPageSizeChange"
+                      />
                     </template>
 
                     <div v-else class="table-empty table-empty--detail">请选择左侧数据表查看字段和样例</div>
@@ -204,6 +268,12 @@
         <div class="form-grid form-grid--basic">
           <el-form-item label="数据源名称" prop="name">
             <el-input v-model="form.name" placeholder="请输入数据源名称" />
+          </el-form-item>
+
+          <el-form-item label="所属分组">
+            <el-select v-model="form.groupId" placeholder="未分组" clearable>
+              <el-option v-for="group in datasourceGroups" :key="group.id" :label="group.name" :value="group.id" />
+            </el-select>
           </el-form-item>
 
           <el-form-item label="来源类型" prop="sourceKind">
@@ -434,6 +504,38 @@
         </template>
       </el-form>
 
+      <div v-if="canPreviewDraft" v-loading="dialogPreviewLoading" class="draft-preview-card">
+        <div class="section-head">
+          <div>
+            <div class="section-title">返回结果预览</div>
+            <div class="section-subtitle">使用当前弹窗中的未保存配置直接请求，不需要先保存数据源。</div>
+          </div>
+          <el-button size="small" type="primary" plain :loading="dialogPreviewLoading" @click="handlePreviewDraft">预览返回结果</el-button>
+        </div>
+
+        <div class="preview-summary">字段 {{ dialogPreview.columns.length }} 个 / 样例 {{ dialogPreview.rows.length }} 行 / 总计 {{ dialogPreview.rowCount }} 行</div>
+
+        <el-table
+          v-if="dialogPreview.columns.length"
+          :data="dialogPreview.rows"
+          border
+          size="small"
+          max-height="320"
+          class="preview-table"
+        >
+          <el-table-column
+            v-for="column in dialogPreview.columns"
+            :key="column"
+            :prop="column"
+            :label="column"
+            min-width="140"
+            show-overflow-tooltip
+          />
+        </el-table>
+
+        <el-empty v-else :image-size="64" description="点击“预览返回结果”查看当前配置的数据返回内容" />
+      </div>
+
       <template #footer>
         <div class="dialog-footer">
           <span class="dialog-hint">保存后会同步到数据集和大屏页面编写可选列表。</span>
@@ -445,27 +547,47 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="groupDialogVisible" :title="groupEditId ? '重命名分组' : '新建分组'" width="400px" destroy-on-close>
+      <el-form label-width="80px">
+        <el-form-item label="分组名称">
+          <el-input v-model="groupName" placeholder="请输入分组名称" @keyup.enter="handleGroupSubmit" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="groupDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="groupSaving" @click="handleGroupSubmit">确定</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Delete, Edit, Plus, RefreshRight } from '@element-plus/icons-vue'
+import { Delete, Edit, FolderAdd, Plus, RefreshRight } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
+  createDatasourceGroup,
   createDatasource,
+  deleteDatasourceGroup,
   deleteDatasource,
+  getDatasourceGroups,
   getDatasourceList,
+  previewDatasourceDraft,
   getDatasourcePreviewData,
   getDatasourceTables,
   getTableColumns,
   previewExtract,
+  renameDatasourceGroup,
   testDatasourceConnection,
   updateDatasource,
   type ColumnMeta,
   type Datasource,
+  type DatasourceDraftPreviewRequest,
   type DatasourceForm,
+  type DatasourceGroup,
   type DatasourcePreviewResult,
   type DatasourceSourceKind,
   type ExtractPreviewResult,
@@ -500,6 +622,8 @@ interface ApiDatasourceFormState {
   resultPath: string
 }
 
+type GroupFilter = 'ALL' | 'UNGROUPED' | number
+
 const SOURCE_KIND_OPTIONS: Array<{ label: string; value: DatasourceSourceKind }> = [
   { label: '数据库', value: 'DATABASE' },
   { label: 'API 接口', value: 'API' },
@@ -523,10 +647,11 @@ const SOURCE_KIND_LABELS: Record<DatasourceSourceKind, string> = {
 }
 
 const emptyPreview = (): DatasourcePreviewResult => ({ columns: [], rows: [], rowCount: 0 })
-const emptyExtractPreview = (): ExtractPreviewResult => ({ sqlText: '', columns: [], rows: [], rowCount: 0 })
+const emptyExtractPreview = (): ExtractPreviewResult => ({ sqlText: '', columns: [], rows: [], rowCount: 0, totalRows: 0, limit: 20, offset: 0 })
 
 const createEmptyForm = (): DatasourceEditorForm => ({
   name: '',
+  groupId: null,
   sourceKind: 'DATABASE',
   datasourceType: 'MYSQL',
   connectMode: 'DIRECT',
@@ -562,7 +687,9 @@ const createEmptyApiRuntimeForm = (): ApiDatasourceFormState => ({
 
 const loading = ref(false)
 const datasources = ref<Datasource[]>([])
+const datasourceGroups = ref<DatasourceGroup[]>([])
 const searchKeyword = ref('')
+const selectedGroupFilter = ref<GroupFilter>('ALL')
 const selectedId = ref<number | null>(null)
 
 const previewLoading = ref(false)
@@ -574,24 +701,43 @@ const selectedTable = ref('')
 const columnsLoading = ref(false)
 const tableColumns = ref<ColumnMeta[]>([])
 const extractPreview = reactive<ExtractPreviewResult>(emptyExtractPreview())
+const extractPreviewLoading = ref(false)
+const extractPreviewPage = ref(1)
+const extractPreviewPageSize = ref(20)
 
 const dialogVisible = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const dialogEditId = ref<number | null>(null)
 const saving = ref(false)
 const testing = ref(false)
+const dialogPreviewLoading = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive<DatasourceEditorForm>(createEmptyForm())
 const apiRuntimeForm = reactive<ApiDatasourceFormState>(createEmptyApiRuntimeForm())
 const apiRuntimeTab = ref<'headers' | 'query' | 'body'>('headers')
+const dialogPreview = reactive<DatasourcePreviewResult>(emptyPreview())
+const groupDialogVisible = ref(false)
+const groupName = ref('')
+const groupSaving = ref(false)
+const groupEditId = ref<number | null>(null)
 
 const selectedDatasource = computed(() => datasources.value.find((item) => item.id === selectedId.value) ?? null)
+const canPreviewDraft = computed(() => form.sourceKind !== 'DATABASE')
+const activeGroupDraftId = computed(() => typeof selectedGroupFilter.value === 'number' ? selectedGroupFilter.value : null)
+const groupNameMap = computed(() => new Map(datasourceGroups.value.map((item) => [item.id, item.name])))
 const filteredDatasources = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
-  const list = [...datasources.value].sort((left, right) => right.id - left.id)
+  let list = [...datasources.value].sort((left, right) => right.id - left.id)
+  if (selectedGroupFilter.value === 'UNGROUPED') {
+    list = list.filter((item) => item.groupId == null)
+  } else if (typeof selectedGroupFilter.value === 'number') {
+    list = list.filter((item) => item.groupId === selectedGroupFilter.value)
+  }
   if (!keyword) return list
   return list.filter((item) => item.name.toLowerCase().includes(keyword))
 })
+const ungroupedDatasourceCount = computed(() => datasources.value.filter((item) => item.groupId == null).length)
+const extractPreviewTotalRows = computed(() => extractPreview.totalRows ?? extractPreview.rowCount)
 const filteredTables = computed(() => {
   const keyword = tableSearch.value.trim().toLowerCase()
   if (!keyword) return tables.value
@@ -628,13 +774,17 @@ const jsonDraftStats = computed(() => {
   }
 })
 
+const datasourceCountByGroup = (groupId: number) => datasources.value.filter((item) => item.groupId === groupId).length
+
 const selectedDatasourceInfo = computed(() => {
   const datasource = selectedDatasource.value
   if (!datasource) return [] as Array<{ label: string; value: string }>
   const sourceKind = resolveSourceKind(datasource)
   const config = parseConfigJson(datasource.configJson)
+  const groupLabel = datasource.groupId == null ? '未分组' : (groupNameMap.value.get(datasource.groupId) || `#${datasource.groupId}`)
   if (sourceKind === 'DATABASE') {
     return [
+      { label: '所属分组', value: groupLabel },
       { label: '数据库类型', value: datasource.datasourceType || '-' },
       { label: '主机地址', value: datasource.host || '-' },
       { label: '端口', value: datasource.port ? String(datasource.port) : '-' },
@@ -645,6 +795,7 @@ const selectedDatasourceInfo = computed(() => {
   }
   if (sourceKind === 'API') {
     return [
+      { label: '所属分组', value: groupLabel },
       { label: '请求地址', value: readString(config.apiUrl ?? config.url) || '-' },
       { label: '请求方式', value: readString(config.apiMethod ?? config.method) || 'GET' },
       { label: '结果路径', value: readString(config.apiResultPath ?? config.resultPath) || '-' },
@@ -653,6 +804,7 @@ const selectedDatasourceInfo = computed(() => {
   }
   if (sourceKind === 'TABLE') {
     return [
+      { label: '所属分组', value: groupLabel },
       { label: '分隔格式', value: readString(config.tableDelimiter ?? config.delimiter) || 'CSV' },
       { label: '首行为表头', value: readBoolean(config.tableHasHeader ?? config.hasHeader, true) ? '是' : '否' },
       { label: '内容行数', value: countLines(readString(config.tableText ?? config.text)) },
@@ -660,6 +812,7 @@ const selectedDatasourceInfo = computed(() => {
     ]
   }
   return [
+    { label: '所属分组', value: groupLabel },
     { label: '结果路径', value: readString(config.jsonResultPath ?? config.resultPath) || '-' },
     { label: 'JSON 长度', value: `${readString(config.jsonText ?? config.text).length} 字符` },
     { label: '创建时间', value: datasource.createdAt || '-' },
@@ -687,6 +840,7 @@ const rules: FormRules<DatasourceEditorForm> = {
 watch(selectedDatasource, async (datasource) => {
   Object.assign(preview, emptyPreview())
   Object.assign(extractPreview, emptyExtractPreview())
+  extractPreviewPage.value = 1
   tables.value = []
   tableColumns.value = []
   selectedTable.value = ''
@@ -700,6 +854,7 @@ watch(selectedDatasource, async (datasource) => {
 }, { immediate: false })
 
 watch(() => form.sourceKind, (sourceKind) => {
+  resetDialogPreview()
   form.connectMode = 'DIRECT'
   if (sourceKind === 'DATABASE') {
     if (!DATABASE_TYPE_OPTIONS.some((item) => item.value === form.datasourceType)) {
@@ -724,11 +879,28 @@ watch(() => form.sourceKind, (sourceKind) => {
   form.port = ''
 })
 
+watch(filteredDatasources, (list) => {
+  if (!list.length) {
+    selectedId.value = null
+    return
+  }
+  if (!list.some((item) => item.id === selectedId.value)) {
+    selectedId.value = list[0].id
+  }
+}, { immediate: true })
+
 const loadDatasources = async (preferredId?: number | null) => {
   loading.value = true
   try {
-    const list = await getDatasourceList()
+    const [list, groups] = await Promise.all([
+      getDatasourceList(),
+      getDatasourceGroups(),
+    ])
     datasources.value = list
+    datasourceGroups.value = groups
+    if (typeof selectedGroupFilter.value === 'number' && !groups.some((item) => item.id === selectedGroupFilter.value)) {
+      selectedGroupFilter.value = 'ALL'
+    }
     const nextId = preferredId && list.some((item) => item.id === preferredId)
       ? preferredId
       : selectedId.value && list.some((item) => item.id === selectedId.value)
@@ -737,6 +909,7 @@ const loadDatasources = async (preferredId?: number | null) => {
     selectedId.value = nextId
   } catch {
     datasources.value = []
+    datasourceGroups.value = []
     selectedId.value = null
   } finally {
     loading.value = false
@@ -764,6 +937,7 @@ const loadDatabaseTables = async (datasourceId: number) => {
   try {
     const result = await getDatasourceTables(datasourceId)
     tables.value = result
+    extractPreviewPage.value = 1
     if (result.length) {
       const targetTable = result.some((item) => item.tableName === selectedTable.value)
         ? selectedTable.value
@@ -780,14 +954,36 @@ const loadDatabaseTables = async (datasourceId: number) => {
   }
 }
 
+const loadExtractPreview = async (tableName: string, page = extractPreviewPage.value) => {
+  if (!selectedDatasource.value) return
+  extractPreviewLoading.value = true
+  try {
+    const previewResult = await previewExtract({
+      datasourceId: selectedDatasource.value.id,
+      tableName,
+      limit: extractPreviewPageSize.value,
+      offset: (page - 1) * extractPreviewPageSize.value,
+    })
+    Object.assign(extractPreview, previewResult)
+    extractPreviewPage.value = page
+  } catch {
+    Object.assign(extractPreview, emptyExtractPreview())
+  } finally {
+    extractPreviewLoading.value = false
+  }
+}
+
 const selectTable = async (tableName: string) => {
   if (!selectedDatasource.value) return
   selectedTable.value = tableName
   columnsLoading.value = true
+  extractPreviewPage.value = 1
+  Object.assign(extractPreview, emptyExtractPreview())
+  extractPreviewLoading.value = true
   try {
     const [columns, previewResult] = await Promise.all([
       getTableColumns(selectedDatasource.value.id, tableName),
-      previewExtract({ datasourceId: selectedDatasource.value.id, tableName, limit: 20 }),
+      previewExtract({ datasourceId: selectedDatasource.value.id, tableName, limit: extractPreviewPageSize.value, offset: 0 }),
     ])
     tableColumns.value = columns
     Object.assign(extractPreview, previewResult)
@@ -796,14 +992,28 @@ const selectTable = async (tableName: string) => {
     Object.assign(extractPreview, emptyExtractPreview())
   } finally {
     columnsLoading.value = false
+    extractPreviewLoading.value = false
   }
 }
 
-const openCreate = () => {
+const handleExtractPreviewPageChange = async (page: number) => {
+  if (!selectedTable.value) return
+  await loadExtractPreview(selectedTable.value, page)
+}
+
+const handleExtractPreviewPageSizeChange = async (pageSize: number) => {
+  extractPreviewPageSize.value = pageSize
+  if (!selectedTable.value) return
+  await loadExtractPreview(selectedTable.value, 1)
+}
+
+const openCreate = (groupId: number | null = activeGroupDraftId.value) => {
   dialogMode.value = 'create'
   dialogEditId.value = null
   Object.assign(form, createEmptyForm())
+  form.groupId = groupId
   resetApiRuntimeForm()
+  resetDialogPreview()
   dialogVisible.value = true
 }
 
@@ -812,7 +1022,9 @@ const openEdit = (datasource: Datasource) => {
   dialogEditId.value = datasource.id
   Object.assign(form, createEmptyForm())
   resetApiRuntimeForm()
+  resetDialogPreview()
   form.name = datasource.name
+  form.groupId = datasource.groupId ?? null
   form.sourceKind = resolveSourceKind(datasource)
   form.datasourceType = datasource.datasourceType || 'MYSQL'
   form.connectMode = datasource.connectMode || 'DIRECT'
@@ -837,6 +1049,18 @@ const openEdit = (datasource: Datasource) => {
   }
 
   dialogVisible.value = true
+}
+
+const openCreateGroup = () => {
+  groupEditId.value = null
+  groupName.value = ''
+  groupDialogVisible.value = true
+}
+
+const openRenameGroup = (group: DatasourceGroup) => {
+  groupEditId.value = group.id
+  groupName.value = group.name
+  groupDialogVisible.value = true
 }
 
 const handleDatabaseTypeChange = (value: DatabaseType) => {
@@ -886,6 +1110,41 @@ const handleTestConnection = async () => {
   }
 }
 
+const buildDatasourceDraftPreviewPayload = (): DatasourceDraftPreviewRequest => {
+  const payload = buildDatasourcePayload()
+  return {
+    sourceKind: payload.sourceKind,
+    datasourceType: payload.datasourceType,
+    host: payload.host,
+    port: payload.port,
+    databaseName: payload.databaseName,
+    username: payload.username,
+    password: payload.password,
+    configJson: payload.configJson,
+  }
+}
+
+const handlePreviewDraft = async () => {
+  if (!canPreviewDraft.value) {
+    ElMessage.warning('数据库数据源请在数据集或页面 SQL 中预览')
+    return
+  }
+
+  dialogPreviewLoading.value = true
+  try {
+    const result = await previewDatasourceDraft(buildDatasourceDraftPreviewPayload())
+    Object.assign(dialogPreview, result)
+    ElMessage.success('返回结果预览成功')
+  } catch (error) {
+    resetDialogPreview()
+    if (error instanceof Error && error.message) {
+      ElMessage.error(error.message)
+    }
+  } finally {
+    dialogPreviewLoading.value = false
+  }
+}
+
 const handleSubmit = async () => {
   const valid = await validateForm()
   if (!valid) return
@@ -907,6 +1166,29 @@ const handleSubmit = async () => {
   }
 }
 
+const handleGroupSubmit = async () => {
+  if (!groupName.value.trim()) {
+    ElMessage.warning('请输入分组名称')
+    return
+  }
+  groupSaving.value = true
+  try {
+    const saved = groupEditId.value
+      ? await renameDatasourceGroup(groupEditId.value, groupName.value.trim())
+      : await createDatasourceGroup(groupName.value.trim())
+    groupDialogVisible.value = false
+    selectedGroupFilter.value = saved.id
+    await loadDatasources(selectedDatasource.value?.id ?? null)
+    ElMessage.success(groupEditId.value ? '分组重命名成功' : '分组创建成功')
+  } catch (error) {
+    if (error instanceof Error && error.message) {
+      ElMessage.error(error.message)
+    }
+  } finally {
+    groupSaving.value = false
+  }
+}
+
 const handleDelete = async (id: number) => {
   try {
     await deleteDatasource(id)
@@ -921,10 +1203,26 @@ const handleDelete = async (id: number) => {
   }
 }
 
+const handleDeleteGroup = async (id: number) => {
+  try {
+    await deleteDatasourceGroup(id)
+    if (selectedGroupFilter.value === id) {
+      selectedGroupFilter.value = 'ALL'
+    }
+    await loadDatasources(selectedDatasource.value?.id ?? null)
+    ElMessage.success('分组已删除')
+  } catch (error) {
+    if (error instanceof Error && error.message) {
+      ElMessage.error(error.message)
+    }
+  }
+}
+
 const buildDatasourcePayload = (): DatasourceForm => {
   if (form.sourceKind === 'DATABASE') {
     return {
       name: form.name.trim(),
+      groupId: form.groupId ?? null,
       sourceKind: 'DATABASE',
       datasourceType: form.datasourceType,
       connectMode: 'DIRECT',
@@ -951,6 +1249,7 @@ const buildDatasourcePayload = (): DatasourceForm => {
     if (apiRuntimeForm.resultPath.trim()) config.apiResultPath = apiRuntimeForm.resultPath.trim()
     return {
       name: form.name.trim(),
+      groupId: form.groupId ?? null,
       sourceKind: 'API',
       datasourceType: 'REST_API',
       connectMode: 'DIRECT',
@@ -971,6 +1270,7 @@ const buildDatasourcePayload = (): DatasourceForm => {
     }
     return {
       name: form.name.trim(),
+      groupId: form.groupId ?? null,
       sourceKind: 'TABLE',
       datasourceType: 'TABLE',
       connectMode: 'DIRECT',
@@ -990,6 +1290,7 @@ const buildDatasourcePayload = (): DatasourceForm => {
   if (form.jsonResultPath.trim()) config.jsonResultPath = form.jsonResultPath.trim()
   return {
     name: form.name.trim(),
+    groupId: form.groupId ?? null,
     sourceKind: 'JSON_STATIC',
     datasourceType: 'JSON_STATIC',
     connectMode: 'DIRECT',
@@ -1080,6 +1381,10 @@ const stringifyUnknown = (value: unknown) => {
 const resetApiRuntimeForm = () => {
   Object.assign(apiRuntimeForm, createEmptyApiRuntimeForm())
   apiRuntimeTab.value = 'headers'
+}
+
+const resetDialogPreview = () => {
+  Object.assign(dialogPreview, emptyPreview())
 }
 
 const syncApiRuntimeFormFromConfig = (config: Record<string, unknown>) => {
@@ -1193,6 +1498,12 @@ onMounted(async () => {
   padding: 20px 18px 14px;
 }
 
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .sidebar-title {
   font-size: 18px;
   font-weight: 700;
@@ -1208,6 +1519,83 @@ onMounted(async () => {
 
 .sidebar-search {
   padding: 0 18px 14px;
+}
+
+.group-section {
+  padding: 0 18px 14px;
+}
+
+.group-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #71829b;
+}
+
+.group-section-meta {
+  color: #9aa9bc;
+}
+
+.group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dbe8f6;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #183153;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.group-chip:hover {
+  transform: translateY(-1px);
+  border-color: #9ec5eb;
+  box-shadow: 0 8px 18px rgba(25, 74, 128, 0.06);
+}
+
+.group-chip--row {
+  flex: 1;
+}
+
+.group-chip--active {
+  border-color: #409eff;
+  background: linear-gradient(180deg, #eff7ff 0%, #ffffff 100%);
+}
+
+.group-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-chip strong {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #6f86a3;
+}
+
+.group-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .datasource-list {
@@ -1488,6 +1876,11 @@ onMounted(async () => {
   width: 100%;
 }
 
+.table-detail-pagination {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
 .main-empty {
   display: flex;
   flex: 1;
@@ -1497,6 +1890,17 @@ onMounted(async () => {
 
 .datasource-form {
   padding-top: 8px;
+}
+
+.draft-preview-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #deebf7;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 57, 106, 0.05);
 }
 
 .form-grid {

@@ -19,6 +19,9 @@ public class ExtractPreviewRequest {
     @Max(value = 500, message = "limit must be <= 500")
     private Integer limit = 20;
 
+    @Min(value = 0, message = "offset must be >= 0")
+    private Integer offset = 0;
+
     public Long getDatasourceId() {
         return datasourceId;
     }
@@ -49,5 +52,13 @@ public class ExtractPreviewRequest {
 
     public void setLimit(Integer limit) {
         this.limit = limit;
+    }
+
+    public Integer getOffset() {
+        return offset;
+    }
+
+    public void setOffset(Integer offset) {
+        this.offset = offset;
     }
 }

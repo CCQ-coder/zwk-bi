@@ -15,6 +15,7 @@ import com.aibi.bi.model.response.DatasetPreviewResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -146,16 +147,19 @@ public class DatasetService {
         BiDataset entity = new BiDataset();
         entity.setName(request.getName());
         entity.setDatasourceId(request.getDatasourceId());
-        entity.setSqlText(request.getSqlText());
+        entity.setSqlText(normalizeSqlText(request.getSqlText()));
         entity.setFolderId(request.getFolderId());
-        if (!isDemoDataset(entity.getDatasourceId())) {
+        Set<String> filterFieldNames = normalizeFilterFieldNames(request.getFilterFieldNames());
+        if (isDemoDataset(entity.getDatasourceId())) {
+            validateDemoDatasetSql(entity.getSqlText());
+        } else {
             previewAndValidate(entity.getDatasourceId(), entity.getSqlText());
         }
         biDatasetMapper.insert(entity);
         if (isDemoDataset(entity.getDatasourceId())) {
-            syncDemoDatasetFields(entity);
+            syncDemoDatasetFields(entity, filterFieldNames);
         } else {
-            syncDatasetFields(entity);
+            syncDatasetFields(entity, filterFieldNames);
         }
         return entity;
     }
@@ -167,18 +171,21 @@ public class DatasetService {
         }
         entity.setName(request.getName());
         entity.setDatasourceId(request.getDatasourceId());
-        entity.setSqlText(request.getSqlText());
+        entity.setSqlText(normalizeSqlText(request.getSqlText()));
         if (request.getFolderId() != null) {
             entity.setFolderId(request.getFolderId());
         }
-        if (!isDemoDataset(entity.getDatasourceId())) {
+        Set<String> filterFieldNames = normalizeFilterFieldNames(request.getFilterFieldNames());
+        if (isDemoDataset(entity.getDatasourceId())) {
+            validateDemoDatasetSql(entity.getSqlText());
+        } else {
             previewAndValidate(entity.getDatasourceId(), entity.getSqlText());
         }
         biDatasetMapper.update(entity);
         if (isDemoDataset(entity.getDatasourceId())) {
-            syncDemoDatasetFields(entity);
+            syncDemoDatasetFields(entity, filterFieldNames);
         } else {
-            syncDatasetFields(entity);
+            syncDatasetFields(entity, filterFieldNames);
         }
         return entity;
     }
@@ -190,14 +197,14 @@ public class DatasetService {
 
     public DatasetPreviewResponse preview(DatasetPreviewRequest request) {
         if (isDemoDataset(request.getDatasourceId())) {
+            validateDemoDatasetSql(request.getSqlText());
             return getDemoPreviewResponse(request.getSqlText());
         }
         BiDatasource datasource = biDatasourceMapper.findById(request.getDatasourceId());
         if (datasource == null) {
             throw new IllegalArgumentException("Datasource not found: " + request.getDatasourceId());
         }
-        ensureDatasetDatasource(datasource);
-        return datasourceService.previewDatasource(request.getDatasourceId(), request.getSqlText(), null);
+        return previewDatasourceForDataset(datasource, request.getSqlText());
     }
 
     public DatasetPreviewResponse previewDataset(Long datasetId) {
@@ -206,23 +213,23 @@ public class DatasetService {
             throw new IllegalArgumentException("Dataset not found: " + datasetId);
         }
         if (isDemoDataset(dataset.getDatasourceId())) {
+            validateDemoDatasetSql(dataset.getSqlText());
             return getDemoPreviewResponse(dataset.getSqlText());
         }
         BiDatasource datasource = biDatasourceMapper.findById(dataset.getDatasourceId());
         if (datasource == null) {
             throw new IllegalArgumentException("Datasource not found: " + dataset.getDatasourceId());
         }
-        ensureDatasetDatasource(datasource);
-        return datasourceService.previewDatasource(dataset.getDatasourceId(), dataset.getSqlText(), null);
+        return previewDatasourceForDataset(datasource, dataset.getSqlText());
     }
 
     public void refreshAllDatasetFields() {
         for (BiDataset dataset : biDatasetMapper.listAll()) {
             try {
                 if (isDemoDataset(dataset.getDatasourceId())) {
-                    syncDemoDatasetFields(dataset);
+                    syncDemoDatasetFields(dataset, null);
                 } else {
-                    syncDatasetFields(dataset);
+                    syncDatasetFields(dataset, null);
                 }
             } catch (Exception ex) {
                 log.warn("Skip dataset field sync for dataset {} because preview failed: {}", dataset.getId(), ex.getMessage());
@@ -239,48 +246,49 @@ public class DatasetService {
         if (datasource == null) {
             throw new IllegalArgumentException("Datasource not found: " + datasourceId);
         }
-        ensureDatasetDatasource(datasource);
-        datasourceService.previewDatasource(datasourceId, sqlText, null);
+        previewDatasourceForDataset(datasource, sqlText);
     }
 
-    private void syncDatasetFields(BiDataset dataset) {
+    private void syncDatasetFields(BiDataset dataset, Set<String> requestedFilterFields) {
         BiDatasource datasource = biDatasourceMapper.findById(dataset.getDatasourceId());
         if (datasource == null) {
             throw new IllegalArgumentException("Datasource not found: " + dataset.getDatasourceId());
         }
-        ensureDatasetDatasource(datasource);
-        DatasetPreviewResponse preview = datasourceService.previewDatasource(dataset.getDatasourceId(), dataset.getSqlText(), null);
-        biDatasetFieldMapper.deleteByDatasetId(dataset.getId());
-        if (preview.getColumns() == null || preview.getColumns().isEmpty()) {
-            return;
-        }
-        List<BiDatasetField> fields = preview.getColumns().stream().map(column -> {
-            BiDatasetField field = new BiDatasetField();
-            field.setDatasetId(dataset.getId());
-            field.setFieldName(column);
-            field.setFieldLabel(column);
-            field.setFieldType(inferFieldType(column, preview.getRows()));
-            return field;
-        }).toList();
-        if (!fields.isEmpty()) {
-            biDatasetFieldMapper.batchInsert(fields);
-        }
+        DatasetPreviewResponse preview = previewDatasourceForDataset(datasource, dataset.getSqlText());
+        replaceDatasetFields(dataset.getId(), preview, requestedFilterFields);
     }
 
-    private void syncDemoDatasetFields(BiDataset dataset) {
+    private void syncDemoDatasetFields(BiDataset dataset, Set<String> requestedFilterFields) {
         DatasetPreviewResponse preview = getDemoPreviewResponse(dataset.getSqlText());
-        biDatasetFieldMapper.deleteByDatasetId(dataset.getId());
+        replaceDatasetFields(dataset.getId(), preview, requestedFilterFields);
+    }
+
+    private void replaceDatasetFields(Long datasetId, DatasetPreviewResponse preview, Set<String> requestedFilterFields) {
+        List<BiDatasetField> existingFields = biDatasetFieldMapper.listByDatasetId(datasetId);
+        Set<String> filterFieldNames = requestedFilterFields == null
+                ? existingFields.stream()
+                .filter(field -> Boolean.TRUE.equals(field.getFilterable()))
+                .map(BiDatasetField::getFieldName)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet())
+                : requestedFilterFields;
+
         if (preview.getColumns() == null || preview.getColumns().isEmpty()) {
+            biDatasetFieldMapper.deleteByDatasetId(datasetId);
             return;
         }
+
         List<BiDatasetField> fields = preview.getColumns().stream().map(column -> {
             BiDatasetField field = new BiDatasetField();
-            field.setDatasetId(dataset.getId());
+            field.setDatasetId(datasetId);
             field.setFieldName(column);
             field.setFieldLabel(column);
             field.setFieldType(inferFieldType(column, preview.getRows()));
+            field.setFilterable(filterFieldNames.contains(column));
             return field;
         }).toList();
+
+        biDatasetFieldMapper.deleteByDatasetId(datasetId);
         if (!fields.isEmpty()) {
             biDatasetFieldMapper.batchInsert(fields);
         }
@@ -346,10 +354,39 @@ public class DatasetService {
         );
     }
 
-    private void ensureDatasetDatasource(BiDatasource datasource) {
-        if (!datasourceService.isDatabaseDatasource(datasource)) {
-            throw new IllegalArgumentException("SQL 数据集仅支持数据库类型数据源");
+    private DatasetPreviewResponse previewDatasourceForDataset(BiDatasource datasource, String sqlText) {
+        if (datasourceService.isDatabaseDatasource(datasource)) {
+            String normalizedSqlText = normalizeSqlText(sqlText);
+            validateDatabaseDatasetSql(normalizedSqlText);
+            return datasourceService.previewDatasource(datasource.getId(), normalizedSqlText, null);
         }
+        return datasourceService.previewDatasource(datasource.getId(), null, null);
+    }
+
+    private void validateDemoDatasetSql(String sqlText) {
+        if (!StringUtils.hasText(sqlText)) {
+            throw new IllegalArgumentException("演示数据集需要填写静态数据标识");
+        }
+    }
+
+    private void validateDatabaseDatasetSql(String sqlText) {
+        if (!StringUtils.hasText(sqlText)) {
+            throw new IllegalArgumentException("数据库数据集需要填写查询 SQL");
+        }
+    }
+
+    private String normalizeSqlText(String sqlText) {
+        return sqlText == null ? "" : sqlText.trim();
+    }
+
+    private Set<String> normalizeFilterFieldNames(List<String> filterFieldNames) {
+        if (filterFieldNames == null) {
+            return Set.of();
+        }
+        return filterFieldNames.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 
     private DatasetPreviewResponse buildDemoResponse(List<String> columns, Object[][] data) {

@@ -1,13 +1,11 @@
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { getChartList } from '../api/chart';
-import { getDashboardList } from '../api/dashboard';
 import { getDatasetList } from '../api/dataset';
 import { getDatasourceList } from '../api/datasource';
-import request from '../api/request';
+import { getWorkbenchOverview, } from '../api/workbench';
 import TopNavBar from '../components/TopNavBar.vue';
-import { normalizeCanvasConfig, normalizeCoverConfig, normalizePublishConfig, parseReportConfig, } from '../utils/report-config';
-import { flattenAuthMenus, getAuthMenus, getAuthRole } from '../utils/auth-session';
+import { flattenAuthMenus, getAuthMenus } from '../utils/auth-session';
 const SOURCE_KIND_LABELS = {
     DATABASE: '数据库',
     API: 'API 接口',
@@ -23,77 +21,81 @@ const LOGIN_CHART_HEIGHT = 160;
 const LOGIN_CHART_PADDING_X = 18;
 const LOGIN_CHART_PADDING_TOP = 14;
 const LOGIN_CHART_PADDING_BOTTOM = 24;
+const EMPTY_SUMMARY = {
+    datasourceCount: 0,
+    datasetCount: 0,
+    chartCount: 0,
+    screenCount: 0,
+    publishedScreenCount: 0,
+    recentAddedDatasourceCount: 0,
+    recentAddedDatasetCount: 0,
+    recentAddedChartCount: 0,
+    recentAddedScreenCount: 0,
+    recentAddedTotal: 0,
+};
+const EMPTY_LOGIN = {
+    enabled: false,
+    successCount: 0,
+    failCount: 0,
+    activeUserCount: 0,
+    trend: [],
+};
 const loading = ref(false);
 const router = useRouter();
-const datasourceList = ref([]);
-const datasetList = ref([]);
-const chartList = ref([]);
-const reportList = ref([]);
-const loginLogs = ref([]);
+const overview = ref(null);
 const recentScreenPage = ref(1);
 const resourcePage = ref(1);
 const activeResourceCategory = ref('datasource');
-const componentCountMap = computed(() => Object.fromEntries(reportList.value.map((item) => [item.id, item.componentCount ?? 0])));
+const resourceItemsByCategory = reactive({
+    datasource: [],
+    dataset: [],
+    chart: [],
+    screen: [],
+});
+const loadedCategories = reactive({
+    datasource: false,
+    dataset: false,
+    chart: false,
+    screen: false,
+});
+const loadingCategories = reactive({
+    datasource: false,
+    dataset: false,
+    chart: false,
+    screen: false,
+});
 const allowedPaths = computed(() => new Set(flattenAuthMenus(getAuthMenus()).map((item) => item.path).filter(Boolean)));
 const canAccess = (path) => !allowedPaths.value.size
     || allowedPaths.value.has(path)
     || Array.from(allowedPaths.value).some((item) => path.startsWith(`${item}/`));
-const canLoadLoginLogs = computed(() => getAuthRole() === 'ADMIN' && canAccess('/home/system/login-logs'));
-const getReportScene = (report) => {
-    const config = parseReportConfig(report.configJson);
-    return config.scene === 'screen' ? 'screen' : 'dashboard';
-};
-const getPublishStatus = (report) => {
-    const config = parseReportConfig(report.configJson);
-    return normalizePublishConfig(config.publish).status;
-};
-const getCoverUrl = (report) => {
-    const config = parseReportConfig(report.configJson);
-    return normalizeCoverConfig(config.cover).url;
-};
-const getCanvasLabel = (report) => {
-    const scene = getReportScene(report);
-    const config = parseReportConfig(report.configJson);
-    const canvas = normalizeCanvasConfig(config.canvas, scene);
-    return `${canvas.width} × ${canvas.height}`;
-};
+const summary = computed(() => overview.value?.summary ?? EMPTY_SUMMARY);
+const loginOverview = computed(() => overview.value?.login ?? EMPTY_LOGIN);
+const screens = computed(() => overview.value?.screens ?? []);
+const componentCountMap = computed(() => Object.fromEntries(screens.value.map((item) => [item.id, item.componentCount])));
+const canLoadLoginLogs = computed(() => loginOverview.value.enabled && canAccess('/home/system/login-logs'));
+const getPublishStatus = (screen) => screen.publishStatus;
+const getCoverUrl = (screen) => screen.coverUrl;
+const getCanvasLabel = (screen) => `${screen.canvasWidth} × ${screen.canvasHeight}`;
 const getComponentCount = (dashboardId) => componentCountMap.value[dashboardId] ?? 0;
 const sortByCreatedAt = (list) => [...list].sort((left, right) => {
     const leftTime = new Date(left.createdAt || 0).getTime();
     const rightTime = new Date(right.createdAt || 0).getTime();
     return rightTime - leftTime;
 });
-const screens = computed(() => sortByCreatedAt(reportList.value.filter((item) => getReportScene(item) === 'screen')));
-const publishedReportCount = computed(() => screens.value.filter((item) => getPublishStatus(item) === 'PUBLISHED').length);
+const publishedReportCount = computed(() => summary.value.publishedScreenCount);
 const publishProgress = computed(() => {
     if (!screens.value.length)
         return 0;
     return Math.round((publishedReportCount.value / screens.value.length) * 100);
 });
-const isRecentWithinWindow = (value) => {
-    if (!value)
-        return false;
-    const timestamp = new Date(value).getTime();
-    if (Number.isNaN(timestamp))
-        return false;
-    const now = Date.now();
-    const diff = now - timestamp;
-    return diff >= 0 && diff <= RECENT_ADDED_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-};
-const recentAddedDatasourceCount = computed(() => datasourceList.value.filter((item) => isRecentWithinWindow(item.createdAt)).length);
-const recentAddedDatasetCount = computed(() => datasetList.value.filter((item) => isRecentWithinWindow(item.createdAt)).length);
-const recentAddedChartCount = computed(() => chartList.value.filter((item) => isRecentWithinWindow(item.createdAt)).length);
-const recentAddedScreenCount = computed(() => screens.value.filter((item) => isRecentWithinWindow(item.createdAt)).length);
-const recentAddedTotal = computed(() => [
-    recentAddedDatasourceCount.value,
-    recentAddedDatasetCount.value,
-    recentAddedChartCount.value,
-    recentAddedScreenCount.value,
-].reduce((sum, item) => sum + item, 0));
-const recentLoginLogs = computed(() => loginLogs.value.filter((item) => isRecentWithinWindow(item.createdAt)));
-const recentLoginSuccessCount = computed(() => recentLoginLogs.value.filter((item) => item.action === 'LOGIN_SUCCESS').length);
-const recentLoginFailCount = computed(() => recentLoginLogs.value.filter((item) => item.action === 'LOGIN_FAIL').length);
-const recentLoginActiveUserCount = computed(() => new Set(recentLoginLogs.value.map((item) => item.username).filter(Boolean)).size);
+const recentAddedDatasourceCount = computed(() => summary.value.recentAddedDatasourceCount);
+const recentAddedDatasetCount = computed(() => summary.value.recentAddedDatasetCount);
+const recentAddedChartCount = computed(() => summary.value.recentAddedChartCount);
+const recentAddedScreenCount = computed(() => summary.value.recentAddedScreenCount);
+const recentAddedTotal = computed(() => summary.value.recentAddedTotal);
+const recentLoginSuccessCount = computed(() => loginOverview.value.successCount);
+const recentLoginFailCount = computed(() => loginOverview.value.failCount);
+const recentLoginActiveUserCount = computed(() => loginOverview.value.activeUserCount);
 const recentAddedBars = computed(() => {
     const rawItems = [
         {
@@ -154,45 +156,13 @@ const recentAddedRingSegments = computed(() => {
         return segment;
     });
 });
-const recentLoginTrend = computed(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const buckets = Array.from({ length: RECENT_ADDED_WINDOW_DAYS }, (_, index) => {
-        const date = new Date(today);
-        date.setDate(today.getDate() - (RECENT_ADDED_WINDOW_DAYS - 1 - index));
-        return {
-            key: date.toISOString().slice(0, 10),
-            label: `${date.getMonth() + 1}/${date.getDate()}`,
-            success: 0,
-            fail: 0,
-            total: 0,
-        };
-    });
-    const bucketMap = new Map(buckets.map((item) => [item.key, item]));
-    recentLoginLogs.value.forEach((item) => {
-        const date = new Date(item.createdAt);
-        if (Number.isNaN(date.getTime()))
-            return;
-        date.setHours(0, 0, 0, 0);
-        const bucket = bucketMap.get(date.toISOString().slice(0, 10));
-        if (!bucket)
-            return;
-        if (item.action === 'LOGIN_SUCCESS') {
-            bucket.success += 1;
-        }
-        else if (item.action === 'LOGIN_FAIL') {
-            bucket.fail += 1;
-        }
-        bucket.total = bucket.success + bucket.fail;
-    });
-    return buckets.map((item) => ({
-        key: item.key,
-        label: item.label,
-        success: item.success,
-        fail: item.fail,
-        total: item.total,
-    }));
-});
+const recentLoginTrend = computed(() => (loginOverview.value.trend ?? []).map((item) => ({
+    key: item.key,
+    label: item.label,
+    success: item.success,
+    fail: item.fail,
+    total: item.total,
+})));
 const hasRecentLoginData = computed(() => recentLoginTrend.value.some((item) => item.total > 0));
 const loginChartMaxValue = computed(() => Math.max(...recentLoginTrend.value.flatMap((item) => [item.success, item.fail]), 1));
 const loginChartPoints = computed(() => {
@@ -217,88 +187,86 @@ const loginGuideLines = computed(() => {
         y: LOGIN_CHART_PADDING_TOP + availableHeight * ratio,
     }));
 });
-const allResourceItems = computed(() => {
-    const datasourceAssets = datasourceList.value.map((item) => ({
-        id: `datasource-${item.id}`,
-        name: item.name,
-        typeLabel: '数据源',
-        secondary: `${SOURCE_KIND_LABELS[item.sourceKind]} · ${item.datasourceType || '未标注类型'}`,
-        createdAt: item.createdAt,
-        statusLabel: SOURCE_KIND_LABELS[item.sourceKind],
-        statusType: 'info',
-        path: '/home/prepare/datasource',
-        category: 'datasource',
-    }));
-    const datasetAssets = datasetList.value.map((item) => ({
-        id: `dataset-${item.id}`,
-        name: item.name,
-        typeLabel: '数据集',
-        secondary: item.datasourceId ? `来源数据源 #${item.datasourceId}` : '未绑定数据源',
-        createdAt: item.createdAt,
-        statusLabel: '可建模',
-        statusType: 'success',
-        path: '/home/prepare/dataset',
-        category: 'dataset',
-    }));
-    const chartAssets = chartList.value.map((item) => ({
-        id: `chart-${item.id}`,
-        name: item.name,
-        typeLabel: '图表组件',
-        secondary: item.datasetId ? `来源数据集 #${item.datasetId} · ${item.chartType}` : `${item.chartType} · 未绑定数据集`,
-        createdAt: item.createdAt,
-        statusLabel: item.chartType,
-        statusType: 'info',
-        path: '/home/prepare/components',
-        category: 'chart',
-    }));
-    const screenAssets = screens.value.map((item) => ({
-        id: `screen-${item.id}`,
-        name: item.name,
-        typeLabel: '数据大屏',
-        secondary: `${getComponentCount(item.id)} 个组件 · ${getCanvasLabel(item)}`,
-        createdAt: item.createdAt,
-        statusLabel: getPublishStatus(item) === 'PUBLISHED' ? '已发布' : '草稿',
-        statusType: getPublishStatus(item) === 'PUBLISHED' ? 'success' : 'warning',
-        path: `/home/screen/edit/${item.id}`,
-        category: 'screen',
-    }));
-    return sortByCreatedAt([...datasourceAssets, ...datasetAssets, ...chartAssets, ...screenAssets]);
-});
+const buildDatasourceAssets = (datasources) => sortByCreatedAt(datasources.map((item) => ({
+    id: `datasource-${item.id}`,
+    name: item.name,
+    typeLabel: '数据源',
+    secondary: `${SOURCE_KIND_LABELS[item.sourceKind]} · ${item.datasourceType || '未标注类型'}`,
+    createdAt: item.createdAt,
+    statusLabel: SOURCE_KIND_LABELS[item.sourceKind],
+    statusType: 'info',
+    path: '/home/prepare/datasource',
+    category: 'datasource',
+})));
+const buildDatasetAssets = (datasets) => sortByCreatedAt(datasets.map((item) => ({
+    id: `dataset-${item.id}`,
+    name: item.name,
+    typeLabel: '数据集',
+    secondary: item.datasourceId ? `来源数据源 #${item.datasourceId}` : '未绑定数据源',
+    createdAt: item.createdAt,
+    statusLabel: '可建模',
+    statusType: 'success',
+    path: '/home/prepare/dataset',
+    category: 'dataset',
+})));
+const buildChartAssets = (charts) => sortByCreatedAt(charts.map((item) => ({
+    id: `chart-${item.id}`,
+    name: item.name,
+    typeLabel: '图表组件',
+    secondary: item.datasetId ? `来源数据集 #${item.datasetId} · ${item.chartType}` : `${item.chartType} · 未绑定数据集`,
+    createdAt: item.createdAt,
+    statusLabel: item.chartType,
+    statusType: 'info',
+    path: '/home/prepare/components',
+    category: 'chart',
+})));
+const buildScreenAssets = (screenList) => sortByCreatedAt(screenList.map((item) => ({
+    id: `screen-${item.id}`,
+    name: item.name,
+    typeLabel: '数据大屏',
+    secondary: `${getComponentCount(item.id)} 个组件 · ${getCanvasLabel(item)}`,
+    createdAt: item.createdAt,
+    statusLabel: getPublishStatus(item) === 'PUBLISHED' ? '已发布' : '草稿',
+    statusType: getPublishStatus(item) === 'PUBLISHED' ? 'success' : 'warning',
+    path: `/home/screen/edit/${item.id}`,
+    category: 'screen',
+})));
 const resourceCategories = computed(() => {
     const categories = [
         {
             key: 'datasource',
             label: '数据源',
-            count: allResourceItems.value.filter((item) => item.category === 'datasource').length,
+            count: summary.value.datasourceCount,
             path: '/home/prepare/datasource',
         },
         {
             key: 'dataset',
             label: '数据集',
-            count: allResourceItems.value.filter((item) => item.category === 'dataset').length,
+            count: summary.value.datasetCount,
             path: '/home/prepare/dataset',
         },
         {
             key: 'chart',
             label: '图表组件',
-            count: allResourceItems.value.filter((item) => item.category === 'chart').length,
+            count: summary.value.chartCount,
             path: '/home/prepare/components',
         },
         {
             key: 'screen',
             label: '数据大屏',
-            count: allResourceItems.value.filter((item) => item.category === 'screen').length,
+            count: summary.value.screenCount,
             path: '/home/screen',
         },
     ];
     return categories.filter((item) => canAccess(item.path));
 });
 const activeResourceMeta = computed(() => resourceCategories.value.find((item) => item.key === activeResourceCategory.value) || null);
-const filteredResourceItems = computed(() => allResourceItems.value.filter((item) => item.category === activeResourceCategory.value));
+const filteredResourceItems = computed(() => resourceItemsByCategory[activeResourceCategory.value]);
 const pagedResourceItems = computed(() => {
     const start = (resourcePage.value - 1) * RESOURCE_PAGE_SIZE;
     return filteredResourceItems.value.slice(start, start + RESOURCE_PAGE_SIZE);
 });
+const activeResourceLoading = computed(() => loadingCategories[activeResourceCategory.value]);
 const pagedRecentScreens = computed(() => {
     const start = (recentScreenPage.value - 1) * RECENT_SCREEN_PAGE_SIZE;
     return screens.value.slice(start, start + RECENT_SCREEN_PAGE_SIZE);
@@ -311,8 +279,13 @@ watch(resourceCategories, (categories) => {
         activeResourceCategory.value = categories[0].key;
     }
 }, { immediate: true });
-watch(activeResourceCategory, () => {
+watch(screens, (value) => {
+    resourceItemsByCategory.screen = buildScreenAssets(value);
+    loadedCategories.screen = true;
+}, { immediate: true });
+watch(activeResourceCategory, (category) => {
     resourcePage.value = 1;
+    void ensureCategoryLoaded(category);
 });
 watch(() => screens.value.length, (count) => {
     const maxPage = Math.max(1, Math.ceil(count / RECENT_SCREEN_PAGE_SIZE));
@@ -345,30 +318,59 @@ const goTo = (path) => {
 const openScreen = (id) => {
     router.push(`/home/screen/edit/${id}`);
 };
-const loadData = async () => {
+const ensureCategoryLoaded = async (category) => {
+    if (loadedCategories[category] || loadingCategories[category]) {
+        return;
+    }
+    const categoryMeta = resourceCategories.value.find((item) => item.key === category);
+    if (!categoryMeta || categoryMeta.count === 0) {
+        resourceItemsByCategory[category] = [];
+        loadedCategories[category] = true;
+        return;
+    }
+    if (category === 'screen') {
+        resourceItemsByCategory.screen = buildScreenAssets(screens.value);
+        loadedCategories.screen = true;
+        return;
+    }
+    loadingCategories[category] = true;
+    try {
+        if (category === 'datasource') {
+            resourceItemsByCategory.datasource = buildDatasourceAssets(await getDatasourceList());
+        }
+        else if (category === 'dataset') {
+            resourceItemsByCategory.dataset = buildDatasetAssets(await getDatasetList());
+        }
+        else if (category === 'chart') {
+            resourceItemsByCategory.chart = buildChartAssets(await getChartList());
+        }
+        loadedCategories[category] = true;
+    }
+    finally {
+        loadingCategories[category] = false;
+    }
+};
+const warmupActiveCategory = () => {
+    if (typeof window === 'undefined') {
+        return;
+    }
+    window.setTimeout(() => {
+        void ensureCategoryLoaded(activeResourceCategory.value);
+    }, 0);
+};
+const loadOverview = async () => {
     loading.value = true;
     try {
-        const loginLogsPromise = canLoadLoginLogs.value
-            ? request.get('/audit-logs/login').catch(() => [])
-            : Promise.resolve([]);
-        const [datasources, datasets, charts, dashboards, logs] = await Promise.all([
-            getDatasourceList(),
-            getDatasetList(),
-            getChartList(),
-            getDashboardList(),
-            loginLogsPromise,
-        ]);
-        datasourceList.value = datasources;
-        datasetList.value = datasets;
-        chartList.value = charts;
-        reportList.value = dashboards;
-        loginLogs.value = logs;
+        overview.value = await getWorkbenchOverview();
     }
     finally {
         loading.value = false;
     }
 };
-onMounted(loadData);
+onMounted(async () => {
+    await loadOverview();
+    warmupActiveCategory();
+});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -970,13 +972,20 @@ if (__VLS_ctx.resourceCategories.length) {
         (category.count);
     }
 }
-if (__VLS_ctx.pagedResourceItems.length) {
+if (__VLS_ctx.activeResourceLoading && !__VLS_ctx.pagedResourceItems.length) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "resource-loading" },
+    });
+}
+else if (__VLS_ctx.pagedResourceItems.length) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "resource-list" },
     });
     for (const [item] of __VLS_getVForSourceType((__VLS_ctx.pagedResourceItems))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
             ...{ onClick: (...[$event]) => {
+                    if (!!(__VLS_ctx.activeResourceLoading && !__VLS_ctx.pagedResourceItems.length))
+                        return;
                     if (!(__VLS_ctx.pagedResourceItems.length))
                         return;
                     __VLS_ctx.goTo(item.path);
@@ -1163,6 +1172,7 @@ var __VLS_30;
 /** @type {__VLS_StyleScopedClasses['resource-toolbar']} */ ;
 /** @type {__VLS_StyleScopedClasses['resource-tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['resource-tab__count']} */ ;
+/** @type {__VLS_StyleScopedClasses['resource-loading']} */ ;
 /** @type {__VLS_StyleScopedClasses['resource-list']} */ ;
 /** @type {__VLS_StyleScopedClasses['resource-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['resource-item__main']} */ ;
@@ -1184,12 +1194,12 @@ const __VLS_self = (await import('vue')).defineComponent({
             recentScreenPage: recentScreenPage,
             resourcePage: resourcePage,
             activeResourceCategory: activeResourceCategory,
+            screens: screens,
             canLoadLoginLogs: canLoadLoginLogs,
             getPublishStatus: getPublishStatus,
             getCoverUrl: getCoverUrl,
             getCanvasLabel: getCanvasLabel,
             getComponentCount: getComponentCount,
-            screens: screens,
             publishedReportCount: publishedReportCount,
             publishProgress: publishProgress,
             recentAddedScreenCount: recentAddedScreenCount,
@@ -1209,6 +1219,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             activeResourceMeta: activeResourceMeta,
             filteredResourceItems: filteredResourceItems,
             pagedResourceItems: pagedResourceItems,
+            activeResourceLoading: activeResourceLoading,
             pagedRecentScreens: pagedRecentScreens,
             formatDate: formatDate,
             goTo: goTo,

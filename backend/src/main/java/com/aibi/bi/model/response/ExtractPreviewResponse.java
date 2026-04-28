@@ -9,6 +9,9 @@ public class ExtractPreviewResponse {
     private List<String> columns;
     private List<Map<String, Object>> rows;
     private int rowCount;
+    private long totalRows;
+    private int limit;
+    private int offset;
 
     public String getSqlText() {
         return sqlText;
@@ -40,5 +43,29 @@ public class ExtractPreviewResponse {
 
     public void setRowCount(int rowCount) {
         this.rowCount = rowCount;
+    }
+
+    public long getTotalRows() {
+        return totalRows;
+    }
+
+    public void setTotalRows(long totalRows) {
+        this.totalRows = totalRows;
+    }
+
+    public int getLimit() {
+        return limit;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    public int getOffset() {
+        return offset;
+    }
+
+    public void setOffset(int offset) {
+        this.offset = offset;
     }
 }
