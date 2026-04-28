@@ -1,10 +1,8 @@
 package com.aibi.bi.model.request;
 
-import jakarta.validation.constraints.NotNull;
-
 public class ChartPageSourceQueryRequest {
 
-    @NotNull(message = "datasourceId is required")
+    // Nullable — inline JSON runtime config can be previewed without datasource.
     private Long datasourceId;
 
     private String sqlText;

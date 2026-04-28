@@ -159,6 +159,7 @@
             v-else-if="isStaticWidget(component)"
             :chart-type="getComponentChartConfig(component).chartType"
             :chart-config="getComponentChartConfig(component)"
+            :style-config="getComponentConfig(component).style"
             :data="componentDataMap.get(component.id) ?? null"
             :dark="scene === 'screen'"
             :show-title="getComponentConfig(component).style.showTitle"

@@ -138,9 +138,12 @@ const emptyForm = () => ({
     folderId: null
 });
 const form = reactive(emptyForm());
+const resolveDatasourceValue = (value) => {
+    const normalized = Number(value);
+    return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
+};
 const rules = {
     name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-    datasourceId: [{ required: true, message: '请选择数据源', trigger: 'change' }],
     sqlText: [{ required: true, message: '请输入 SQL', trigger: 'blur' }]
 };
 const loadTree = async () => {
@@ -196,21 +199,29 @@ const loadTables = async (dsId) => {
     }
 };
 const refreshTables = () => {
-    if (form.datasourceId)
-        loadTables(Number(form.datasourceId));
+    const datasourceId = resolveDatasourceValue(form.datasourceId);
+    if (datasourceId)
+        loadTables(datasourceId);
 };
 const onDatasourceChange = (val) => {
-    if (val)
-        loadTables(Number(val));
+    const datasourceId = resolveDatasourceValue(val);
+    if (!datasourceId) {
+        tables.value = [];
+        selectedTable.value = '';
+        tableColumns.value = [];
+        return;
+    }
+    loadTables(datasourceId);
 };
 const selectTable = async (tableName) => {
     selectedTable.value = tableName;
     tableColumns.value = [];
-    if (!form.datasourceId)
+    const datasourceId = resolveDatasourceValue(form.datasourceId);
+    if (!datasourceId)
         return;
     columnsLoading.value = true;
     try {
-        tableColumns.value = await getTableColumns(Number(form.datasourceId), tableName);
+        tableColumns.value = await getTableColumns(datasourceId, tableName);
     }
     catch {
         ElMessage.error('获取列信息失败');
@@ -239,7 +250,7 @@ const openCreate = (folderId) => {
 const openEdit = (row) => {
     editId.value = row.id;
     form.name = row.name;
-    form.datasourceId = row.datasourceId ?? '';
+    form.datasourceId = resolveDatasourceValue(row.datasourceId) ?? '';
     form.sqlText = row.sqlText;
     form.folderId = row.folderId;
     Object.assign(formPreview, { columns: [], rows: [], rowCount: 0 });
@@ -254,12 +265,18 @@ const handleSubmit = async () => {
     await formRef.value?.validate();
     saving.value = true;
     try {
+        const payload = {
+            name: form.name,
+            datasourceId: resolveDatasourceValue(form.datasourceId),
+            sqlText: form.sqlText,
+            folderId: form.folderId,
+        };
         if (editId.value) {
-            await updateDataset(editId.value, form);
+            await updateDataset(editId.value, payload);
             ElMessage.success('更新成功');
         }
         else {
-            await createDataset(form);
+            await createDataset(payload);
             ElMessage.success('创建成功');
         }
         dialogVisible.value = false;
@@ -280,11 +297,11 @@ const handleDeleteDataset = async (id) => {
     await loadTree();
 };
 const handlePreview = async () => {
-    await formRef.value?.validateField(['datasourceId', 'sqlText']);
+    await formRef.value?.validateField(['sqlText']);
     previewBtnLoading.value = true;
     try {
         const result = await previewDatasetSql({
-            datasourceId: Number(form.datasourceId),
+            datasourceId: resolveDatasourceValue(form.datasourceId),
             sqlText: form.sqlText
         });
         Object.assign(formPreview, result);
@@ -542,35 +559,31 @@ if (__VLS_ctx.selectedDataset) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "content-actions" },
     });
-    if (__VLS_ctx.selectedDataset.datasourceId) {
-        const __VLS_50 = {}.ElButton;
-        /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
-        // @ts-ignore
-        const __VLS_51 = __VLS_asFunctionalComponent(__VLS_50, new __VLS_50({
-            ...{ 'onClick': {} },
-            type: "primary",
-            size: "small",
-        }));
-        const __VLS_52 = __VLS_51({
-            ...{ 'onClick': {} },
-            type: "primary",
-            size: "small",
-        }, ...__VLS_functionalComponentArgsRest(__VLS_51));
-        let __VLS_54;
-        let __VLS_55;
-        let __VLS_56;
-        const __VLS_57 = {
-            onClick: (...[$event]) => {
-                if (!(__VLS_ctx.selectedDataset))
-                    return;
-                if (!(__VLS_ctx.selectedDataset.datasourceId))
-                    return;
-                __VLS_ctx.openEdit(__VLS_ctx.selectedDataset);
-            }
-        };
-        __VLS_53.slots.default;
-        var __VLS_53;
-    }
+    const __VLS_50 = {}.ElButton;
+    /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
+    // @ts-ignore
+    const __VLS_51 = __VLS_asFunctionalComponent(__VLS_50, new __VLS_50({
+        ...{ 'onClick': {} },
+        type: "primary",
+        size: "small",
+    }));
+    const __VLS_52 = __VLS_51({
+        ...{ 'onClick': {} },
+        type: "primary",
+        size: "small",
+    }, ...__VLS_functionalComponentArgsRest(__VLS_51));
+    let __VLS_54;
+    let __VLS_55;
+    let __VLS_56;
+    const __VLS_57 = {
+        onClick: (...[$event]) => {
+            if (!(__VLS_ctx.selectedDataset))
+                return;
+            __VLS_ctx.openEdit(__VLS_ctx.selectedDataset);
+        }
+    };
+    __VLS_53.slots.default;
+    var __VLS_53;
     if (__VLS_ctx.selectedDataset.datasourceId) {
         const __VLS_58 = {}.ElPopconfirm;
         /** @type {[typeof __VLS_components.ElPopconfirm, typeof __VLS_components.elPopconfirm, typeof __VLS_components.ElPopconfirm, typeof __VLS_components.elPopconfirm, ]} */ ;
@@ -1061,13 +1074,15 @@ const __VLS_164 = {}.ElSelect;
 const __VLS_165 = __VLS_asFunctionalComponent(__VLS_164, new __VLS_164({
     ...{ 'onChange': {} },
     modelValue: (__VLS_ctx.form.datasourceId),
-    placeholder: "请选择",
+    placeholder: "留空表示演示数据集",
+    clearable: true,
     ...{ style: {} },
 }));
 const __VLS_166 = __VLS_165({
     ...{ 'onChange': {} },
     modelValue: (__VLS_ctx.form.datasourceId),
-    placeholder: "请选择",
+    placeholder: "留空表示演示数据集",
+    clearable: true,
     ...{ style: {} },
 }, ...__VLS_functionalComponentArgsRest(__VLS_165));
 let __VLS_168;

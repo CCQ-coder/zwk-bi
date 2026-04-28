@@ -19,15 +19,18 @@ public class UserService {
     private final SysRoleMapper sysRoleMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final AuditLogService auditLogService;
+    private final MenuCacheSupport menuCacheSupport;
 
     public UserService(BiUserMapper biUserMapper,
                        SysRoleMapper sysRoleMapper,
                        SysUserRoleMapper sysUserRoleMapper,
-                       AuditLogService auditLogService) {
+                       AuditLogService auditLogService,
+                       MenuCacheSupport menuCacheSupport) {
         this.biUserMapper = biUserMapper;
         this.sysRoleMapper = sysRoleMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.auditLogService = auditLogService;
+        this.menuCacheSupport = menuCacheSupport;
     }
 
     public List<UserResponse> list() {
@@ -48,6 +51,7 @@ public class UserService {
 
         biUserMapper.insert(user);
     syncUserRole(user);
+    menuCacheSupport.invalidateUser(user.getId());
         auditLogService.record(null, operator, "USER_CREATE", "USER", String.valueOf(user.getId()),
                 "创建用户: " + user.getUsername(), ipAddr);
         return toResponse(user);
@@ -68,6 +72,7 @@ public class UserService {
 
         biUserMapper.update(user);
         syncUserRole(user);
+    menuCacheSupport.invalidateUser(user.getId());
         auditLogService.record(null, operator, "USER_UPDATE", "USER", String.valueOf(user.getId()),
                 "更新用户: " + user.getUsername(), ipAddr);
         return toResponse(user);
@@ -83,6 +88,7 @@ public class UserService {
         }
         sysUserRoleMapper.deleteByUserId(id);
         biUserMapper.deleteById(id);
+        menuCacheSupport.invalidateUser(id);
         auditLogService.record(null, operator, "USER_DELETE", "USER", String.valueOf(id),
                 "删除用户: " + user.getUsername(), ipAddr);
     }

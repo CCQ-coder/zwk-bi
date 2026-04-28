@@ -44,7 +44,7 @@ export interface ChartPageSqlQueryRequest {
 }
 
 export interface ChartPageSourceQueryRequest {
-  datasourceId: number
+  datasourceId: number | null
   sqlText?: string
   runtimeConfigText?: string
 }

@@ -170,6 +170,11 @@ public class DatasourceService {
         return queryDatasource(datasource, sqlText, runtimeConfigText, maxRows);
     }
 
+    public DatasetPreviewResponse previewInlineJson(String runtimeConfigText, Integer maxRows) {
+        Map<String, Object> config = mergeConfig("{}", runtimeConfigText, "JSON 页面配置格式不正确");
+        return buildJsonPreviewResponse(config, maxRows);
+    }
+
     private DatasetPreviewResponse queryDatasource(BiDatasource datasource, String sqlText, String runtimeConfigText, Integer maxRows) {
         String sourceKind = resolveSourceKind(datasource);
         return switch (sourceKind) {
@@ -386,6 +391,10 @@ public class DatasourceService {
 
     private DatasetPreviewResponse queryJsonDatasource(BiDatasource datasource, String runtimeConfigText, Integer maxRows) {
         Map<String, Object> config = mergeConfig(datasource.getConfigJson(), runtimeConfigText, "JSON 页面配置格式不正确");
+        return buildJsonPreviewResponse(config, maxRows);
+    }
+
+    private DatasetPreviewResponse buildJsonPreviewResponse(Map<String, Object> config, Integer maxRows) {
         String jsonText = readText(firstNonNull(config.get("jsonText"), config.get("text")), "");
         if (!StringUtils.hasText(jsonText)) {
             throw new IllegalArgumentException("JSON 静态数据源缺少 JSON 内容");

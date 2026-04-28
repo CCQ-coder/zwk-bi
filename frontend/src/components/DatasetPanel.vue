@@ -41,7 +41,7 @@
           <div class="content-header">
             <span class="content-title">{{ selectedDataset.name }}</span>
             <div class="content-actions">
-              <el-button v-if="selectedDataset.datasourceId" type="primary" size="small" @click="openEdit(selectedDataset)">编辑</el-button>
+              <el-button type="primary" size="small" @click="openEdit(selectedDataset)">编辑</el-button>
               <el-popconfirm v-if="selectedDataset.datasourceId" title="确认删除？" @confirm="handleDeleteDataset(selectedDataset.id)">
                 <template #reference>
                   <el-button type="danger" size="small">删除</el-button>
@@ -114,7 +114,7 @@
           />
 
           <div v-if="tablesLoading" class="browser-tip">加载中...</div>
-          <div v-else-if="!form.datasourceId" class="browser-tip">请先选择数据源</div>
+          <div v-else-if="!form.datasourceId" class="browser-tip">当前为演示数据集，可直接编写静态 SQL 标识，无需选择数据源。</div>
           <div v-else-if="!filteredTables.length" class="browser-tip">暂无数据表</div>
           <div v-else class="table-list">
             <div
@@ -165,7 +165,8 @@
             <el-form-item label="数据源" prop="datasourceId">
               <el-select
                 v-model="form.datasourceId"
-                placeholder="请选择"
+                placeholder="留空表示演示数据集"
+                clearable
                 style="width:100%"
                 @change="onDatasourceChange"
               >
@@ -176,7 +177,7 @@
                   :value="ds.id"
                 />
               </el-select>
-              <div class="preview-empty" style="margin-top:6px;text-align:left">数据集仅支持数据库型数据源，API / 表格 / JSON 静态数据请在页面编写模式中使用。</div>
+              <div class="preview-empty" style="margin-top:6px;text-align:left">数据库数据集请选择数据库型数据源；演示 / 静态数据集可留空，直接使用内置静态数据标识。</div>
             </el-form-item>
             <el-form-item label="SQL" prop="sqlText">
               <el-input
@@ -427,9 +428,13 @@ const emptyForm = (): DatasetForm => ({
 
 const form = reactive<DatasetForm>(emptyForm())
 
+const resolveDatasourceValue = (value: number | string | null | undefined) => {
+  const normalized = Number(value)
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : null
+}
+
 const rules: FormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  datasourceId: [{ required: true, message: '请选择数据源', trigger: 'change' }],
   sqlText: [{ required: true, message: '请输入 SQL', trigger: 'blur' }]
 }
 
@@ -483,20 +488,29 @@ const loadTables = async (dsId: number) => {
 }
 
 const refreshTables = () => {
-  if (form.datasourceId) loadTables(Number(form.datasourceId))
+  const datasourceId = resolveDatasourceValue(form.datasourceId)
+  if (datasourceId) loadTables(datasourceId)
 }
 
 const onDatasourceChange = (val: number | string) => {
-  if (val) loadTables(Number(val))
+  const datasourceId = resolveDatasourceValue(val)
+  if (!datasourceId) {
+    tables.value = []
+    selectedTable.value = ''
+    tableColumns.value = []
+    return
+  }
+  loadTables(datasourceId)
 }
 
 const selectTable = async (tableName: string) => {
   selectedTable.value = tableName
   tableColumns.value = []
-  if (!form.datasourceId) return
+  const datasourceId = resolveDatasourceValue(form.datasourceId)
+  if (!datasourceId) return
   columnsLoading.value = true
   try {
-    tableColumns.value = await getTableColumns(Number(form.datasourceId), tableName)
+    tableColumns.value = await getTableColumns(datasourceId, tableName)
   } catch {
     ElMessage.error('获取列信息失败')
   } finally {
@@ -525,7 +539,7 @@ const openCreate = (folderId: number | null) => {
 const openEdit = (row: Dataset) => {
   editId.value = row.id
   form.name = row.name
-  form.datasourceId = row.datasourceId ?? ''
+  form.datasourceId = resolveDatasourceValue(row.datasourceId) ?? ''
   form.sqlText = row.sqlText
   form.folderId = row.folderId
   Object.assign(formPreview, { columns: [], rows: [], rowCount: 0 })
@@ -540,11 +554,17 @@ const handleSubmit = async () => {
   await formRef.value?.validate()
   saving.value = true
   try {
+    const payload: DatasetForm = {
+      name: form.name,
+      datasourceId: resolveDatasourceValue(form.datasourceId),
+      sqlText: form.sqlText,
+      folderId: form.folderId,
+    }
     if (editId.value) {
-      await updateDataset(editId.value, form)
+      await updateDataset(editId.value, payload)
       ElMessage.success('更新成功')
     } else {
-      await createDataset(form)
+      await createDataset(payload)
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false
@@ -566,11 +586,11 @@ const handleDeleteDataset = async (id: number) => {
 }
 
 const handlePreview = async () => {
-  await formRef.value?.validateField(['datasourceId', 'sqlText'])
+  await formRef.value?.validateField(['sqlText'])
   previewBtnLoading.value = true
   try {
     const result = await previewDatasetSql({
-      datasourceId: Number(form.datasourceId),
+      datasourceId: resolveDatasourceValue(form.datasourceId),
       sqlText: form.sqlText
     })
     Object.assign(formPreview, result)

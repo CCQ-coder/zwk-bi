@@ -709,6 +709,9 @@ const clearChartDataBinding = () => {
     clearPreviewData();
 };
 const ensurePageDatasourceMatched = () => {
+    if (configForm.chart.pageSourceKind === 'JSON_STATIC' && jsonRuntimeForm.text.trim()) {
+        return null;
+    }
     const datasourceId = Number(configForm.chart.datasourceId);
     if (!Number.isFinite(datasourceId) || datasourceId <= 0) {
         throw new Error(`请选择${pageSourceKindLabel.value}数据源`);
@@ -871,7 +874,7 @@ const onPageDatasourceChange = () => {
 const onPageSourceQuery = async () => {
     if (isUseDatasetMode.value)
         return;
-    let datasourceId = 0;
+    let datasourceId = null;
     try {
         datasourceId = ensurePageDatasourceMatched();
         if (configForm.chart.pageSourceKind === 'DATABASE' && !configForm.chart.sqlText.trim()) {

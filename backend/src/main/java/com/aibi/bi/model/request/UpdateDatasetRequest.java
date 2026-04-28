@@ -1,14 +1,13 @@
 package com.aibi.bi.model.request;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 public class UpdateDatasetRequest {
 
     @NotBlank(message = "name is required")
     private String name;
 
-    @NotNull(message = "datasourceId is required")
+    // Nullable — null means "demo dataset" (no real datasource)
     private Long datasourceId;
 
     @NotBlank(message = "sqlText is required")

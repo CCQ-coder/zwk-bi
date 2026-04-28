@@ -20,7 +20,7 @@ export interface DatasetFolder {
 
 export interface DatasetForm {
   name: string
-  datasourceId: number | ''
+  datasourceId: number | '' | null
   sqlText: string
   folderId?: number | null
 }
@@ -56,7 +56,7 @@ export const deleteDataset = (id: number): Promise<void> =>
   request.delete(`/datasets/${id}`)
 
 export const previewDatasetSql = (data: {
-  datasourceId: number
+  datasourceId: number | null
   sqlText: string
 }): Promise<DatasetPreviewResult> => request.post('/datasets/preview', data)
 

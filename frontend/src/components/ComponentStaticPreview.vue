@@ -1,5 +1,5 @@
 <template>
-  <div class="static-widget" :class="[`static-widget--${themeName}`, { 'static-widget--dark': dark }]">
+  <div class="static-widget" :class="[`static-widget--${themeName}`, { 'static-widget--dark': dark }]" :style="widgetStyle">
     <template v-if="isDecorationChartType(chartType)">
       <div class="decor-shell" :class="`decor-shell--${chartType}`">
         <template v-if="chartType === 'decor_title_plate'">
@@ -7,7 +7,7 @@
             <span class="decor-title-plate__rail decor-title-plate__rail--left" />
             <div class="decor-title-plate__bar">
               <span class="decor-title-plate__cap decor-title-plate__cap--left" />
-              <span class="decor-title-plate__label">BI STUDIO</span>
+              <span class="decor-title-plate__label">{{ titleText }}</span>
               <span class="decor-title-plate__cap decor-title-plate__cap--right" />
             </div>
             <span class="decor-title-plate__rail decor-title-plate__rail--right" />
@@ -251,10 +251,31 @@ onBeforeUnmount(() => {
   }
 })
 
-const titleText = computed(() => props.chartConfig.name || chartTypeLabel(props.chartType))
-// Enforce hidden titles for static widgets in preview, per screen design requirement.
-const shouldShowTitle = computed(() => false)
+const titleText = computed(() => props.styleConfig?.titleText || props.chartConfig.name || chartTypeLabel(props.chartType))
+const shouldShowTitle = computed(() => Boolean(props.showTitle || props.styleConfig?.titleText))
 const rawRows = computed(() => props.data?.rawRows ?? [])
+const widgetStyle = computed(() => {
+  const borderWidth = Math.max(0, Number(props.styleConfig?.borderWidth ?? 1))
+  const radius = Math.max(0, Number(props.styleConfig?.cardRadius ?? 14))
+  const isDecoration = isDecorationChartType(props.chartType)
+  const baseColor = props.styleConfig?.titleColor || (props.dark ? '#eaf4ff' : '#18324d')
+  const accentColor = props.styleConfig?.metricValueColor || props.styleConfig?.iconStrokeColor || (props.dark ? '#4fdfff' : '#4db3ff')
+  const successColor = props.styleConfig?.metricTrendUpColor || '#29c27c'
+  const mutedColor = props.dark ? 'rgba(234, 244, 255, 0.72)' : 'rgba(24, 50, 77, 0.72)'
+
+  return {
+    '--static-widget-text-color': baseColor,
+    '--static-widget-accent-color': accentColor,
+    '--static-widget-success-color': successColor,
+    '--static-widget-muted-color': mutedColor,
+    background: isDecoration ? 'transparent' : (props.styleConfig?.bgColor || 'transparent'),
+    border: !isDecoration && props.styleConfig?.borderShow ? `${borderWidth}px solid ${props.styleConfig.borderColor || accentColor}` : 'none',
+    borderRadius: `${radius}px`,
+    boxShadow: !isDecoration && props.styleConfig?.shadowShow
+      ? `0 0 ${Math.max(0, Number(props.styleConfig.shadowBlur ?? 12))}px ${props.styleConfig.shadowColor || 'rgba(77, 179, 255, 0.18)'}`
+      : 'none',
+  }
+})
 
 // ─── iframe ───────────────────────────────────────────────────────────
 const activeIframeTab = ref(0)
@@ -462,12 +483,12 @@ const themeName = computed(() => {
   overflow: hidden;
   border-radius: 14px;
   background: transparent;
-  color: #18324d;
+  color: var(--static-widget-text-color, #18324d);
 }
 
 .static-widget--dark {
   background: transparent;
-  color: #eaf4ff;
+  color: var(--static-widget-text-color, #eaf4ff);
 }
 
 .decor-shell,
@@ -1013,7 +1034,7 @@ const themeName = computed(() => {
   z-index: 1;
   width: 90px;
   height: 90px;
-  color: #4db3ff;
+  color: var(--static-widget-accent-color, #4db3ff);
   filter: drop-shadow(0 0 18px rgba(77, 179, 255, 0.26));
   animation: iconStageFloat 3.6s ease-in-out infinite;
 }
@@ -1030,7 +1051,7 @@ const themeName = computed(() => {
 
 .icon-shell__meta {
   font-size: 12px;
-  opacity: 0.6;
+  color: var(--static-widget-muted-color, rgba(24, 50, 77, 0.72));
 }
 
 .time-shell {
@@ -1045,7 +1066,7 @@ const themeName = computed(() => {
 .link-shell__hint,
 .frame-shell__address,
 .list-shell__value {
-  opacity: 0.68;
+  color: var(--static-widget-muted-color, rgba(24, 50, 77, 0.72));
 }
 
 .time-shell__date {
@@ -1103,7 +1124,7 @@ const themeName = computed(() => {
 }
 
 .link-shell__url {
-  color: #4db3ff;
+  color: var(--static-widget-accent-color, #4db3ff);
   font-size: 18px;
   font-weight: 700;
   text-decoration: underline;
@@ -1208,7 +1229,8 @@ const themeName = computed(() => {
 .text-shell__paragraph {
   font-size: 13px;
   line-height: 1.8;
-  opacity: 0.76;
+  color: inherit;
+  opacity: 0.82;
 }
 
 .metric-shell {
@@ -1221,7 +1243,7 @@ const themeName = computed(() => {
 .metric-shell__value {
   font-size: 34px;
   font-weight: 800;
-  color: #4db3ff;
+  color: var(--static-widget-accent-color, #4db3ff);
 }
 
 .metric-shell__value--flipper {
@@ -1230,11 +1252,11 @@ const themeName = computed(() => {
 
 .metric-shell__trend {
   font-size: 13px;
-  opacity: 0.72;
+  color: var(--static-widget-muted-color, rgba(24, 50, 77, 0.72));
 }
 
 .metric-shell__trend span {
-  color: #29c27c;
+  color: var(--static-widget-success-color, #29c27c);
   font-weight: 700;
 }
 
@@ -1261,7 +1283,7 @@ const themeName = computed(() => {
 .list-shell__index {
   font-size: 12px;
   font-weight: 700;
-  color: #4db3ff;
+  color: var(--static-widget-accent-color, #4db3ff);
 }
 
 .list-shell__thumb {
@@ -1289,7 +1311,7 @@ const themeName = computed(() => {
 }
 
 .cloud-shell__word {
-  color: #4db3ff;
+  color: var(--static-widget-accent-color, #4db3ff);
   font-weight: 700;
   line-height: 1;
 }
@@ -1311,14 +1333,14 @@ const themeName = computed(() => {
 .trend-shell__bar {
   flex: 1;
   border-radius: 10px 10px 4px 4px;
-  background: linear-gradient(180deg, rgba(77, 179, 255, 0.92), rgba(77, 179, 255, 0.18));
+  background: linear-gradient(180deg, var(--static-widget-accent-color, #4db3ff), rgba(77, 179, 255, 0.18));
 }
 
 .trend-shell__axis {
   display: flex;
   gap: 10px;
   font-size: 11px;
-  opacity: 0.62;
+  color: var(--static-widget-muted-color, rgba(24, 50, 77, 0.72));
 }
 
 .trend-shell__axis span {

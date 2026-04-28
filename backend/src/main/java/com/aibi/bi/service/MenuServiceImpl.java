@@ -16,11 +16,14 @@ public class MenuServiceImpl implements MenuService {
 
     private final SysMenuMapper sysMenuMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
+    private final MenuCacheSupport menuCacheSupport;
 
     public MenuServiceImpl(SysMenuMapper sysMenuMapper,
-                           SysRoleMenuMapper sysRoleMenuMapper) {
+                           SysRoleMenuMapper sysRoleMenuMapper,
+                           MenuCacheSupport menuCacheSupport) {
         this.sysMenuMapper = sysMenuMapper;
         this.sysRoleMenuMapper = sysRoleMenuMapper;
+        this.menuCacheSupport = menuCacheSupport;
     }
 
     @Override
@@ -28,8 +31,8 @@ public class MenuServiceImpl implements MenuService {
         if (userId == null) {
             throw new IllegalArgumentException("请先登录");
         }
-        List<SysMenu> flatMenus = sysMenuMapper.listVisibleMenusByUserId(userId);
-        return buildTree(flatMenus);
+        return menuCacheSupport.getCurrentMenus(userId,
+            () -> buildTree(sysMenuMapper.listVisibleMenusByUserId(userId)));
     }
 
     @Override
@@ -42,6 +45,7 @@ public class MenuServiceImpl implements MenuService {
         SysMenu target = normalizeMenu(menu, null);
         validateMenu(target, null);
         sysMenuMapper.insert(target);
+        menuCacheSupport.invalidateAll();
         return target;
     }
 
@@ -55,6 +59,7 @@ public class MenuServiceImpl implements MenuService {
         target.setId(id);
         validateMenu(target, id);
         sysMenuMapper.update(target);
+        menuCacheSupport.invalidateAll();
         return sysMenuMapper.findById(id);
     }
 
@@ -69,6 +74,7 @@ public class MenuServiceImpl implements MenuService {
         }
         sysRoleMenuMapper.deleteByMenuId(id);
         sysMenuMapper.deleteById(id);
+        menuCacheSupport.invalidateAll();
     }
 
     private List<SysMenu> buildTree(List<SysMenu> flatMenus) {

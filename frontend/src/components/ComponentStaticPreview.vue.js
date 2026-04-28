@@ -21,10 +21,30 @@ onBeforeUnmount(() => {
         clockTimer = null;
     }
 });
-const titleText = computed(() => props.chartConfig.name || chartTypeLabel(props.chartType));
-// Enforce hidden titles for static widgets in preview, per screen design requirement.
-const shouldShowTitle = computed(() => false);
+const titleText = computed(() => props.styleConfig?.titleText || props.chartConfig.name || chartTypeLabel(props.chartType));
+const shouldShowTitle = computed(() => Boolean(props.showTitle || props.styleConfig?.titleText));
 const rawRows = computed(() => props.data?.rawRows ?? []);
+const widgetStyle = computed(() => {
+    const borderWidth = Math.max(0, Number(props.styleConfig?.borderWidth ?? 1));
+    const radius = Math.max(0, Number(props.styleConfig?.cardRadius ?? 14));
+    const isDecoration = isDecorationChartType(props.chartType);
+    const baseColor = props.styleConfig?.titleColor || (props.dark ? '#eaf4ff' : '#18324d');
+    const accentColor = props.styleConfig?.metricValueColor || props.styleConfig?.iconStrokeColor || (props.dark ? '#4fdfff' : '#4db3ff');
+    const successColor = props.styleConfig?.metricTrendUpColor || '#29c27c';
+    const mutedColor = props.dark ? 'rgba(234, 244, 255, 0.72)' : 'rgba(24, 50, 77, 0.72)';
+    return {
+        '--static-widget-text-color': baseColor,
+        '--static-widget-accent-color': accentColor,
+        '--static-widget-success-color': successColor,
+        '--static-widget-muted-color': mutedColor,
+        background: isDecoration ? 'transparent' : (props.styleConfig?.bgColor || 'transparent'),
+        border: !isDecoration && props.styleConfig?.borderShow ? `${borderWidth}px solid ${props.styleConfig.borderColor || accentColor}` : 'none',
+        borderRadius: `${radius}px`,
+        boxShadow: !isDecoration && props.styleConfig?.shadowShow
+            ? `0 0 ${Math.max(0, Number(props.styleConfig.shadowBlur ?? 12))}px ${props.styleConfig.shadowColor || 'rgba(77, 179, 255, 0.18)'}`
+            : 'none',
+    };
+});
 // ─── iframe ───────────────────────────────────────────────────────────
 const activeIframeTab = ref(0);
 const IFRAME_URL_FIELDS = ['url', 'URL', 'href', 'link', '链接', '地址', '网址', 'iframeUrl', 'iframe_url'];
@@ -281,6 +301,7 @@ let __VLS_directives;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "static-widget" },
     ...{ class: ([`static-widget--${__VLS_ctx.themeName}`, { 'static-widget--dark': __VLS_ctx.dark }]) },
+    ...{ style: (__VLS_ctx.widgetStyle) },
 });
 if (__VLS_ctx.isDecorationChartType(__VLS_ctx.chartType)) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -303,6 +324,7 @@ if (__VLS_ctx.isDecorationChartType(__VLS_ctx.chartType)) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "decor-title-plate__label" },
         });
+        (__VLS_ctx.titleText);
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
             ...{ class: "decor-title-plate__cap decor-title-plate__cap--right" },
         });
@@ -812,6 +834,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             isVectorIconChartType: isVectorIconChartType,
             titleText: titleText,
             shouldShowTitle: shouldShowTitle,
+            widgetStyle: widgetStyle,
             activeIframeTab: activeIframeTab,
             iframeSingleUrl: iframeSingleUrl,
             iframeTabList: iframeTabList,

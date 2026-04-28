@@ -1215,6 +1215,7 @@ else {
             const __VLS_84 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
                 chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
+                styleConfig: (__VLS_ctx.getComponentConfig(component).style),
                 data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
                 dark: (__VLS_ctx.scene === 'screen'),
                 showTitle: (__VLS_ctx.getComponentConfig(component).style.showTitle),
@@ -1222,6 +1223,7 @@ else {
             const __VLS_85 = __VLS_84({
                 chartType: (__VLS_ctx.getComponentChartConfig(component).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(component)),
+                styleConfig: (__VLS_ctx.getComponentConfig(component).style),
                 data: (__VLS_ctx.componentDataMap.get(component.id) ?? null),
                 dark: (__VLS_ctx.scene === 'screen'),
                 showTitle: (__VLS_ctx.getComponentConfig(component).style.showTitle),

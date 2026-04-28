@@ -17,8 +17,40 @@
           <div class="overview-dashboard overview-dashboard--single">
             <div class="overview-dashboard__summary-card">
               <div class="overview-dashboard__summary-kicker">新增总量</div>
-              <div class="overview-dashboard__summary-value">{{ recentAddedTotal }}</div>
-              <div class="overview-dashboard__summary-meta">最近 {{ RECENT_ADDED_WINDOW_DAYS }} 天共新增 {{ recentAddedTotal }} 个资源</div>
+              <div class="overview-dashboard__summary-visual">
+                <div class="overview-dashboard__ring-wrap">
+                  <svg class="overview-dashboard__ring-chart" viewBox="0 0 128 128" aria-hidden="true">
+                    <circle class="overview-dashboard__ring-track" cx="64" cy="64" r="42" />
+                    <circle
+                      v-for="segment in recentAddedRingSegments"
+                      :key="segment.key"
+                      class="overview-dashboard__ring-segment"
+                      cx="64"
+                      cy="64"
+                      r="42"
+                      :stroke="segment.color"
+                      :stroke-dasharray="segment.dasharray"
+                      :stroke-dashoffset="segment.dashoffset"
+                    />
+                  </svg>
+                  <div class="overview-dashboard__ring-copy">
+                    <strong>{{ recentAddedTotal }}</strong>
+                    <span>最近 {{ RECENT_ADDED_WINDOW_DAYS }} 天</span>
+                  </div>
+                </div>
+
+                <div class="overview-dashboard__summary-copy">
+                  <div class="overview-dashboard__summary-value">{{ recentAddedTotal }}</div>
+                  <div class="overview-dashboard__summary-meta">最近 {{ RECENT_ADDED_WINDOW_DAYS }} 天共新增 {{ recentAddedTotal }} 个资源</div>
+                  <div class="overview-dashboard__summary-legend">
+                    <span v-for="item in recentAddedBars" :key="`ring-${item.key}`" class="overview-dashboard__summary-legend-item">
+                      <i class="overview-dashboard__summary-legend-dot" :style="{ background: item.color }"></i>
+                      <span>{{ item.label }}</span>
+                      <strong>+{{ item.value }}</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
 
               <div class="overview-dashboard__status-panel">
                 <div class="overview-dashboard__status-head">
@@ -105,23 +137,32 @@
                   <span class="overview-dashboard__legend-item"><i class="overview-dashboard__legend-dot overview-dashboard__legend-dot--fail"></i>登录失败</span>
                 </div>
 
-                <div class="overview-dashboard__login-columns">
-                  <div v-for="item in recentLoginTrend" :key="item.key" class="overview-dashboard__login-column-item">
-                    <div class="overview-dashboard__login-total">{{ item.total }}</div>
-                    <div class="overview-dashboard__login-track">
-                      <span
-                        v-if="item.failPercent > 0"
-                        class="overview-dashboard__login-segment overview-dashboard__login-segment--fail"
-                        :style="{ height: `${item.failPercent}%` }"
-                      ></span>
-                      <span
-                        v-if="item.successPercent > 0"
-                        class="overview-dashboard__login-segment overview-dashboard__login-segment--success"
-                        :style="{ height: `${item.successPercent}%` }"
-                      ></span>
-                    </div>
-                    <div class="overview-dashboard__login-label">{{ item.label }}</div>
+                <div v-if="hasRecentLoginData" class="overview-dashboard__line-panel">
+                  <svg class="overview-dashboard__line-chart" viewBox="0 0 320 160" preserveAspectRatio="none" aria-hidden="true">
+                    <line
+                      v-for="guide in loginGuideLines"
+                      :key="guide.key"
+                      class="overview-dashboard__line-guide"
+                      x1="18"
+                      x2="302"
+                      :y1="guide.y"
+                      :y2="guide.y"
+                    />
+                    <polyline class="overview-dashboard__line overview-dashboard__line--success" :points="loginSuccessLinePoints" />
+                    <polyline class="overview-dashboard__line overview-dashboard__line--fail" :points="loginFailLinePoints" />
+                    <g v-for="point in loginChartPoints" :key="point.key">
+                      <circle class="overview-dashboard__point overview-dashboard__point--success" :cx="point.x" :cy="point.successY" r="4" />
+                      <circle class="overview-dashboard__point overview-dashboard__point--fail" :cx="point.x" :cy="point.failY" r="4" />
+                    </g>
+                  </svg>
+
+                  <div class="overview-dashboard__line-labels">
+                    <span v-for="item in recentLoginTrend" :key="`label-${item.key}`">{{ item.label }}</span>
                   </div>
+                </div>
+
+                <div v-else class="overview-dashboard__login-empty overview-dashboard__login-empty--inline">
+                  最近 {{ RECENT_ADDED_WINDOW_DAYS }} 天暂无登录日志。
                 </div>
               </template>
 
@@ -291,6 +332,14 @@ interface DashboardBarItem {
   value: number
   percent: number
   accent: string
+  color: string
+}
+
+interface DashboardRingSegment {
+  key: string
+  color: string
+  dasharray: string
+  dashoffset: string
 }
 
 interface LoginAuditLog {
@@ -303,9 +352,16 @@ interface LoginAuditLog {
 interface LoginTrendItem {
   key: string
   label: string
+  success: number
+  fail: number
   total: number
-  successPercent: number
-  failPercent: number
+}
+
+interface LoginChartPoint {
+  key: string
+  x: number
+  successY: number
+  failY: number
 }
 
 const SOURCE_KIND_LABELS: Record<DatasourceSourceKind, string> = {
@@ -318,6 +374,12 @@ const SOURCE_KIND_LABELS: Record<DatasourceSourceKind, string> = {
 const RECENT_ADDED_WINDOW_DAYS = 7
 const RECENT_SCREEN_PAGE_SIZE = 4
 const RESOURCE_PAGE_SIZE = 6
+const DASHBOARD_RING_CIRCUMFERENCE = 2 * Math.PI * 42
+const LOGIN_CHART_WIDTH = 320
+const LOGIN_CHART_HEIGHT = 160
+const LOGIN_CHART_PADDING_X = 18
+const LOGIN_CHART_PADDING_TOP = 14
+const LOGIN_CHART_PADDING_BOTTOM = 24
 
 const loading = ref(false)
 const router = useRouter()
@@ -416,24 +478,28 @@ const recentAddedBars = computed<DashboardBarItem[]>(() => {
       label: '数据源',
       value: recentAddedDatasourceCount.value,
       accent: 'linear-gradient(180deg, #7dd0c6 0%, #55b0a3 100%)',
+      color: '#55b0a3',
     },
     {
       key: 'dataset' as const,
       label: '数据集',
       value: recentAddedDatasetCount.value,
       accent: 'linear-gradient(180deg, #90c7df 0%, #6ea8c7 100%)',
+      color: '#6ea8c7',
     },
     {
       key: 'chart' as const,
       label: '图表组件',
       value: recentAddedChartCount.value,
       accent: 'linear-gradient(180deg, #98bbe7 0%, #5f97cf 100%)',
+      color: '#5f97cf',
     },
     {
       key: 'screen' as const,
       label: '数据大屏',
       value: recentAddedScreenCount.value,
       accent: 'linear-gradient(180deg, #87c8b6 0%, #65b29e 100%)',
+      color: '#65b29e',
     },
   ]
 
@@ -443,6 +509,32 @@ const recentAddedBars = computed<DashboardBarItem[]>(() => {
     ...item,
     percent: item.value > 0 ? Math.max(14, Math.round((item.value / maxValue) * 100)) : 0,
   }))
+})
+
+const recentAddedRingSegments = computed<DashboardRingSegment[]>(() => {
+  const ringItems = recentAddedBars.value.filter((item) => item.value > 0)
+
+  if (!ringItems.length || recentAddedTotal.value <= 0) {
+    return [{
+      key: 'empty',
+      color: '#d7e2e6',
+      dasharray: `${DASHBOARD_RING_CIRCUMFERENCE} 0`,
+      dashoffset: '0',
+    }]
+  }
+
+  let offset = 0
+  return ringItems.map((item) => {
+    const length = (item.value / recentAddedTotal.value) * DASHBOARD_RING_CIRCUMFERENCE
+    const segment = {
+      key: item.key,
+      color: item.color,
+      dasharray: `${length} ${Math.max(DASHBOARD_RING_CIRCUMFERENCE - length, 0)}`,
+      dashoffset: `${-offset}`,
+    }
+    offset += length
+    return segment
+  })
 })
 
 const recentLoginTrend = computed<LoginTrendItem[]>(() => {
@@ -477,14 +569,43 @@ const recentLoginTrend = computed<LoginTrendItem[]>(() => {
     bucket.total = bucket.success + bucket.fail
   })
 
-  const maxTotal = Math.max(...buckets.map((item) => item.total), 1)
-
   return buckets.map((item) => ({
     key: item.key,
     label: item.label,
+    success: item.success,
+    fail: item.fail,
     total: item.total,
-    successPercent: item.success > 0 ? Math.round((item.success / maxTotal) * 100) : 0,
-    failPercent: item.fail > 0 ? Math.round((item.fail / maxTotal) * 100) : 0,
+  }))
+})
+
+const hasRecentLoginData = computed(() => recentLoginTrend.value.some((item) => item.total > 0))
+const loginChartMaxValue = computed(() => Math.max(
+  ...recentLoginTrend.value.flatMap((item) => [item.success, item.fail]),
+  1,
+))
+
+const loginChartPoints = computed<LoginChartPoint[]>(() => {
+  const availableWidth = LOGIN_CHART_WIDTH - LOGIN_CHART_PADDING_X * 2
+  const availableHeight = LOGIN_CHART_HEIGHT - LOGIN_CHART_PADDING_TOP - LOGIN_CHART_PADDING_BOTTOM
+  const step = recentLoginTrend.value.length > 1 ? availableWidth / (recentLoginTrend.value.length - 1) : 0
+  const maxValue = loginChartMaxValue.value
+  const toY = (value: number) => LOGIN_CHART_PADDING_TOP + availableHeight - (value / maxValue) * availableHeight
+
+  return recentLoginTrend.value.map((item, index) => ({
+    key: item.key,
+    x: LOGIN_CHART_PADDING_X + step * index,
+    successY: toY(item.success),
+    failY: toY(item.fail),
+  }))
+})
+
+const loginSuccessLinePoints = computed(() => loginChartPoints.value.map((item) => `${item.x},${item.successY}`).join(' '))
+const loginFailLinePoints = computed(() => loginChartPoints.value.map((item) => `${item.x},${item.failY}`).join(' '))
+const loginGuideLines = computed(() => {
+  const availableHeight = LOGIN_CHART_HEIGHT - LOGIN_CHART_PADDING_TOP - LOGIN_CHART_PADDING_BOTTOM
+  return [0.25, 0.5, 0.75].map((ratio, index) => ({
+    key: `guide-${index}`,
+    y: LOGIN_CHART_PADDING_TOP + availableHeight * ratio,
   }))
 })
 
@@ -634,7 +755,7 @@ const loadData = async () => {
   loading.value = true
   try {
     const loginLogsPromise: Promise<LoginAuditLog[]> = canLoadLoginLogs.value
-      ? request.get('/audit-logs/login').catch(() => [] as LoginAuditLog[])
+      ? request.get<LoginAuditLog[], LoginAuditLog[]>('/audit-logs/login').catch(() => [] as LoginAuditLog[])
       : Promise.resolve([] as LoginAuditLog[])
 
     const [datasources, datasets, charts, dashboards, logs] = await Promise.all([
@@ -696,10 +817,10 @@ onMounted(loadData)
 .workbench-main {
   position: relative;
   z-index: 1;
-  padding: 24px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .overview-shell {
@@ -715,12 +836,12 @@ onMounted(loadData)
 }
 
 .overview-card--dashboard {
-  padding: 18px;
+  padding: 12px 14px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 250, 250, 0.84));
   backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .overview-side__head {
@@ -808,11 +929,98 @@ onMounted(loadData)
   color: #173246;
 }
 
+.overview-dashboard__summary-visual {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.overview-dashboard__ring-wrap {
+  position: relative;
+  width: 128px;
+  height: 128px;
+}
+
+.overview-dashboard__ring-chart {
+  width: 128px;
+  height: 128px;
+}
+
+.overview-dashboard__ring-track,
+.overview-dashboard__ring-segment {
+  fill: none;
+  stroke-width: 14;
+}
+
+.overview-dashboard__ring-track {
+  stroke: rgba(218, 227, 231, 0.92);
+}
+
+.overview-dashboard__ring-segment {
+  transform: rotate(-90deg);
+  transform-origin: 64px 64px;
+}
+
+.overview-dashboard__ring-copy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.overview-dashboard__ring-copy strong {
+  font-size: 30px;
+  line-height: 1;
+  color: #173246;
+}
+
+.overview-dashboard__ring-copy span {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #708792;
+}
+
+.overview-dashboard__summary-copy {
+  min-width: 0;
+}
+
 .overview-dashboard__summary-meta {
   margin-top: 10px;
   font-size: 14px;
   line-height: 1.7;
   color: #6f8591;
+}
+
+.overview-dashboard__summary-legend {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.overview-dashboard__summary-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: #6f8591;
+}
+
+.overview-dashboard__summary-legend-item strong {
+  margin-left: auto;
+  color: #173246;
+}
+
+.overview-dashboard__summary-legend-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
 }
 
 .overview-dashboard__status-panel {
@@ -928,8 +1136,8 @@ onMounted(loadData)
 }
 
 .overview-dashboard__column-item {
-  width: 78px;
-  max-width: 78px;
+  width: 66px;
+  max-width: 66px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -945,9 +1153,9 @@ onMounted(loadData)
 }
 
 .overview-dashboard__column-track {
-  width: 68px;
-  height: 160px;
-  padding: 8px;
+  width: 52px;
+  height: 152px;
+  padding: 6px;
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(240, 246, 248, 0.94), rgba(232, 240, 243, 0.82));
   border: 1px solid rgba(211, 221, 226, 0.84);
@@ -1104,10 +1312,68 @@ onMounted(loadData)
   text-align: center;
 }
 
+.overview-dashboard__login-empty--inline {
+  min-height: 180px;
+}
+
+.overview-dashboard__line-panel {
+  margin-top: 18px;
+}
+
+.overview-dashboard__line-chart {
+  width: 100%;
+  height: 180px;
+  overflow: visible;
+}
+
+.overview-dashboard__line-guide {
+  stroke: rgba(198, 211, 217, 0.88);
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+}
+
+.overview-dashboard__line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.overview-dashboard__line--success {
+  stroke: #4fb2a2;
+}
+
+.overview-dashboard__line--fail {
+  stroke: #5f8ec7;
+}
+
+.overview-dashboard__point {
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.overview-dashboard__point--success {
+  fill: #4fb2a2;
+}
+
+.overview-dashboard__point--fail {
+  fill: #5f8ec7;
+}
+
+.overview-dashboard__line-labels {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  font-size: 12px;
+  color: #728792;
+  text-align: center;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
-  gap: 18px;
+  gap: 12px;
 }
 
 .surface-card {
@@ -1119,7 +1385,7 @@ onMounted(loadData)
 }
 
 .surface-card :deep(.el-card__body) {
-  padding-top: 18px;
+  padding-top: 12px;
 }
 
 .surface-card :deep(.el-card__header) {
@@ -1331,6 +1597,11 @@ onMounted(loadData)
   .overview-dashboard__summary-card {
     grid-column: 1 / -1;
   }
+
+  .overview-dashboard__summary-visual {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1373,6 +1644,11 @@ onMounted(loadData)
 @media (max-width: 640px) {
   .overview-dashboard__summary-grid,
   .overview-dashboard--single {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-dashboard__summary-legend,
+  .overview-dashboard__line-labels {
     grid-template-columns: 1fr;
   }
 

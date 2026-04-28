@@ -18,13 +18,16 @@ public class RoleServiceImpl implements RoleService {
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
     private final SysMenuMapper sysMenuMapper;
+    private final MenuCacheSupport menuCacheSupport;
 
     public RoleServiceImpl(SysRoleMapper sysRoleMapper,
                            SysRoleMenuMapper sysRoleMenuMapper,
-                           SysMenuMapper sysMenuMapper) {
+                           SysMenuMapper sysMenuMapper,
+                           MenuCacheSupport menuCacheSupport) {
         this.sysRoleMapper = sysRoleMapper;
         this.sysRoleMenuMapper = sysRoleMenuMapper;
         this.sysMenuMapper = sysMenuMapper;
+        this.menuCacheSupport = menuCacheSupport;
     }
 
     @Override
@@ -62,6 +65,7 @@ public class RoleServiceImpl implements RoleService {
         for (Long menuId : normalizedIds) {
             sysRoleMenuMapper.insert(roleId, menuId);
         }
+        menuCacheSupport.invalidateAll();
         return List.copyOf(normalizedIds);
     }
 

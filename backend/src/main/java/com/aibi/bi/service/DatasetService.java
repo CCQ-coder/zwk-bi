@@ -334,6 +334,8 @@ public class DatasetService {
             return buildTeaLineRankingDemoResponse();
         } else if (normalizedSql.contains("demo_tea_order")) {
             return buildTeaOrderDetailDemoResponse();
+        } else if (normalizedSql.contains("demo_animal_screen_1")) {
+            return buildAnimalScreenDemoResponse();
         }
         // Generic multi-field demo
         return buildDemoResponse(
@@ -429,6 +431,48 @@ public class DatasetService {
             }
         );
         }
+
+    private DatasetPreviewResponse buildAnimalScreenDemoResponse() {
+        return buildDemoResponse(
+                Arrays.asList("模块", "动物", "品类", "指标", "数值", "单位", "简介", "生态位", "能力", "得分", "时段", "活跃指数", "综合值", "排序"),
+                new Object[][]{
+                        {"档案卡", "雪山狼犬", "犬科", null, null, null, "高寒巡护型犬种，耐力和嗅觉表现突出，适合山地搜救、夜间巡视与长距离追踪。", null, null, null, null, null, null, 1},
+                        {"档案卡", "月影灵猫", "猫科", null, null, null, "夜行潜伏型猫科样本，跃迁能力和夜视能力极强，擅长狭窄环境侦察与静默接近。", null, null, null, null, null, null, 2},
+                        {"指标", "雪山狼犬", "犬科", "体重kg", new BigDecimal("38.6"), "kg", null, null, null, null, null, null, null, 10},
+                        {"指标", "雪山狼犬", "犬科", "奔跑速度", 61, "km/h", null, null, null, null, null, null, null, 11},
+                        {"指标", "雪山狼犬", "犬科", "嗅觉评分", 96, "pts", null, null, null, null, null, null, null, 12},
+                        {"指标", "月影灵猫", "猫科", "体重kg", new BigDecimal("7.4"), "kg", null, null, null, null, null, null, null, 13},
+                        {"指标", "月影灵猫", "猫科", "跳跃高度", 232, "cm", null, null, null, null, null, null, null, 14},
+                        {"指标", "月影灵猫", "猫科", "夜视指数", 98, "pts", null, null, null, null, null, null, null, 15},
+                        {"生态位占比", null, null, null, 32, "%", null, "山地巡护", null, null, null, null, null, 20},
+                        {"生态位占比", null, null, null, 24, "%", null, "城市搜救", null, null, null, null, null, 21},
+                        {"生态位占比", null, null, null, 18, "%", null, "夜间潜行", null, null, null, null, null, 22},
+                        {"生态位占比", null, null, null, 26, "%", null, "湿地追踪", null, null, null, null, null, 23},
+                        {"感知排行", null, null, null, null, null, null, null, "夜视", 98, null, null, null, 30},
+                        {"感知排行", null, null, null, null, null, null, null, "嗅觉", 96, null, null, null, 31},
+                        {"感知排行", null, null, null, null, null, null, null, "听觉", 92, null, null, null, 32},
+                        {"感知排行", null, null, null, null, null, null, null, "耐力", 89, null, null, null, 33},
+                        {"感知排行", null, null, null, null, null, null, null, "社交", 84, null, null, null, 34},
+                        {"综合评分", "雪山狼犬", "犬科", null, null, null, null, null, null, null, null, null, 95, 40},
+                        {"综合评分", "月影灵猫", "猫科", null, null, null, null, null, null, null, null, null, 93, 41},
+                        {"综合评分", "银背猎隼", "鸟纲", null, null, null, null, null, null, null, null, null, 88, 42},
+                        {"综合评分", "潮汐海豚", "鲸偶蹄目", null, null, null, null, null, null, null, null, null, 86, 43},
+                        {"综合评分", "岩岭雪豹", "猫科", null, null, null, null, null, null, null, null, null, 90, 44},
+                        {"活动趋势", "雪山狼犬", "犬科", null, null, null, null, null, null, null, "06:00", 62, null, 50},
+                        {"活动趋势", "雪山狼犬", "犬科", null, null, null, null, null, null, null, "09:00", 78, null, 51},
+                        {"活动趋势", "雪山狼犬", "犬科", null, null, null, null, null, null, null, "12:00", 65, null, 52},
+                        {"活动趋势", "雪山狼犬", "犬科", null, null, null, null, null, null, null, "15:00", 84, null, 53},
+                        {"活动趋势", "雪山狼犬", "犬科", null, null, null, null, null, null, null, "18:00", 92, null, 54},
+                        {"活动趋势", "雪山狼犬", "犬科", null, null, null, null, null, null, null, "21:00", 74, null, 55},
+                        {"活动趋势", "月影灵猫", "猫科", null, null, null, null, null, null, null, "06:00", 24, null, 56},
+                        {"活动趋势", "月影灵猫", "猫科", null, null, null, null, null, null, null, "09:00", 38, null, 57},
+                        {"活动趋势", "月影灵猫", "猫科", null, null, null, null, null, null, null, "12:00", 48, null, 58},
+                        {"活动趋势", "月影灵猫", "猫科", null, null, null, null, null, null, null, "15:00", 66, null, 59},
+                        {"活动趋势", "月影灵猫", "猫科", null, null, null, null, null, null, null, "18:00", 88, null, 60},
+                        {"活动趋势", "月影灵猫", "猫科", null, null, null, null, null, null, null, "21:00", 96, null, 61}
+                }
+        );
+    }
 
     private String inferFieldType(String column, List<Map<String, Object>> rows) {
         if (rows == null) {

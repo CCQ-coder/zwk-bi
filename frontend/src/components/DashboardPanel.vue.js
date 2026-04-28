@@ -1352,11 +1352,13 @@ else {
             const __VLS_132 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
                 chartType: (__VLS_ctx.getComponentChartConfig(comp).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(comp)),
+                styleConfig: (__VLS_ctx.getComponentConfig(comp).style),
                 showTitle: (__VLS_ctx.getComponentConfig(comp).style.showTitle),
             }));
             const __VLS_133 = __VLS_132({
                 chartType: (__VLS_ctx.getComponentChartConfig(comp).chartType),
                 chartConfig: (__VLS_ctx.getComponentChartConfig(comp)),
+                styleConfig: (__VLS_ctx.getComponentConfig(comp).style),
                 showTitle: (__VLS_ctx.getComponentConfig(comp).style.showTitle),
             }, ...__VLS_functionalComponentArgsRest(__VLS_132));
         }

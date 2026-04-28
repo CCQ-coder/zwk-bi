@@ -152,7 +152,10 @@ public class ChartService {
 
     public DatasetPreviewResponse queryPageSource(ChartPageSourceQueryRequest request) {
         if (request.getDatasourceId() == null || request.getDatasourceId() == 0L) {
-            throw new IllegalArgumentException("datasourceId is required for page-source query");
+            if (request.getRuntimeConfigText() == null || request.getRuntimeConfigText().isBlank()) {
+                throw new IllegalArgumentException("datasourceId is required for page-source query");
+            }
+            return datasourceService.previewInlineJson(request.getRuntimeConfigText(), null);
         }
         return datasourceService.previewDatasource(request.getDatasourceId(), request.getSqlText(), request.getRuntimeConfigText());
     }
@@ -293,7 +296,15 @@ public class ChartService {
     private RuntimeSource resolveRuntimeSource(ResolvedChartConfig resolvedConfig) {
         if ("PAGE_SQL".equalsIgnoreCase(resolvedConfig.sourceMode())) {
             if (resolvedConfig.datasourceId() == null || resolvedConfig.datasourceId() == 0L) {
-                return null;
+                if (resolvedConfig.runtimeConfigText() == null || resolvedConfig.runtimeConfigText().isBlank()) {
+                    return null;
+                }
+                return new RuntimeSource(
+                        null,
+                        resolvedConfig.sqlText(),
+                        resolvedConfig.runtimeConfigText(),
+                        datasourceService.previewInlineJson(resolvedConfig.runtimeConfigText(), null)
+                );
             }
             if ((resolvedConfig.sqlText() == null || resolvedConfig.sqlText().isBlank())
                     && (resolvedConfig.runtimeConfigText() == null || resolvedConfig.runtimeConfigText().isBlank())) {

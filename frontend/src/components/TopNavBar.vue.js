@@ -1,8 +1,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ArrowRight, Expand, Fold, Operation, SwitchButton } from '@element-plus/icons-vue';
-import { getCurrentMenus } from '../api/menu';
-import { clearAuthSession, getAuthDisplayName, getAuthMenus, hasAuthSession, saveAuthMenus, } from '../utils/auth-session';
+import { ArrowRight, Connection, DataAnalysis, Expand, Fold, Grid, House, Monitor, Operation, Promotion, Setting, SwitchButton, } from '@element-plus/icons-vue';
+import { clearAuthSession, getAuthDisplayName, } from '../utils/auth-session';
+import { clearSharedMenus, ensureSharedMenus, useSharedMenus } from '../utils/menu-cache';
 const __VLS_props = defineProps();
 const NAV_COLLAPSED_STORAGE_KEY = 'bi_shell_nav_collapsed';
 const MENU_HINTS = {
@@ -18,9 +18,22 @@ const MENU_HINTS = {
     '/home/modeling': '模型设计与管理',
     '/home/system': '系统设置与权限',
 };
+const MENU_ICONS = {
+    '/home': House,
+    '/home/screen': Monitor,
+    '/home/publish/groups': Promotion,
+    '/home/publish/panels': Promotion,
+    '/home/prepare': Connection,
+    '/home/prepare/datasource': Connection,
+    '/home/prepare/dataset': Connection,
+    '/home/prepare/components': Connection,
+    '/home/prepare/extract': Connection,
+    '/home/modeling': DataAnalysis,
+    '/home/system': Setting,
+};
 const router = useRouter();
 const route = useRoute();
-const menus = ref(getAuthMenus());
+const menus = useSharedMenus();
 const drawerVisible = ref(false);
 const navCollapsed = ref(localStorage.getItem(NAV_COLLAPSED_STORAGE_KEY) === '1');
 const displayName = computed(() => getAuthDisplayName());
@@ -69,6 +82,7 @@ const clearShellBodyClass = () => {
     document.body.classList.remove('bi-shell-nav-expanded', 'bi-shell-nav-collapsed');
 };
 const getMenuHint = (path) => MENU_HINTS[path] || '进入对应模块';
+const getMenuIcon = (path) => MENU_ICONS[path] || Grid;
 const go = (path) => {
     drawerVisible.value = false;
     router.push(path);
@@ -77,21 +91,10 @@ const toggleCollapse = () => {
     navCollapsed.value = !navCollapsed.value;
 };
 const isMenuActive = (menu) => menu.activePaths.some((path) => isPathActive(path));
-const loadMenus = async () => {
-    if (!hasAuthSession())
-        return;
-    try {
-        const latestMenus = await getCurrentMenus();
-        menus.value = latestMenus;
-        saveAuthMenus(latestMenus);
-    }
-    catch {
-        menus.value = getAuthMenus();
-    }
-};
 const logout = () => {
     drawerVisible.value = false;
     clearAuthSession();
+    clearSharedMenus();
     clearShellBodyClass();
     router.push('/login');
 };
@@ -101,7 +104,7 @@ watch(navCollapsed, (value) => {
 }, { immediate: true });
 onMounted(async () => {
     applyShellBodyClass();
-    await loadMenus();
+    await ensureSharedMenus();
 });
 onBeforeUnmount(() => {
     clearShellBodyClass();
@@ -120,6 +123,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['side-nav__item']} */ ;
 /** @type {__VLS_StyleScopedClasses['side-nav__item--active']} */ ;
 /** @type {__VLS_StyleScopedClasses['side-nav__item--active']} */ ;
+/** @type {__VLS_StyleScopedClasses['side-nav__item-mark']} */ ;
 /** @type {__VLS_StyleScopedClasses['side-nav--collapsed']} */ ;
 /** @type {__VLS_StyleScopedClasses['side-nav__user']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-menu-copy']} */ ;
@@ -212,7 +216,17 @@ for (const [menu] of __VLS_getVForSourceType((__VLS_ctx.navMenus))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ class: "side-nav__item-mark" },
     });
-    (menu.name.slice(0, 1));
+    const __VLS_16 = {}.ElIcon;
+    /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
+    // @ts-ignore
+    const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({}));
+    const __VLS_18 = __VLS_17({}, ...__VLS_functionalComponentArgsRest(__VLS_17));
+    __VLS_19.slots.default;
+    const __VLS_20 = ((__VLS_ctx.getMenuIcon(menu.path)));
+    // @ts-ignore
+    const __VLS_21 = __VLS_asFunctionalComponent(__VLS_20, new __VLS_20({}));
+    const __VLS_22 = __VLS_21({}, ...__VLS_functionalComponentArgsRest(__VLS_21));
+    var __VLS_19;
     if (!__VLS_ctx.navCollapsed) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "side-nav__item-copy" },
@@ -254,39 +268,39 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
     ...{ class: "side-nav__logout" },
     type: "button",
 });
-const __VLS_16 = {}.ElIcon;
+const __VLS_24 = {}.ElIcon;
 /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
 // @ts-ignore
-const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({}));
-const __VLS_18 = __VLS_17({}, ...__VLS_functionalComponentArgsRest(__VLS_17));
-__VLS_19.slots.default;
-const __VLS_20 = {}.SwitchButton;
+const __VLS_25 = __VLS_asFunctionalComponent(__VLS_24, new __VLS_24({}));
+const __VLS_26 = __VLS_25({}, ...__VLS_functionalComponentArgsRest(__VLS_25));
+__VLS_27.slots.default;
+const __VLS_28 = {}.SwitchButton;
 /** @type {[typeof __VLS_components.SwitchButton, ]} */ ;
 // @ts-ignore
-const __VLS_21 = __VLS_asFunctionalComponent(__VLS_20, new __VLS_20({}));
-const __VLS_22 = __VLS_21({}, ...__VLS_functionalComponentArgsRest(__VLS_21));
-var __VLS_19;
+const __VLS_29 = __VLS_asFunctionalComponent(__VLS_28, new __VLS_28({}));
+const __VLS_30 = __VLS_29({}, ...__VLS_functionalComponentArgsRest(__VLS_29));
+var __VLS_27;
 if (!__VLS_ctx.navCollapsed) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
 }
-const __VLS_24 = {}.ElDrawer;
+const __VLS_32 = {}.ElDrawer;
 /** @type {[typeof __VLS_components.ElDrawer, typeof __VLS_components.elDrawer, typeof __VLS_components.ElDrawer, typeof __VLS_components.elDrawer, ]} */ ;
 // @ts-ignore
-const __VLS_25 = __VLS_asFunctionalComponent(__VLS_24, new __VLS_24({
+const __VLS_33 = __VLS_asFunctionalComponent(__VLS_32, new __VLS_32({
     modelValue: (__VLS_ctx.drawerVisible),
     direction: "ltr",
     size: "280px",
     ...{ class: "nav-drawer" },
 }));
-const __VLS_26 = __VLS_25({
+const __VLS_34 = __VLS_33({
     modelValue: (__VLS_ctx.drawerVisible),
     direction: "ltr",
     size: "280px",
     ...{ class: "nav-drawer" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_25));
-__VLS_27.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_33));
+__VLS_35.slots.default;
 {
-    const { header: __VLS_thisSlot } = __VLS_27.slots;
+    const { header: __VLS_thisSlot } = __VLS_35.slots;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "drawer-head" },
     });
@@ -325,22 +339,40 @@ for (const [menu] of __VLS_getVForSourceType((__VLS_ctx.navMenus))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "drawer-menu-copy" },
     });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "drawer-menu-main" },
+    });
+    const __VLS_36 = {}.ElIcon;
+    /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
+    // @ts-ignore
+    const __VLS_37 = __VLS_asFunctionalComponent(__VLS_36, new __VLS_36({
+        ...{ class: "drawer-menu-icon" },
+    }));
+    const __VLS_38 = __VLS_37({
+        ...{ class: "drawer-menu-icon" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_37));
+    __VLS_39.slots.default;
+    const __VLS_40 = ((__VLS_ctx.getMenuIcon(menu.path)));
+    // @ts-ignore
+    const __VLS_41 = __VLS_asFunctionalComponent(__VLS_40, new __VLS_40({}));
+    const __VLS_42 = __VLS_41({}, ...__VLS_functionalComponentArgsRest(__VLS_41));
+    var __VLS_39;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     (menu.name);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.small, __VLS_intrinsicElements.small)({});
     (__VLS_ctx.getMenuHint(menu.path));
-    const __VLS_28 = {}.ElIcon;
+    const __VLS_44 = {}.ElIcon;
     /** @type {[typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, typeof __VLS_components.ElIcon, typeof __VLS_components.elIcon, ]} */ ;
     // @ts-ignore
-    const __VLS_29 = __VLS_asFunctionalComponent(__VLS_28, new __VLS_28({}));
-    const __VLS_30 = __VLS_29({}, ...__VLS_functionalComponentArgsRest(__VLS_29));
-    __VLS_31.slots.default;
-    const __VLS_32 = {}.ArrowRight;
+    const __VLS_45 = __VLS_asFunctionalComponent(__VLS_44, new __VLS_44({}));
+    const __VLS_46 = __VLS_45({}, ...__VLS_functionalComponentArgsRest(__VLS_45));
+    __VLS_47.slots.default;
+    const __VLS_48 = {}.ArrowRight;
     /** @type {[typeof __VLS_components.ArrowRight, ]} */ ;
     // @ts-ignore
-    const __VLS_33 = __VLS_asFunctionalComponent(__VLS_32, new __VLS_32({}));
-    const __VLS_34 = __VLS_33({}, ...__VLS_functionalComponentArgsRest(__VLS_33));
-    var __VLS_31;
+    const __VLS_49 = __VLS_asFunctionalComponent(__VLS_48, new __VLS_48({}));
+    const __VLS_50 = __VLS_49({}, ...__VLS_functionalComponentArgsRest(__VLS_49));
+    var __VLS_47;
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "drawer-user-card" },
@@ -359,28 +391,28 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "drawer-user-role" },
 });
-const __VLS_36 = {}.ElButton;
+const __VLS_52 = {}.ElButton;
 /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
 // @ts-ignore
-const __VLS_37 = __VLS_asFunctionalComponent(__VLS_36, new __VLS_36({
+const __VLS_53 = __VLS_asFunctionalComponent(__VLS_52, new __VLS_52({
     ...{ 'onClick': {} },
     link: true,
     ...{ class: "logout-btn" },
 }));
-const __VLS_38 = __VLS_37({
+const __VLS_54 = __VLS_53({
     ...{ 'onClick': {} },
     link: true,
     ...{ class: "logout-btn" },
-}, ...__VLS_functionalComponentArgsRest(__VLS_37));
-let __VLS_40;
-let __VLS_41;
-let __VLS_42;
-const __VLS_43 = {
+}, ...__VLS_functionalComponentArgsRest(__VLS_53));
+let __VLS_56;
+let __VLS_57;
+let __VLS_58;
+const __VLS_59 = {
     onClick: (__VLS_ctx.logout)
 };
-__VLS_39.slots.default;
-var __VLS_39;
-var __VLS_27;
+__VLS_55.slots.default;
+var __VLS_55;
+var __VLS_35;
 /** @type {__VLS_StyleScopedClasses['nav-mobile-trigger']} */ ;
 /** @type {__VLS_StyleScopedClasses['side-nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['side-nav__top']} */ ;
@@ -414,6 +446,8 @@ var __VLS_27;
 /** @type {__VLS_StyleScopedClasses['drawer-menu']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-menu-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-menu-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['drawer-menu-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['drawer-menu-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-user-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['user-avatar']} */ ;
 /** @type {__VLS_StyleScopedClasses['drawer-user-copy']} */ ;
@@ -435,6 +469,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             avatarText: avatarText,
             navMenus: navMenus,
             getMenuHint: getMenuHint,
+            getMenuIcon: getMenuIcon,
             go: go,
             toggleCollapse: toggleCollapse,
             isMenuActive: isMenuActive,

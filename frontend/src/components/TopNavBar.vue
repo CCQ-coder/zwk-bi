@@ -118,15 +118,12 @@ import {
   Setting,
   SwitchButton,
 } from '@element-plus/icons-vue'
-import { getCurrentMenus } from '../api/menu'
 import {
   clearAuthSession,
   getAuthDisplayName,
-  getAuthMenus,
-  hasAuthSession,
-  saveAuthMenus,
   type AuthMenuItem,
 } from '../utils/auth-session'
+import { clearSharedMenus, ensureSharedMenus, useSharedMenus } from '../utils/menu-cache'
 
 defineProps<{ active?: 'workbench' | 'dashboard' | 'screen' | 'publish' | 'prepare' | 'modeling' | 'system' }>()
 
@@ -169,7 +166,7 @@ const MENU_ICONS: Record<string, Component> = {
 
 const router = useRouter()
 const route = useRoute()
-const menus = ref<AuthMenuItem[]>(getAuthMenus())
+const menus = useSharedMenus()
 const drawerVisible = ref(false)
 const navCollapsed = ref(localStorage.getItem(NAV_COLLAPSED_STORAGE_KEY) === '1')
 
@@ -240,20 +237,10 @@ const toggleCollapse = () => {
 
 const isMenuActive = (menu: ResolvedNavItem) => menu.activePaths.some((path) => isPathActive(path))
 
-const loadMenus = async () => {
-  if (!hasAuthSession()) return
-  try {
-    const latestMenus = await getCurrentMenus()
-    menus.value = latestMenus
-    saveAuthMenus(latestMenus)
-  } catch {
-    menus.value = getAuthMenus()
-  }
-}
-
 const logout = () => {
   drawerVisible.value = false
   clearAuthSession()
+  clearSharedMenus()
   clearShellBodyClass()
   router.push('/login')
 }
@@ -265,7 +252,7 @@ watch(navCollapsed, (value) => {
 
 onMounted(async () => {
   applyShellBodyClass()
-  await loadMenus()
+  await ensureSharedMenus()
 })
 
 onBeforeUnmount(() => {

@@ -4,9 +4,10 @@ import { getChartList } from '../api/chart';
 import { getDashboardList } from '../api/dashboard';
 import { getDatasetList } from '../api/dataset';
 import { getDatasourceList } from '../api/datasource';
+import request from '../api/request';
 import TopNavBar from '../components/TopNavBar.vue';
 import { normalizeCanvasConfig, normalizeCoverConfig, normalizePublishConfig, parseReportConfig, } from '../utils/report-config';
-import { flattenAuthMenus, getAuthMenus } from '../utils/auth-session';
+import { flattenAuthMenus, getAuthMenus, getAuthRole } from '../utils/auth-session';
 const SOURCE_KIND_LABELS = {
     DATABASE: '数据库',
     API: 'API 接口',
@@ -16,12 +17,19 @@ const SOURCE_KIND_LABELS = {
 const RECENT_ADDED_WINDOW_DAYS = 7;
 const RECENT_SCREEN_PAGE_SIZE = 4;
 const RESOURCE_PAGE_SIZE = 6;
+const DASHBOARD_RING_CIRCUMFERENCE = 2 * Math.PI * 42;
+const LOGIN_CHART_WIDTH = 320;
+const LOGIN_CHART_HEIGHT = 160;
+const LOGIN_CHART_PADDING_X = 18;
+const LOGIN_CHART_PADDING_TOP = 14;
+const LOGIN_CHART_PADDING_BOTTOM = 24;
 const loading = ref(false);
 const router = useRouter();
 const datasourceList = ref([]);
 const datasetList = ref([]);
 const chartList = ref([]);
 const reportList = ref([]);
+const loginLogs = ref([]);
 const recentScreenPage = ref(1);
 const resourcePage = ref(1);
 const activeResourceCategory = ref('datasource');
@@ -30,6 +38,7 @@ const allowedPaths = computed(() => new Set(flattenAuthMenus(getAuthMenus()).map
 const canAccess = (path) => !allowedPaths.value.size
     || allowedPaths.value.has(path)
     || Array.from(allowedPaths.value).some((item) => path.startsWith(`${item}/`));
+const canLoadLoginLogs = computed(() => getAuthRole() === 'ADMIN' && canAccess('/home/system/login-logs'));
 const getReportScene = (report) => {
     const config = parseReportConfig(report.configJson);
     return config.scene === 'screen' ? 'screen' : 'dashboard';
@@ -81,6 +90,10 @@ const recentAddedTotal = computed(() => [
     recentAddedChartCount.value,
     recentAddedScreenCount.value,
 ].reduce((sum, item) => sum + item, 0));
+const recentLoginLogs = computed(() => loginLogs.value.filter((item) => isRecentWithinWindow(item.createdAt)));
+const recentLoginSuccessCount = computed(() => recentLoginLogs.value.filter((item) => item.action === 'LOGIN_SUCCESS').length);
+const recentLoginFailCount = computed(() => recentLoginLogs.value.filter((item) => item.action === 'LOGIN_FAIL').length);
+const recentLoginActiveUserCount = computed(() => new Set(recentLoginLogs.value.map((item) => item.username).filter(Boolean)).size);
 const recentAddedBars = computed(() => {
     const rawItems = [
         {
@@ -88,30 +101,120 @@ const recentAddedBars = computed(() => {
             label: '数据源',
             value: recentAddedDatasourceCount.value,
             accent: 'linear-gradient(180deg, #7dd0c6 0%, #55b0a3 100%)',
+            color: '#55b0a3',
         },
         {
             key: 'dataset',
             label: '数据集',
             value: recentAddedDatasetCount.value,
             accent: 'linear-gradient(180deg, #90c7df 0%, #6ea8c7 100%)',
+            color: '#6ea8c7',
         },
         {
             key: 'chart',
             label: '图表组件',
             value: recentAddedChartCount.value,
             accent: 'linear-gradient(180deg, #98bbe7 0%, #5f97cf 100%)',
+            color: '#5f97cf',
         },
         {
             key: 'screen',
             label: '数据大屏',
             value: recentAddedScreenCount.value,
             accent: 'linear-gradient(180deg, #87c8b6 0%, #65b29e 100%)',
+            color: '#65b29e',
         },
     ];
     const maxValue = Math.max(...rawItems.map((item) => item.value), 1);
     return rawItems.map((item) => ({
         ...item,
         percent: item.value > 0 ? Math.max(14, Math.round((item.value / maxValue) * 100)) : 0,
+    }));
+});
+const recentAddedRingSegments = computed(() => {
+    const ringItems = recentAddedBars.value.filter((item) => item.value > 0);
+    if (!ringItems.length || recentAddedTotal.value <= 0) {
+        return [{
+                key: 'empty',
+                color: '#d7e2e6',
+                dasharray: `${DASHBOARD_RING_CIRCUMFERENCE} 0`,
+                dashoffset: '0',
+            }];
+    }
+    let offset = 0;
+    return ringItems.map((item) => {
+        const length = (item.value / recentAddedTotal.value) * DASHBOARD_RING_CIRCUMFERENCE;
+        const segment = {
+            key: item.key,
+            color: item.color,
+            dasharray: `${length} ${Math.max(DASHBOARD_RING_CIRCUMFERENCE - length, 0)}`,
+            dashoffset: `${-offset}`,
+        };
+        offset += length;
+        return segment;
+    });
+});
+const recentLoginTrend = computed(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const buckets = Array.from({ length: RECENT_ADDED_WINDOW_DAYS }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() - (RECENT_ADDED_WINDOW_DAYS - 1 - index));
+        return {
+            key: date.toISOString().slice(0, 10),
+            label: `${date.getMonth() + 1}/${date.getDate()}`,
+            success: 0,
+            fail: 0,
+            total: 0,
+        };
+    });
+    const bucketMap = new Map(buckets.map((item) => [item.key, item]));
+    recentLoginLogs.value.forEach((item) => {
+        const date = new Date(item.createdAt);
+        if (Number.isNaN(date.getTime()))
+            return;
+        date.setHours(0, 0, 0, 0);
+        const bucket = bucketMap.get(date.toISOString().slice(0, 10));
+        if (!bucket)
+            return;
+        if (item.action === 'LOGIN_SUCCESS') {
+            bucket.success += 1;
+        }
+        else if (item.action === 'LOGIN_FAIL') {
+            bucket.fail += 1;
+        }
+        bucket.total = bucket.success + bucket.fail;
+    });
+    return buckets.map((item) => ({
+        key: item.key,
+        label: item.label,
+        success: item.success,
+        fail: item.fail,
+        total: item.total,
+    }));
+});
+const hasRecentLoginData = computed(() => recentLoginTrend.value.some((item) => item.total > 0));
+const loginChartMaxValue = computed(() => Math.max(...recentLoginTrend.value.flatMap((item) => [item.success, item.fail]), 1));
+const loginChartPoints = computed(() => {
+    const availableWidth = LOGIN_CHART_WIDTH - LOGIN_CHART_PADDING_X * 2;
+    const availableHeight = LOGIN_CHART_HEIGHT - LOGIN_CHART_PADDING_TOP - LOGIN_CHART_PADDING_BOTTOM;
+    const step = recentLoginTrend.value.length > 1 ? availableWidth / (recentLoginTrend.value.length - 1) : 0;
+    const maxValue = loginChartMaxValue.value;
+    const toY = (value) => LOGIN_CHART_PADDING_TOP + availableHeight - (value / maxValue) * availableHeight;
+    return recentLoginTrend.value.map((item, index) => ({
+        key: item.key,
+        x: LOGIN_CHART_PADDING_X + step * index,
+        successY: toY(item.success),
+        failY: toY(item.fail),
+    }));
+});
+const loginSuccessLinePoints = computed(() => loginChartPoints.value.map((item) => `${item.x},${item.successY}`).join(' '));
+const loginFailLinePoints = computed(() => loginChartPoints.value.map((item) => `${item.x},${item.failY}`).join(' '));
+const loginGuideLines = computed(() => {
+    const availableHeight = LOGIN_CHART_HEIGHT - LOGIN_CHART_PADDING_TOP - LOGIN_CHART_PADDING_BOTTOM;
+    return [0.25, 0.5, 0.75].map((ratio, index) => ({
+        key: `guide-${index}`,
+        y: LOGIN_CHART_PADDING_TOP + availableHeight * ratio,
     }));
 });
 const allResourceItems = computed(() => {
@@ -245,16 +348,21 @@ const openScreen = (id) => {
 const loadData = async () => {
     loading.value = true;
     try {
-        const [datasources, datasets, charts, dashboards] = await Promise.all([
+        const loginLogsPromise = canLoadLoginLogs.value
+            ? request.get('/audit-logs/login').catch(() => [])
+            : Promise.resolve([]);
+        const [datasources, datasets, charts, dashboards, logs] = await Promise.all([
             getDatasourceList(),
             getDatasetList(),
             getChartList(),
             getDashboardList(),
+            loginLogsPromise,
         ]);
         datasourceList.value = datasources;
         datasetList.value = datasets;
         chartList.value = charts;
         reportList.value = dashboards;
+        loginLogs.value = logs;
     }
     finally {
         loading.value = false;
@@ -267,9 +375,17 @@ let __VLS_components;
 let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['workbench-page']} */ ;
 /** @type {__VLS_StyleScopedClasses['workbench-page']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__ring-track']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__ring-segment']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__ring-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__ring-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-legend-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__status-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-fact']} */ ;
 /** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['recent-screen-item']} */ ;
@@ -279,14 +395,23 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['recent-screen-item__cover']} */ ;
 /** @type {__VLS_StyleScopedClasses['content-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard--single']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-visual']} */ ;
 /** @type {__VLS_StyleScopedClasses['workbench-main']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-card--dashboard']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-side__title']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__columns']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-summary']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-columns']} */ ;
 /** @type {__VLS_StyleScopedClasses['recent-screen-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['recent-screen-item__cover']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-grid']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard--single']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-legend']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__line-labels']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__columns']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-columns']} */ ;
 /** @type {__VLS_StyleScopedClasses['section-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['resource-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['resource-item__meta']} */ ;
@@ -344,6 +469,45 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "overview-dashboard__summary-kicker" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__summary-visual" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__ring-wrap" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.svg, __VLS_intrinsicElements.svg)({
+    ...{ class: "overview-dashboard__ring-chart" },
+    viewBox: "0 0 128 128",
+    'aria-hidden': "true",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.circle)({
+    ...{ class: "overview-dashboard__ring-track" },
+    cx: "64",
+    cy: "64",
+    r: "42",
+});
+for (const [segment] of __VLS_getVForSourceType((__VLS_ctx.recentAddedRingSegments))) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.circle)({
+        key: (segment.key),
+        ...{ class: "overview-dashboard__ring-segment" },
+        cx: "64",
+        cy: "64",
+        r: "42",
+        stroke: (segment.color),
+        'stroke-dasharray': (segment.dasharray),
+        'stroke-dashoffset': (segment.dashoffset),
+    });
+}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__ring-copy" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+(__VLS_ctx.recentAddedTotal);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+(__VLS_ctx.RECENT_ADDED_WINDOW_DAYS);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__summary-copy" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "overview-dashboard__summary-value" },
 });
 (__VLS_ctx.recentAddedTotal);
@@ -352,6 +516,23 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 (__VLS_ctx.RECENT_ADDED_WINDOW_DAYS);
 (__VLS_ctx.recentAddedTotal);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__summary-legend" },
+});
+for (const [item] of __VLS_getVForSourceType((__VLS_ctx.recentAddedBars))) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        key: (`ring-${item.key}`),
+        ...{ class: "overview-dashboard__summary-legend-item" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.i, __VLS_intrinsicElements.i)({
+        ...{ class: "overview-dashboard__summary-legend-dot" },
+        ...{ style: ({ background: item.color }) },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (item.label);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (item.value);
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "overview-dashboard__status-panel" },
 });
@@ -393,7 +574,19 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.
 __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
 (__VLS_ctx.recentAddedScreenCount);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "overview-dashboard__chart-card" },
+    ...{ class: "overview-dashboard__mini-fact" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+(__VLS_ctx.recentLoginActiveUserCount);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__mini-fact" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+(__VLS_ctx.recentLoginFailCount);
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__chart-card overview-dashboard__chart-card--recent" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "overview-dashboard__chart-head" },
@@ -435,6 +628,127 @@ for (const [item] of __VLS_getVForSourceType((__VLS_ctx.recentAddedBars))) {
         ...{ class: "overview-dashboard__column-note" },
     });
     (__VLS_ctx.RECENT_ADDED_WINDOW_DAYS);
+}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__chart-card overview-dashboard__chart-card--login" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__chart-head" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__chart-title" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__chart-subtitle" },
+});
+(__VLS_ctx.canLoadLoginLogs ? `最近 ${__VLS_ctx.RECENT_ADDED_WINDOW_DAYS} 天登录成功 / 失败趋势` : '当前账号无登录日志查看权限');
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "overview-dashboard__chart-unit" },
+});
+if (__VLS_ctx.canLoadLoginLogs) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "overview-dashboard__login-summary" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "overview-dashboard__login-fact" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.recentLoginSuccessCount);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "overview-dashboard__login-fact" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.recentLoginFailCount);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "overview-dashboard__login-fact" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+    (__VLS_ctx.recentLoginActiveUserCount);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "overview-dashboard__legend" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "overview-dashboard__legend-item" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.i, __VLS_intrinsicElements.i)({
+        ...{ class: "overview-dashboard__legend-dot overview-dashboard__legend-dot--success" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "overview-dashboard__legend-item" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.i, __VLS_intrinsicElements.i)({
+        ...{ class: "overview-dashboard__legend-dot overview-dashboard__legend-dot--fail" },
+    });
+    if (__VLS_ctx.hasRecentLoginData) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "overview-dashboard__line-panel" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.svg, __VLS_intrinsicElements.svg)({
+            ...{ class: "overview-dashboard__line-chart" },
+            viewBox: "0 0 320 160",
+            preserveAspectRatio: "none",
+            'aria-hidden': "true",
+        });
+        for (const [guide] of __VLS_getVForSourceType((__VLS_ctx.loginGuideLines))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.line)({
+                key: (guide.key),
+                ...{ class: "overview-dashboard__line-guide" },
+                x1: "18",
+                x2: "302",
+                y1: (guide.y),
+                y2: (guide.y),
+            });
+        }
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.polyline)({
+            ...{ class: "overview-dashboard__line overview-dashboard__line--success" },
+            points: (__VLS_ctx.loginSuccessLinePoints),
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.polyline)({
+            ...{ class: "overview-dashboard__line overview-dashboard__line--fail" },
+            points: (__VLS_ctx.loginFailLinePoints),
+        });
+        for (const [point] of __VLS_getVForSourceType((__VLS_ctx.loginChartPoints))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.g, __VLS_intrinsicElements.g)({
+                key: (point.key),
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.circle)({
+                ...{ class: "overview-dashboard__point overview-dashboard__point--success" },
+                cx: (point.x),
+                cy: (point.successY),
+                r: "4",
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.circle)({
+                ...{ class: "overview-dashboard__point overview-dashboard__point--fail" },
+                cx: (point.x),
+                cy: (point.failY),
+                r: "4",
+            });
+        }
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "overview-dashboard__line-labels" },
+        });
+        for (const [item] of __VLS_getVForSourceType((__VLS_ctx.recentLoginTrend))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                key: (`label-${item.key}`),
+            });
+            (item.label);
+        }
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "overview-dashboard__login-empty overview-dashboard__login-empty--inline" },
+        });
+        (__VLS_ctx.RECENT_ADDED_WINDOW_DAYS);
+    }
+}
+else {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "overview-dashboard__login-empty" },
+    });
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
     ...{ class: "content-grid" },
@@ -757,8 +1071,18 @@ var __VLS_30;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard--single']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-kicker']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-visual']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__ring-wrap']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__ring-chart']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__ring-track']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__ring-segment']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__ring-copy']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-copy']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-value']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-legend']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-legend-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-legend-dot']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__status-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__status-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__status-value']} */ ;
@@ -768,7 +1092,10 @@ var __VLS_30;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__summary-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__mini-fact']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-card--recent']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-head']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-subtitle']} */ ;
@@ -780,6 +1107,38 @@ var __VLS_30;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__column-bar']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__column-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['overview-dashboard__column-note']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-card--login']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-head']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-subtitle']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__chart-unit']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-summary']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-fact']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__legend']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__legend-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__legend-dot']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__legend-dot--success']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__legend-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__legend-dot']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__legend-dot--fail']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__line-panel']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__line-chart']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__line-guide']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__line']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__line--success']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__line']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__line--fail']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__point']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__point--success']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__point']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__point--fail']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__line-labels']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-empty']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-empty--inline']} */ ;
+/** @type {__VLS_StyleScopedClasses['overview-dashboard__login-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['content-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['surface-card']} */ ;
 /** @type {__VLS_StyleScopedClasses['recent-card']} */ ;
@@ -825,6 +1184,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             recentScreenPage: recentScreenPage,
             resourcePage: resourcePage,
             activeResourceCategory: activeResourceCategory,
+            canLoadLoginLogs: canLoadLoginLogs,
             getPublishStatus: getPublishStatus,
             getCoverUrl: getCoverUrl,
             getCanvasLabel: getCanvasLabel,
@@ -834,7 +1194,17 @@ const __VLS_self = (await import('vue')).defineComponent({
             publishProgress: publishProgress,
             recentAddedScreenCount: recentAddedScreenCount,
             recentAddedTotal: recentAddedTotal,
+            recentLoginSuccessCount: recentLoginSuccessCount,
+            recentLoginFailCount: recentLoginFailCount,
+            recentLoginActiveUserCount: recentLoginActiveUserCount,
             recentAddedBars: recentAddedBars,
+            recentAddedRingSegments: recentAddedRingSegments,
+            recentLoginTrend: recentLoginTrend,
+            hasRecentLoginData: hasRecentLoginData,
+            loginChartPoints: loginChartPoints,
+            loginSuccessLinePoints: loginSuccessLinePoints,
+            loginFailLinePoints: loginFailLinePoints,
+            loginGuideLines: loginGuideLines,
             resourceCategories: resourceCategories,
             activeResourceMeta: activeResourceMeta,
             filteredResourceItems: filteredResourceItems,

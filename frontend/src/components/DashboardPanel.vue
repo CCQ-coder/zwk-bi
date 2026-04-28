@@ -117,6 +117,7 @@
               <ComponentStaticPreview
                 :chart-type="getComponentChartConfig(comp).chartType"
                 :chart-config="getComponentChartConfig(comp)"
+                :style-config="getComponentConfig(comp).style"
                 :show-title="getComponentConfig(comp).style.showTitle"
               />
             </div>

@@ -184,7 +184,8 @@ import sceneSunsetVilla from '../assets/login/uploaded/scene-3.png'
 import sceneAlpineLake from '../assets/login/uploaded/scene-4.png'
 import { login } from '../api/auth'
 import { getCurrentMenus } from '../api/menu'
-import { saveAuthMenus, saveAuthSession } from '../utils/auth-session'
+import { saveAuthSession } from '../utils/auth-session'
+import { setSharedMenus } from '../utils/menu-cache'
 import { getPlatformBranding } from '../utils/platform-settings'
 
 const router = useRouter()
@@ -252,7 +253,7 @@ const handleLogin = async () => {
     const result = await login({ username: loginForm.username, password: loginForm.password })
     saveAuthSession(result)
     const menus = await getCurrentMenus()
-    saveAuthMenus(menus)
+    setSharedMenus(menus)
     if (rememberUser.value) {
       localStorage.setItem('bi_last_username', loginForm.username)
     } else {
