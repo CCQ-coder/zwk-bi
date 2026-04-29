@@ -39,7 +39,7 @@ const widgetStyle = computed(() => {
         '--static-widget-muted-color': mutedColor,
         background: isDecoration ? 'transparent' : (props.styleConfig?.bgColor || 'transparent'),
         border: !isDecoration && props.styleConfig?.borderShow ? `${borderWidth}px solid ${props.styleConfig.borderColor || accentColor}` : 'none',
-        borderRadius: `${radius}px`,
+        borderRadius: isDecoration ? '0px' : `${radius}px`,
         boxShadow: !isDecoration && props.styleConfig?.shadowShow
             ? `0 0 ${Math.max(0, Number(props.styleConfig.shadowBlur ?? 12))}px ${props.styleConfig.shadowColor || 'rgba(77, 179, 255, 0.18)'}`
             : 'none',
@@ -263,6 +263,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_stream']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_stream']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_pulse']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_pulse']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_pulse']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell--decor_border_bracket']} */ ;

@@ -142,19 +142,35 @@
                 />
 
                 <div class="table-browser">
-                  <div class="table-list" v-loading="tablesLoading">
-                    <button
-                      v-for="table in filteredTables"
-                      :key="table.tableName"
-                      type="button"
-                      class="table-item"
-                      :class="{ 'table-item--active': selectedTable === table.tableName }"
-                      @click="selectTable(table.tableName)"
-                    >
-                      <div class="table-item-name">{{ table.tableName }}</div>
-                      <div class="table-item-meta">{{ table.comment || table.tableType || 'TABLE' }}</div>
-                    </button>
-                    <div v-if="!tablesLoading && !filteredTables.length" class="table-empty">暂无可用数据表</div>
+                  <div class="table-list-panel">
+                    <div class="table-list" v-loading="tablesLoading">
+                      <button
+                        v-for="table in paginatedTables"
+                        :key="table.tableName"
+                        type="button"
+                        class="table-item"
+                        :class="{ 'table-item--active': selectedTable === table.tableName }"
+                        @click="selectTable(table.tableName)"
+                      >
+                        <div class="table-item-name">{{ table.tableName }}</div>
+                        <div class="table-item-meta">{{ table.comment || table.tableType || 'TABLE' }}</div>
+                      </button>
+                      <div v-if="!tablesLoading && !paginatedTables.length" class="table-empty">暂无可用数据表</div>
+                    </div>
+
+                    <div class="preview-summary table-list-summary">筛选后 {{ tableListTotal }} 张表</div>
+                    <el-pagination
+                      v-if="tableListTotal > tableListPageSize"
+                      v-model:current-page="tableListPage"
+                      v-model:page-size="tableListPageSize"
+                      class="table-list-pagination"
+                      background
+                      layout="total, sizes, prev, pager, next"
+                      :page-sizes="[10, 20, 50]"
+                      :total="tableListTotal"
+                      @current-change="handleTableListPageChange"
+                      @size-change="handleTableListPageSizeChange"
+                    />
                   </div>
 
                   <div class="table-detail">
@@ -166,6 +182,8 @@
                         </div>
                       </div>
 
+                      <div class="preview-summary">字段 {{ tableColumns.length }} 个 / 当前页 {{ extractPreview.rows.length }} 行 / 全部 {{ extractPreviewTotalRows }} 行</div>
+
                       <div class="column-list" v-loading="columnsLoading">
                         <div v-for="column in tableColumns" :key="column.columnName" class="column-item">
                           <div>
@@ -175,8 +193,6 @@
                           <el-tag size="small">{{ column.dataType }}</el-tag>
                         </div>
                       </div>
-
-                      <div class="preview-summary">当前页 {{ extractPreview.rows.length }} 行 / 全部 {{ extractPreviewTotalRows }} 行</div>
 
                       <el-table
                         v-if="extractPreview.columns.length"
@@ -704,6 +720,8 @@ const extractPreview = reactive<ExtractPreviewResult>(emptyExtractPreview())
 const extractPreviewLoading = ref(false)
 const extractPreviewPage = ref(1)
 const extractPreviewPageSize = ref(20)
+const tableListPage = ref(1)
+const tableListPageSize = ref(10)
 
 const dialogVisible = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
@@ -742,6 +760,11 @@ const filteredTables = computed(() => {
   const keyword = tableSearch.value.trim().toLowerCase()
   if (!keyword) return tables.value
   return tables.value.filter((item) => item.tableName.toLowerCase().includes(keyword))
+})
+const tableListTotal = computed(() => filteredTables.value.length)
+const paginatedTables = computed(() => {
+  const start = (tableListPage.value - 1) * tableListPageSize.value
+  return filteredTables.value.slice(start, start + tableListPageSize.value)
 })
 const tableDraftStats = computed(() => {
   const lines = form.tableText.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)
@@ -841,6 +864,7 @@ watch(selectedDatasource, async (datasource) => {
   Object.assign(preview, emptyPreview())
   Object.assign(extractPreview, emptyExtractPreview())
   extractPreviewPage.value = 1
+  tableListPage.value = 1
   tables.value = []
   tableColumns.value = []
   selectedTable.value = ''
@@ -852,6 +876,17 @@ watch(selectedDatasource, async (datasource) => {
   }
   await loadStaticPreview(datasource.id)
 }, { immediate: false })
+
+watch(tableSearch, () => {
+  tableListPage.value = 1
+})
+
+watch(filteredTables, (list) => {
+  const maxPage = Math.max(1, Math.ceil(list.length / tableListPageSize.value))
+  if (tableListPage.value > maxPage) {
+    tableListPage.value = maxPage
+  }
+})
 
 watch(() => form.sourceKind, (sourceKind) => {
   resetDialogPreview()
@@ -937,6 +972,7 @@ const loadDatabaseTables = async (datasourceId: number) => {
   try {
     const result = await getDatasourceTables(datasourceId)
     tables.value = result
+    tableListPage.value = 1
     extractPreviewPage.value = 1
     if (result.length) {
       const targetTable = result.some((item) => item.tableName === selectedTable.value)
@@ -976,6 +1012,7 @@ const loadExtractPreview = async (tableName: string, page = extractPreviewPage.v
 const selectTable = async (tableName: string) => {
   if (!selectedDatasource.value) return
   selectedTable.value = tableName
+  syncTableListPage(tableName)
   columnsLoading.value = true
   extractPreviewPage.value = 1
   Object.assign(extractPreview, emptyExtractPreview())
@@ -1005,6 +1042,28 @@ const handleExtractPreviewPageSizeChange = async (pageSize: number) => {
   extractPreviewPageSize.value = pageSize
   if (!selectedTable.value) return
   await loadExtractPreview(selectedTable.value, 1)
+}
+
+const syncTableListPage = (tableName: string) => {
+  const index = filteredTables.value.findIndex((item) => item.tableName === tableName)
+  if (index < 0) {
+    tableListPage.value = 1
+    return
+  }
+  tableListPage.value = Math.floor(index / tableListPageSize.value) + 1
+}
+
+const handleTableListPageChange = (page: number) => {
+  tableListPage.value = page
+}
+
+const handleTableListPageSizeChange = (pageSize: number) => {
+  tableListPageSize.value = pageSize
+  if (selectedTable.value) {
+    syncTableListPage(selectedTable.value)
+    return
+  }
+  tableListPage.value = 1
 }
 
 const openCreate = (groupId: number | null = activeGroupDraftId.value) => {
@@ -1801,14 +1860,22 @@ onMounted(async () => {
   flex: 1;
 }
 
+.table-list-panel,
 .table-list,
 .table-detail,
 .column-list {
   min-height: 0;
-  overflow: auto;
+}
+
+.table-list-panel,
+.table-detail {
+  display: flex;
+  flex-direction: column;
 }
 
 .table-list {
+  flex: 1;
+  overflow: auto;
   padding-right: 4px;
 }
 
@@ -1859,7 +1926,13 @@ onMounted(async () => {
 .column-list {
   display: grid;
   gap: 8px;
-  margin: 12px 0 14px;
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #e6eef8;
+  border-radius: 14px;
+  background: #f9fbfe;
 }
 
 .column-item {
@@ -1876,6 +1949,11 @@ onMounted(async () => {
   width: 100%;
 }
 
+.table-list-summary {
+  margin-top: 12px;
+}
+
+.table-list-pagination,
 .table-detail-pagination {
   margin-top: 12px;
   justify-content: flex-end;

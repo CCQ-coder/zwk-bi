@@ -1,17 +1,74 @@
 <template>
   <div class="screen-root" :class="{ 'screen-root--editor': screenId, 'screen-root--quiet': screenId }">
-    <!-- 编辑器模式：可折叠左侧综合面板 -->
+    <aside v-if="screenId" class="screen-layer-rail">
+      <div class="layer-rail-head">
+        <div class="layer-rail-icon">
+          <el-icon><Operation /></el-icon>
+        </div>
+        <div class="layer-rail-head-main">
+          <div class="layer-rail-title-row">
+            <span class="layer-rail-title">图层</span>
+            <span class="layer-rail-count">{{ components.length + 1 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="lp-layer-scroll">
+        <div class="lp-layer-item" :class="{ 'lp-layer-item--active': overlaySelected }" @click="selectOverlayLayer">
+          <div class="lp-layer-item-main">
+            <div class="lp-layer-title-line">
+              <span class="lp-layer-order-index lp-layer-order-index--fixed">{{ layeredComponents.length + 1 }}</span>
+              <span class="lp-layer-leading-icon lp-layer-leading-icon--background"></span>
+              <span class="lp-layer-name">背景版</span>
+            </div>
+            <span class="lp-layer-meta">固定底层 · {{ overlayConfig.w }} × {{ overlayConfig.h }}</span>
+          </div>
+          <span class="lp-layer-badge">背景</span>
+        </div>
+
+        <div
+          v-for="(component, layerIdx) in layeredComponents"
+          :key="component.id"
+          class="lp-layer-item"
+          :class="{ 'lp-layer-item--active': isComponentSelected(component.id), 'lp-layer-item--drag-over': layerDragOverIdx === layerIdx }"
+          draggable="true"
+          @dragstart="onLayerDragStart($event, layerIdx)"
+          @dragover.prevent="onLayerDragOver($event, layerIdx)"
+          @dragleave="onLayerDragLeave"
+          @drop.prevent="onLayerDrop($event, layerIdx)"
+          @dragend="onLayerDragEnd"
+          @click="selectLayerComponent(component)"
+          @contextmenu.prevent.stop="openComponentContextMenu($event, component)"
+        >
+          <div class="lp-layer-item-main">
+            <div class="lp-layer-title-line">
+              <span class="lp-layer-order-index">{{ layerIdx + 1 }}</span>
+              <span class="lp-layer-drag-handle">⠿</span>
+              <span class="lp-layer-name">{{ getComponentDisplayName(component) }}</span>
+            </div>
+            <span class="lp-layer-meta">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }} · Z{{ component.zIndex ?? 0 }}</span>
+          </div>
+          <div class="lp-layer-actions">
+            <span class="lp-layer-drag-tip">拖拽</span>
+            <el-button link size="small" @click.stop="bringSpecificComponentToFront(component)">置顶</el-button>
+          </div>
+        </div>
+
+        <el-empty v-if="!components.length" description="当前大屏还没有组件" :image-size="48" />
+      </div>
+    </aside>
+
+    <!-- 编辑器模式：可折叠组件库浮层 -->
     <aside
-      v-if="screenId"
+      v-if="screenId && !effectiveSidebarCollapsed"
       ref="leftPanelRef"
       class="screen-left-panel"
-      :class="{ 'screen-left-panel--collapsed': effectiveSidebarCollapsed }"
-      :style="effectiveSidebarCollapsed ? {} : { width: leftPanelWidth + 'px' }"
+      :style="leftPanelStyle"
       @mouseenter="hoverExpandSidebar"
       @mouseleave="hoverCollapseSidebar"
     >
       <!-- 头部 -->
-      <div class="lp-head">
+      <div class="lp-head" @mousedown.left.stop="startLeftPanelDrag">
         <button class="lp-toggle-btn" @click.stop="toggleSidebar" :title="effectiveSidebarCollapsed ? '展开面板' : '收起面板'">
           <span class="lp-toggle-icon">☰</span>
         </button>
@@ -23,27 +80,13 @@
           <div class="lp-head-badges">
             <span class="lp-head-pill">{{ templateAssets.length }} 资产</span>
             <span class="lp-head-pill lp-head-pill--accent">{{ components.length }} 组件</span>
+            <span v-if="screenId && sidebarLibraryLoading" class="lp-head-pill">侧栏补充中</span>
           </div>
         </template>
       </div>
 
-      <!-- 折叠状态下的图标快捷菜单 -->
-      <div v-if="effectiveSidebarCollapsed" class="lp-icon-menu">
-        <el-tooltip content="组件" placement="right">
-          <div class="lp-icon-item" @click="sidebarCollapsed = false">
-            <el-icon><Grid /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="图层" placement="right">
-          <div class="lp-icon-item" @click="sidebarCollapsed = false">
-            <el-icon><Operation /></el-icon>
-          </div>
-        </el-tooltip>
-      </div>
-
-      <!-- 展开状态下的完整内容 -->
-      <div v-if="!effectiveSidebarCollapsed" class="lp-shell lp-shell--dual">
-        <div class="lp-pane lp-pane--components">
+      <div class="lp-shell lp-shell--single">
+        <div class="lp-pane lp-pane--components" @scroll="hideTemplatePreview">
           <div class="lp-pane-head">
             <div class="lp-pane-title">组件</div>
             <div class="lp-pane-subtitle">图表组件、装饰组件、文字组件和小装饰都在这里</div>
@@ -54,57 +97,62 @@
             <el-input v-model="assetSearch" placeholder="搜索组件名称..." clearable size="small" :prefix-icon="Search" />
           </div>
 
-          <!-- 分类折叠列表 -->
-          <div class="lp-cat-scroll">
-            <div v-for="cat in CHART_CATEGORIES" :key="cat.label" class="lp-cat-section">
-              <div
-                class="lp-cat-header"
-                :class="{ 'lp-cat-header--open': expandedCats.has(cat.label) }"
-                @click="toggleCategory(cat.label)"
+          <div class="lp-category-panel">
+            <div class="lp-category-head">
+              <span class="lp-category-kicker">分类</span>
+              <el-button v-if="activeAssetCategoryLabel || assetType" link size="small" class="lp-category-clear" @click="clearAssetFilters">全部</el-button>
+            </div>
+
+            <div class="lp-category-tabs" role="tablist" aria-label="组件分类">
+              <button
+                v-for="cat in CHART_CATEGORIES"
+                :key="cat.label"
+                type="button"
+                class="lp-category-tab"
+                :class="{ 'lp-category-tab--active': activeAssetCategoryLabel === cat.label }"
+                @click="toggleAssetCategory(cat.label)"
               >
-                <span class="lp-cat-label">{{ cat.label }}</span>
-                <el-icon class="lp-cat-arrow" :class="{ 'lp-cat-arrow--open': expandedCats.has(cat.label) }">
-                  <ArrowRight />
-                </el-icon>
-              </div>
-              <div v-if="expandedCats.has(cat.label)" class="lp-type-grid">
-                <div
-                  v-for="item in cat.types"
-                  :key="item.type"
-                  class="lp-type-chip"
-                  :class="{ 'lp-type-chip--active': assetType === item.type }"
-                  :title="item.label"
-                  draggable="true"
-                  @click="assetType = item.type"
-                  @dragstart="onTypeChipDragStart($event, item.type)"
-                  @dragend="onTypeChipDragEnd"
+                <span class="lp-category-tab-label">{{ cat.label }}</span>
+              </button>
+            </div>
+
+            <div v-if="activeAssetCategory" class="lp-type-strip">
+              <div
+                v-for="item in activeAssetCategory.types"
+                :key="item.type"
+                class="lp-type-chip lp-type-chip--compact"
+                :class="{ 'lp-type-chip--active': assetType === item.type }"
+                :title="item.label"
+                draggable="true"
+                @click="selectAssetType(item.type)"
+                @dragstart="onTypeChipDragStart($event, item.type)"
+                @dragend="onTypeChipDragEnd"
+              >
+                <span
+                  v-if="shouldUseTypeVisualPreview(item.type)"
+                  class="lp-type-visual"
+                  :class="{
+                    'lp-type-visual--decoration': isDecorationChartType(item.type),
+                    'lp-type-visual--icon': isVectorIconChartType(item.type),
+                  }"
                 >
-                  <span
-                    v-if="shouldUseTypeVisualPreview(item.type)"
-                    class="lp-type-visual"
-                    :class="{
-                      'lp-type-visual--decoration': isDecorationChartType(item.type),
-                      'lp-type-visual--icon': isVectorIconChartType(item.type),
-                    }"
-                  >
-                    <ComponentStaticPreview
-                      :chart-type="item.type"
-                      :chart-config="getTypeChipPreviewChartConfig(item.type)"
-                      :show-title="false"
-                      dark
-                    />
-                  </span>
-                  <span v-else class="lp-type-icon" v-html="item.svgIcon" />
-                  <span class="lp-type-label">{{ item.label }}</span>
-                </div>
+                  <ComponentStaticPreview
+                    :chart-type="item.type"
+                    :chart-config="getTypeChipPreviewChartConfig(item.type)"
+                    :show-title="false"
+                    dark
+                  />
+                </span>
+                <span v-else class="lp-type-icon" v-html="item.svgIcon" />
+                <span class="lp-type-label">{{ item.label }}</span>
               </div>
             </div>
           </div>
 
           <!-- 分隔行 -->
           <div class="lp-divider">
-            <span class="lp-divider-text">{{ assetType ? chartTypeLabel(assetType) : '全部组件' }}</span>
-            <el-button v-if="assetType" link size="small" style="font-size:11px;color:#4db3ff" @click="assetType = ''">清除</el-button>
+            <span class="lp-divider-text">{{ assetType ? chartTypeLabel(assetType) : activeAssetCategoryLabel || '全部组件' }}</span>
+            <el-button v-if="activeAssetCategoryLabel || assetType" link size="small" style="font-size:11px;color:#4db3ff" @click="clearAssetFilters">清除</el-button>
           </div>
 
           <div class="lp-library-panel">
@@ -112,6 +160,7 @@
               <div>
                 <div class="lp-library-kicker">模板库</div>
                 <div class="lp-library-note">列表只展示简略信息，悬停即可预览，双击或拖入画布使用。</div>
+                <div v-if="screenId && sidebarLibraryLoading" class="lp-library-loading-hint">远程模板、图表和数据集正在后台补充，不阻塞画布首屏。</div>
               </div>
             </div>
 
@@ -120,7 +169,7 @@
                 <div
                   v-for="template in filteredTemplates"
                   :key="template.id"
-                  class="lp-asset-card lp-asset-card--compact"
+                  class="lp-asset-card lp-asset-card--compact lp-asset-card--dense"
                   :class="{ 'lp-asset-card--selected': selectedTemplateId === template.id, 'lp-asset-card--builtin': template.builtIn }"
                   draggable="true"
                   @click="selectedTemplateId = template.id"
@@ -138,17 +187,34 @@
                       'lp-ac-mini-stage--decoration': isDecorationChartType(getTemplateAssetConfig(template).chart.chartType),
                     }"
                   >
-                    <ComponentStaticPreview
-                      v-if="isTemplateStaticAsset(template)"
-                      :chart-type="getTemplateAssetConfig(template).chart.chartType"
-                      :chart-config="getTemplateAssetConfig(template).chart"
-                      :show-title="false"
-                    />
-                    <ComponentTemplatePreview
-                      v-else
-                      :chart-config="getTemplateAssetConfig(template).chart"
-                      :style-config="getTemplateAssetConfig(template).style"
-                    />
+                    <template v-if="shouldRenderTemplateCardPreview(template.id)">
+                      <ComponentStaticPreview
+                        v-if="isTemplateStaticAsset(template)"
+                        :chart-type="getTemplateAssetConfig(template).chart.chartType"
+                        :chart-config="getTemplateAssetConfig(template).chart"
+                        :show-title="false"
+                      />
+                      <Suspense v-else>
+                        <template #default>
+                          <AsyncComponentTemplatePreview
+                            :chart-config="getTemplateAssetConfig(template).chart"
+                            :style-config="getTemplateAssetConfig(template).style"
+                          />
+                        </template>
+                        <template #fallback>
+                          <div class="lp-ac-mini-stage-placeholder">
+                            <span class="lp-ac-mini-stage-placeholder-kicker">预览加载中</span>
+                            <span class="lp-ac-mini-stage-placeholder-title">{{ template.name }}</span>
+                            <span class="lp-ac-mini-stage-placeholder-meta">{{ chartTypeLabel(template.chartType) }}</span>
+                          </div>
+                        </template>
+                      </Suspense>
+                    </template>
+                    <div v-else class="lp-ac-mini-stage-placeholder">
+                      <span class="lp-ac-mini-stage-placeholder-kicker">悬停预览</span>
+                      <span class="lp-ac-mini-stage-placeholder-title">{{ template.name }}</span>
+                      <span class="lp-ac-mini-stage-placeholder-meta">{{ chartTypeLabel(template.chartType) }}</span>
+                    </div>
                     <span class="lp-ac-mini-stage-badge">{{ chartTypeLabel(template.chartType) }}</span>
                   </div>
                   <div class="lp-ac-row">
@@ -164,55 +230,9 @@
                   </div>
                 </div>
 
-                <el-empty v-if="!filteredTemplates.length && !loading" description="暂无匹配组件" :image-size="42" />
+                <el-empty v-if="!filteredTemplates.length && !loading" class="lp-asset-empty" description="暂无匹配组件" :image-size="42" />
               </div>
             </div>
-          </div>
-        </div>
-
-        <div class="lp-pane lp-pane--layers">
-          <div class="lp-pane-head">
-            <div class="lp-pane-title">图层</div>
-            <div class="lp-pane-subtitle">按层级查看背景版与组件顺序</div>
-          </div>
-
-          <div class="lp-layer-order-tip">图层顺序从上到下显示，点击可直接选中。</div>
-
-          <div class="lp-layer-scroll">
-            <div class="lp-layer-item" :class="{ 'lp-layer-item--active': overlaySelected }" @click="selectOverlayLayer">
-              <div class="lp-layer-item-main">
-                <span class="lp-layer-name">背景版</span>
-                <span class="lp-layer-meta">固定底层 · {{ overlayConfig.w }} × {{ overlayConfig.h }}</span>
-              </div>
-              <span class="lp-layer-badge">背景</span>
-            </div>
-
-            <div
-              v-for="(component, layerIdx) in layeredComponents"
-              :key="component.id"
-              class="lp-layer-item"
-              :class="{ 'lp-layer-item--active': isComponentSelected(component.id), 'lp-layer-item--drag-over': layerDragOverIdx === layerIdx }"
-              draggable="true"
-              @dragstart="onLayerDragStart($event, layerIdx)"
-              @dragover.prevent="onLayerDragOver($event, layerIdx)"
-              @dragleave="onLayerDragLeave"
-              @drop.prevent="onLayerDrop($event, layerIdx)"
-              @dragend="onLayerDragEnd"
-              @click="selectLayerComponent(component)"
-              @contextmenu.prevent.stop="openComponentContextMenu($event, component)"
-            >
-              <div class="lp-layer-item-main">
-                <span class="lp-layer-drag-handle">⠿</span>
-                <span class="lp-layer-name">{{ getComponentDisplayName(component) }}</span>
-                <span class="lp-layer-meta">{{ chartTypeLabel(getComponentChartConfig(component).chartType) }} · {{ getComponentStatusText(component) }} · Z{{ component.zIndex ?? 0 }}</span>
-              </div>
-              <div class="lp-layer-actions">
-                <span class="lp-layer-drag-tip">拖拽</span>
-                <el-button link size="small" @click.stop="bringSpecificComponentToFront(component)">置顶</el-button>
-              </div>
-            </div>
-
-            <el-empty v-if="!components.length" description="当前大屏还没有组件" :image-size="48" />
           </div>
         </div>
       </div>
@@ -245,19 +265,24 @@
               :show-title="false"
               dark
             />
-            <ComponentTemplatePreview
-              v-else
-              :chart-config="getTemplateAssetConfig(hoveredTemplate).chart"
-              :style-config="getTemplateAssetConfig(hoveredTemplate).style"
-            />
+            <Suspense v-else>
+              <template #default>
+                <AsyncComponentTemplatePreview
+                  :chart-config="getTemplateAssetConfig(hoveredTemplate).chart"
+                  :style-config="getTemplateAssetConfig(hoveredTemplate).style"
+                />
+              </template>
+              <template #fallback>
+                <div class="lp-hover-stage-loading">预览加载中...</div>
+              </template>
+            </Suspense>
           </div>
 
           <div class="lp-hover-meta">{{ hoveredTemplate.description || summarizeTemplateConfig(hoveredTemplate.configJson) || '拖入画布后继续配置样式和交互。' }}</div>
         </div>
       </div>
 
-      <!-- 拖拽缩放手柄 (仅展开时可用) -->
-      <div v-if="!effectiveSidebarCollapsed" class="lp-resize-handle" @mousedown.prevent="startPanelResize" />
+      <div class="lp-resize-handle" @mousedown.prevent="startPanelResize" />
     </aside>
 
     <!-- 列表模式：侧边栏 -->
@@ -419,6 +444,16 @@
             </div>
           </div>
           <div class="screen-actions">
+            <div class="screen-tool-launchers screen-tool-launchers--action">
+              <el-button
+                :icon="Grid"
+                :type="!effectiveSidebarCollapsed ? 'primary' : undefined"
+                @click="openSidebarPanel"
+              >
+                组件库
+              </el-button>
+            </div>
+            <el-button size="small" type="primary" :loading="pageSaving" @click="saveCurrentScreen">保存页面</el-button>
             <el-button size="small" :icon="Refresh" :loading="compLoading" @click="loadComponents" title="刷新画布" />
             <el-button size="small" :icon="PictureFilled" :loading="coverSaving" @click="captureScreenCover">{{ currentCoverConfig.url ? '更新封面' : '生成封面' }}</el-button>
             <el-button size="small" :disabled="!canUndo" :loading="undoApplying" @click="undoLastChange">撤销</el-button>
@@ -699,17 +734,26 @@
       </div>
 
       <!-- 组件属性面板 -->
-      <EditorComponentInspector
-        v-else
-        scene="screen"
-        :component="activeComponent"
-        :chart="activeChart"
-        @apply-layout="applyLayoutPatch"
-        @bring-front="bringComponentToFront"
-        @remove="handleRemoveActiveComponent"
-        @preview-component="previewActiveComponent"
-        @save-component="saveActiveComponent"
-      />
+      <Suspense v-else>
+        <template #default>
+          <AsyncEditorComponentInspector
+            scene="screen"
+            :component="activeComponent"
+            :chart="activeChart"
+            @apply-layout="applyLayoutPatch"
+            @bring-front="bringComponentToFront"
+            @remove="handleRemoveActiveComponent"
+            @preview-component="previewActiveComponent"
+            @save-component="saveActiveComponent"
+          />
+        </template>
+        <template #fallback>
+          <div class="screen-inspector-loading">
+            <div class="screen-inspector-loading-title">属性面板加载中</div>
+            <div class="screen-inspector-loading-text">右侧编辑器按需挂载，先保证画布优先可操作。</div>
+          </div>
+        </template>
+      </Suspense>
     </aside>
 
     <teleport to="body">
@@ -807,18 +851,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, triggerRef, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, triggerRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, CirclePlus, Close, Delete, Download, Filter, Grid, Operation, PictureFilled, Plus, Promotion, Refresh, Search, Share, View } from '@element-plus/icons-vue'
 import ComponentDataFallback from './ComponentDataFallback.vue'
 import DesignerTablePreview from './DesignerTablePreview.vue'
 import ComponentStaticPreview from './ComponentStaticPreview.vue'
-import ComponentTemplatePreview from './ComponentTemplatePreview.vue'
-import EditorComponentInspector from './EditorComponentInspector.vue'
 import {
   addDashboardComponent,
   createDashboard,
   deleteDashboard,
+  getDashboardById,
   getDashboardComponents,
   getDashboardList,
   removeDashboardComponent,
@@ -864,6 +907,9 @@ import {
 } from '../utils/report-config'
 import { uploadImage } from '../api/upload'
 
+const AsyncComponentTemplatePreview = defineAsyncComponent(() => import('./ComponentTemplatePreview.vue'))
+const AsyncEditorComponentInspector = defineAsyncComponent(() => import('./EditorComponentInspector.vue'))
+
 // ─── Props & Emits ────────────────────────────────────────────────────────────
 const props = withDefaults(defineProps<{
   screenId?: number | null
@@ -905,7 +951,10 @@ const makeGaugeIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2
 const makeScatterIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="22" r="2.5" fill="currentColor"/><circle cx="16" cy="10" r="2.5" fill="currentColor"/><circle cx="22" cy="18" r="2.5" fill="currentColor"/><circle cx="28" cy="8" r="2.5" fill="currentColor"/><circle cx="32" cy="20" r="2.5" fill="currentColor"/></svg>`
 const makeTreemapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="20" height="18" fill="currentColor" opacity=".8" rx="1"/><rect x="25" y="3" width="12" height="10" fill="currentColor" opacity=".5" rx="1"/><rect x="25" y="15" width="12" height="6" fill="currentColor" opacity=".35" rx="1"/><rect x="3" y="23" width="34" height="6" fill="currentColor" opacity=".25" rx="1"/></svg>`
 const makeTableIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="32" height="7" fill="currentColor" rx="1"/><rect x="4" y="13" width="32" height="5" fill="currentColor" opacity=".4" rx="1"/><rect x="4" y="20" width="32" height="5" fill="currentColor" opacity=".25" rx="1"/><line x1="18" y1="4" x2="18" y2="25" stroke="white" stroke-width="1" opacity=".4"/></svg>`
-const makeDecorFrameIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M6 6H14V8H8V14H6V6ZM26 6H34V14H32V8H26V6ZM6 18H8V24H14V26H6V18ZM32 18H34V26H26V24H32V18Z" fill="currentColor"/><rect x="11" y="11" width="18" height="10" rx="2" fill="currentColor" opacity=".18"/></svg>`
+const makeDecorFrameIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="6" width="28" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".38"/><path d="M6 11H14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M26 6V12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 26H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".78"/><path d="M34 17H27" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".78"/></svg>`
+const makeDecorCornerIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M6 12V6H14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 12V6H26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 20V26H14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M34 20V26H26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 8H25" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".4"/><path d="M15 24H25" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".4"/></svg>`
+const makeDecorGlowIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="6" width="26" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".3"/><rect x="11" y="10" width="18" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".72"/><path d="M11 16H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".9"/><path d="M24 16H29" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".9"/><circle cx="20" cy="16" r="2.1" fill="currentColor" opacity=".82"/></svg>`
+const makeDecorGridIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="6" width="26" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".26" stroke-dasharray="2 2"/><path d="M14 6V26" stroke="currentColor" stroke-width="1" opacity=".28"/><path d="M20 6V26" stroke="currentColor" stroke-width="1" opacity=".48"/><path d="M26 6V26" stroke="currentColor" stroke-width="1" opacity=".28"/><path d="M7 12H33" stroke="currentColor" stroke-width="1" opacity=".28"/><path d="M7 18H33" stroke="currentColor" stroke-width="1" opacity=".48"/><path d="M7 24H33" stroke="currentColor" stroke-width="1" opacity=".28"/></svg>`
 const makeDecorTitlePlateIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M4 16H12" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/><path d="M28 16H36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/><rect x="12" y="10" width="16" height="12" rx="6" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="1.4"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="24" cy="16" r="1.5" fill="currentColor"/></svg>`
 const makeDecorDividerIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M4 16H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/><path d="M25 16H36" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/><circle cx="20" cy="16" r="4" fill="currentColor" opacity=".2" stroke="currentColor" stroke-width="1.5"/></svg>`
 const makeDecorTargetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".68"/><circle cx="20" cy="16" r="5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".4"/><path d="M20 4V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M20 22V28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 16H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M26 16H32" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
@@ -913,7 +962,7 @@ const makeDecorScanIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.o
 const makeDecorHexIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M15 5H25L32 16L25 27H15L8 16Z" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="1.4"/><path d="M18 11H22L25 16L22 21H18L15 16Z" fill="currentColor" opacity=".55"/></svg>`
 const makeDecorPanelIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/><path d="M9 9H18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M24 9H31V16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M29 20V23H25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 const makeDecorStreamIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"/><path d="M8 10H24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 22H32" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".75"/></svg>`
-const makeDecorPulseIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="7" width="26" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".35"/><rect x="11" y="11" width="18" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".7"/></svg>`
+const makeDecorPulseIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="7" width="26" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".24"/><path d="M13 11H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M22 11H27" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M13 21H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M22 21H27" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M11 13V19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M29 13V19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><circle cx="13" cy="11" r="1.4" fill="currentColor" opacity=".86"/><circle cx="27" cy="11" r="1.4" fill="currentColor" opacity=".86"/><circle cx="13" cy="21" r="1.4" fill="currentColor" opacity=".86"/><circle cx="27" cy="21" r="1.4" fill="currentColor" opacity=".86"/></svg>`
 const makeDecorBracketIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M7 11V6H14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M33 11V6H26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M7 21V26H14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M33 21V26H26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`
 const makeDecorCircuitIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M6 8H14V14H26V8H34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 24H18V18H30V24H34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14" cy="14" r="2" fill="currentColor"/><circle cx="18" cy="18" r="2" fill="currentColor"/><circle cx="26" cy="14" r="2" fill="currentColor"/><circle cx="30" cy="18" r="2" fill="currentColor"/></svg>`
 const makeTextBlockIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="6" y="5" width="28" height="22" rx="4" fill="currentColor" opacity=".12"/><rect x="10" y="10" width="20" height="3" rx="1.5" fill="currentColor"/><rect x="10" y="16" width="16" height="3" rx="1.5" fill="currentColor" opacity=".72"/><rect x="10" y="22" width="12" height="3" rx="1.5" fill="currentColor" opacity=".48"/></svg>`
@@ -1007,9 +1056,9 @@ const CHART_COMPONENT_ITEMS: ChartTypeItem[] = [
 
 const DECORATION_COMPONENT_ITEMS: ChartTypeItem[] = [
   createTypeItem('decor_border_frame', makeDecorFrameIcon()),
-  createTypeItem('decor_border_corner', makeDecorFrameIcon()),
-  createTypeItem('decor_border_glow', makeDecorFrameIcon()),
-  createTypeItem('decor_border_grid', makeDecorFrameIcon()),
+  createTypeItem('decor_border_corner', makeDecorCornerIcon()),
+  createTypeItem('decor_border_glow', makeDecorGlowIcon()),
+  createTypeItem('decor_border_grid', makeDecorGridIcon()),
   createTypeItem('decor_border_stream', makeDecorStreamIcon()),
   createTypeItem('decor_border_pulse', makeDecorPulseIcon()),
   createTypeItem('decor_border_bracket', makeDecorBracketIcon()),
@@ -1192,6 +1241,10 @@ const STATIC_TEMPLATE_LIBRARY: StaticAssetSeed[] = [
 ]
 
 const defaultChartTemplateLayout = (chartType: string) => {
+  const staticAsset = STATIC_TEMPLATE_LIBRARY.find((item) => item.type === chartType)
+  if (staticAsset) {
+    return { ...staticAsset.layout }
+  }
   if (chartType === 'table' || chartType === 'table_summary' || chartType === 'table_pivot') {
     return { width: 760, height: 340 }
   }
@@ -1211,33 +1264,72 @@ const DEFAULT_CHART_TEMPLATE_LIBRARY: StaticAssetSeed[] = CHART_COMPONENT_ITEMS.
 const BUILTIN_TEMPLATE_LIBRARY: StaticAssetSeed[] = [...DEFAULT_CHART_TEMPLATE_LIBRARY, ...STATIC_TEMPLATE_LIBRARY]
 
 // ─── 左侧面板展开/折叠 & 拖拽缩放 ────────────────────────────────────────────
-const DEFAULT_EXPANDED_CATEGORIES = new Set<string>(['柱图', '线/面图', '占比/分布', '表格组件'])
-const expandedCats = ref(new Set<string>(
-  CHART_CATEGORIES.map((c) => c.label).filter((label) => DEFAULT_EXPANDED_CATEGORIES.has(label))
-))
-const toggleCategory = (label: string) => {
-  const next = new Set(expandedCats.value)
-  if (next.has(label)) { next.delete(label) } else { next.add(label) }
-  expandedCats.value = next
+const resolveAssetCategoryByType = (type: string) => CHART_CATEGORIES.find((category) => category.types.some((item) => item.type === type)) ?? null
+const selectedAssetCategoryLabel = ref('')
+const activeAssetCategory = computed(() => {
+  if (!props.screenId) return null
+  if (selectedAssetCategoryLabel.value) {
+    return CHART_CATEGORIES.find((category) => category.label === selectedAssetCategoryLabel.value) ?? null
+  }
+  if (assetType.value) {
+    return resolveAssetCategoryByType(assetType.value)
+  }
+  return null
+})
+const activeAssetCategoryLabel = computed(() => activeAssetCategory.value?.label ?? '')
+const activeAssetCategoryTypes = computed(() => new Set(activeAssetCategory.value?.types.map((item) => item.type) ?? []))
+const toggleAssetCategory = (label: string) => {
+  if (selectedAssetCategoryLabel.value === label) {
+    selectedAssetCategoryLabel.value = ''
+    assetType.value = ''
+    return
+  }
+  selectedAssetCategoryLabel.value = label
+  if (assetType.value) {
+    const category = resolveAssetCategoryByType(assetType.value)
+    if (category?.label !== label) {
+      assetType.value = ''
+    }
+  }
+}
+const selectAssetType = (type: string) => {
+  const category = resolveAssetCategoryByType(type)
+  if (category) {
+    selectedAssetCategoryLabel.value = category.label
+  }
+  assetType.value = assetType.value === type ? '' : type
+}
+const clearAssetFilters = () => {
+  selectedAssetCategoryLabel.value = ''
+  assetType.value = ''
 }
 
-const sidebarCollapsed = ref(false)
+const sidebarCollapsed = ref(Boolean(props.screenId))
 const compactEditorMode = ref(false)
 const inspectorCollapsed = ref(true)
 const autoFitCanvas = ref(true)
 let sidebarHoverTimer: number | null = null
 const COMPACT_EDITOR_BREAKPOINT = 1440
 
-const effectiveSidebarCollapsed = computed(() => sidebarCollapsed.value || compactEditorMode.value)
+const effectiveSidebarCollapsed = computed(() => sidebarCollapsed.value)
+
+const openSidebarPanel = () => {
+  if (!effectiveSidebarCollapsed.value) {
+    sidebarCollapsed.value = true
+    scheduleCanvasFit()
+    return
+  }
+  sidebarCollapsed.value = false
+  scheduleCanvasFit()
+}
 
 const toggleSidebar = () => {
-  if (compactEditorMode.value) return
   sidebarCollapsed.value = !sidebarCollapsed.value
   scheduleCanvasFit()
 }
 
 const hoverExpandSidebar = () => {
-  if (compactEditorMode.value || !sidebarCollapsed.value) return
+  if (!sidebarCollapsed.value) return
   if (sidebarHoverTimer !== null) { clearTimeout(sidebarHoverTimer); sidebarHoverTimer = null }
   sidebarHoverTimer = window.setTimeout(() => {
     sidebarCollapsed.value = false
@@ -1251,6 +1343,57 @@ const hoverCollapseSidebar = () => {
 }
 
 const leftPanelWidth = ref(460)
+const leftPanelHeight = ref(0)
+const DEFAULT_LEFT_PANEL_LEFT = 188 + 14
+const DEFAULT_LEFT_PANEL_LEFT_COMPACT = 92 + 10
+const DEFAULT_LEFT_PANEL_TOP = 72
+const DEFAULT_LEFT_PANEL_BOTTOM_GAP = 16
+const leftPanelPosition = reactive({
+  left: 0,
+  top: DEFAULT_LEFT_PANEL_TOP,
+})
+const getLeftPanelMinLeft = () => {
+  return compactEditorMode.value ? DEFAULT_LEFT_PANEL_LEFT_COMPACT : DEFAULT_LEFT_PANEL_LEFT
+}
+const getLeftPanelMinTop = () => (compactEditorMode.value ? 62 : DEFAULT_LEFT_PANEL_TOP)
+const syncLeftPanelHeight = () => {
+  if (typeof window === 'undefined') return
+  const rootHeight = leftPanelRef.value?.parentElement?.clientHeight ?? window.innerHeight
+  const minHeight = compactEditorMode.value ? 320 : 420
+  leftPanelHeight.value = Math.max(minHeight, rootHeight - getLeftPanelMinTop() - DEFAULT_LEFT_PANEL_BOTTOM_GAP)
+}
+const clampLeftPanelPosition = (left: number, top: number) => {
+  if (typeof window === 'undefined') {
+    return { left, top }
+  }
+  const minLeft = getLeftPanelMinLeft()
+  const minTop = getLeftPanelMinTop()
+  const panelWidth = compactEditorMode.value ? Math.min(leftPanelWidth.value, Math.max(320, window.innerWidth - minLeft - 10)) : leftPanelWidth.value
+  const panelHeight = leftPanelHeight.value || leftPanelRef.value?.offsetHeight || Math.max(360, window.innerHeight - minTop - 24)
+  const maxLeft = compactEditorMode.value
+    ? minLeft
+    : Math.max(minLeft, window.innerWidth - panelWidth - 16)
+  const maxTop = Math.max(minTop, window.innerHeight - panelHeight - 16)
+  return {
+    left: Math.min(Math.max(left, minLeft), maxLeft),
+    top: Math.min(Math.max(top, minTop), maxTop),
+  }
+}
+const resetLeftPanelPosition = () => {
+  leftPanelPosition.left = getLeftPanelMinLeft()
+  leftPanelPosition.top = getLeftPanelMinTop()
+}
+const leftPanelStyle = computed(() => {
+  const position = clampLeftPanelPosition(leftPanelPosition.left, leftPanelPosition.top)
+  const height = leftPanelHeight.value || (compactEditorMode.value ? 320 : 420)
+  return {
+    width: compactEditorMode.value ? undefined : `${leftPanelWidth.value}px`,
+    height: `${height}px`,
+    bottom: 'auto',
+    left: `${position.left}px`,
+    top: `${position.top}px`,
+  }
+})
 const startPanelResize = (e: MouseEvent) => {
   const startX = e.clientX
   const startWidth = leftPanelWidth.value
@@ -1267,9 +1410,45 @@ const startPanelResize = (e: MouseEvent) => {
   document.addEventListener('mousemove', onMove)
   document.addEventListener('mouseup', onUp)
 }
+const startLeftPanelDrag = (e: MouseEvent) => {
+  const target = e.target as HTMLElement | null
+  if (!target || target.closest('.lp-toggle-btn') || target.closest('input, textarea, button, .el-input, .el-button, .el-tag')) {
+    return
+  }
+  const startLeft = leftPanelPosition.left
+  const startTop = leftPanelPosition.top
+  const startX = e.clientX
+  const startY = e.clientY
+  let rafId = 0
+  let nextX = startX
+  let nextY = startY
+  const applyFrame = () => {
+    rafId = 0
+    const position = clampLeftPanelPosition(startLeft + nextX - startX, startTop + nextY - startY)
+    leftPanelPosition.left = position.left
+    leftPanelPosition.top = position.top
+  }
+  const onMove = (ev: MouseEvent) => {
+    nextX = ev.clientX
+    nextY = ev.clientY
+    if (!rafId) rafId = requestAnimationFrame(applyFrame)
+  }
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    if (rafId) {
+      cancelAnimationFrame(rafId)
+      applyFrame()
+    }
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
 
 const loading = ref(false)
 const compLoading = ref(false)
+const sidebarLibraryLoading = ref(false)
+const sidebarLibraryReady = ref(!props.screenId)
 const dashboards = ref<Dashboard[]>([])
 const currentDashboard = ref<Dashboard | null>(null)
 const components = ref<DashboardComponent[]>([])
@@ -1325,6 +1504,7 @@ const dashboardSearch = ref('')
 const shareVisible = ref(false)
 const publishVisible = ref(false)
 const publishSaving = ref(false)
+const pageSaving = ref(false)
 const canvasSaving = ref(false)
 const coverSaving = ref(false)
 const capturingCover = ref(false)
@@ -1586,8 +1766,9 @@ const filteredCharts = computed(() => {
   const keyword = assetSearch.value.trim().toLowerCase()
   return charts.value.filter((item) => {
     const matchKeyword = !keyword || item.name.toLowerCase().includes(keyword)
+    const matchCategory = !activeAssetCategory.value || activeAssetCategoryTypes.value.has(item.chartType)
     const matchType = !assetType.value || item.chartType === assetType.value
-    return matchKeyword && matchType
+    return matchKeyword && matchCategory && matchType
   })
 })
 
@@ -1597,15 +1778,17 @@ const filteredTemplates = computed(() => {
     const matchKeyword = !keyword
       || item.name.toLowerCase().includes(keyword)
       || item.description.toLowerCase().includes(keyword)
+    const matchCategory = !activeAssetCategory.value || activeAssetCategoryTypes.value.has(item.chartType)
     const matchType = !assetType.value || item.chartType === assetType.value
-    return matchKeyword && matchType
+    return matchKeyword && matchCategory && matchType
   })
 })
 
-const TEMPLATE_PREVIEW_WIDTH = 220
-const TEMPLATE_PREVIEW_HEIGHT = 248
+const TEMPLATE_PREVIEW_WIDTH = 188
+const TEMPLATE_PREVIEW_HEIGHT = 214
 const TEMPLATE_PREVIEW_OFFSET = 14
 let templatePreviewHideTimer: number | null = null
+let sidebarLibraryLoadToken = 0
 
 const cancelHideTemplatePreview = () => {
   if (templatePreviewHideTimer !== null) {
@@ -1656,6 +1839,7 @@ const selectedChartAsset = computed(() => charts.value.find((item) => item.id ==
 const selectedTemplate = computed(() => templateAssets.value.find((item) => item.id === selectedTemplateId.value) ?? null)
 const hoveredTemplate = computed(() => filteredTemplates.value.find((item) => item.id === hoveredTemplateId.value) ?? null)
 const selectedLibraryAsset = computed(() => libraryTab.value === 'templates' ? selectedTemplate.value : selectedChartAsset.value)
+const shouldRenderTemplateCardPreview = (templateId: number) => selectedTemplateId.value === templateId || hoveredTemplateId.value === templateId
 const filteredDashboards = computed(() => {
   const keyword = dashboardSearch.value.trim().toLowerCase()
   return keyword ? dashboards.value.filter((item) => item.name.toLowerCase().includes(keyword)) : dashboards.value
@@ -1729,7 +1913,14 @@ const matchedBgPreset = computed(() => SCREEN_CANVAS_PRESETS.find(
   (item) => item.width === overlayConfig.w && item.height === overlayConfig.h
 )?.id ?? 'custom')
 
-const canvasWorkWidth = computed(() => Math.max(overlayConfig.w + 400, 2400))
+const STAGE_EDGE_PADDING_X = 72
+const STAGE_EDGE_PADDING_Y = 96
+
+const canvasWorkWidth = computed(() => {
+  const bgRight = overlayConfig.x + overlayConfig.w + STAGE_EDGE_PADDING_X
+  const occupied = components.value.reduce((max, item) => Math.max(max, item.posX + item.width + 32), 0)
+  return Math.max(bgRight, occupied, overlayConfig.w + STAGE_EDGE_PADDING_X, 720)
+})
 
 // ─── 缩放控制 ───────────────────────────────────────────────────────────
 const canvasScale = ref(1)
@@ -1742,8 +1933,8 @@ const getStageScrollElement = () => stageScrollRef.value
 const applyFittedCanvasScale = () => {
   const scrollEl = getStageScrollElement()
   if (!scrollEl) return
-  const fitW = (scrollEl.clientWidth - 40) / canvasWorkWidth.value
-  const fitH = (scrollEl.clientHeight - 40) / canvasMinHeight.value
+  const fitW = (scrollEl.clientWidth - 28) / canvasWorkWidth.value
+  const fitH = (scrollEl.clientHeight - 28) / canvasMinHeight.value
   canvasScale.value = Math.max(SCALE_MIN, Math.min(SCALE_MAX, +Math.min(fitW, fitH).toFixed(2)))
 }
 
@@ -1779,13 +1970,9 @@ const toggleInspector = () => {
 }
 
 const canvasMinHeight = computed(() => {
-  const bgBottom = overlayConfig.y + overlayConfig.h + 200
-  const occupied = components.value.reduce((max, item) => Math.max(max, item.posY + item.height + 24), 0)
-  return Math.max(currentCanvasConfig.value.height, bgBottom, 560, occupied)
-})
-
-watch([canvasWorkWidth, canvasMinHeight], () => {
-  scheduleCanvasFit()
+  const bgBottom = overlayConfig.y + overlayConfig.h + STAGE_EDGE_PADDING_Y
+  const occupied = components.value.reduce((max, item) => Math.max(max, item.posY + item.height + 32), 0)
+  return Math.max(bgBottom, occupied, overlayConfig.h + STAGE_EDGE_PADDING_Y, 420)
 })
 
 const RULER_STEP = 200 // 加大标尺间距减少 DOM 数量
@@ -1834,6 +2021,18 @@ const normalizeLayout = (component: DashboardComponent) => {
     if (rawHeight <= 12) component.height = Math.max(MIN_CARD_HEIGHT, rawHeight * LEGACY_GRID_ROW_PX)
     if ((Number(component.posX) || 0) <= 24) component.posX = (Number(component.posX) || 0) * LEGACY_GRID_COL_PX
     if ((Number(component.posY) || 0) <= 24) component.posY = (Number(component.posY) || 0) * LEGACY_GRID_ROW_PX
+  }
+
+  const chartType = getComponentChartConfig(component).chartType ?? ''
+  const preferredLayout = defaultChartTemplateLayout(chartType)
+  const shouldNormalizeStaticFallbackSize =
+    rawWidth === 520 && rawHeight === 320
+    && (preferredLayout.width !== 520 || preferredLayout.height !== 320)
+    && (isStaticWidgetChartType(chartType) || isVectorIconChartType(chartType))
+
+  if (shouldNormalizeStaticFallbackSize) {
+    component.width = preferredLayout.width
+    component.height = preferredLayout.height
   }
 
   component.posX = Math.max(0, Number(component.posX) || 0)
@@ -1928,7 +2127,8 @@ const getEditorCardPadding = (component: DashboardComponent) => {
 
 const getCardStyle = (component: DashboardComponent) => {
   const style = getComponentConfig(component).style
-  const shadow = style.shadowShow
+  const isDecoration = isDecorationComponent(component)
+  const shadow = !isDecoration && style.shadowShow
     ? `0 4px ${style.shadowBlur ?? 12}px ${style.shadowColor ?? 'rgba(0,0,0,0.4)'}`
     : undefined
   return {
@@ -1937,8 +2137,8 @@ const getCardStyle = (component: DashboardComponent) => {
     width: `${component.width}px`,
     height: `${component.height}px`,
     zIndex: String(Math.max(2, component.zIndex ?? 2)),
-    borderRadius: style.cardRadius != null ? `${style.cardRadius}px` : undefined,
-    border: style.borderShow ? `${style.borderWidth}px solid ${style.borderColor}` : undefined,
+    borderRadius: !isDecoration && style.cardRadius != null ? `${style.cardRadius}px` : undefined,
+    border: !isDecoration && style.borderShow ? `${style.borderWidth}px solid ${style.borderColor}` : undefined,
     opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
     boxShadow: shadow,
     padding: getEditorCardPadding(component) > 0 ? `${getEditorCardPadding(component)}px` : undefined,
@@ -2147,9 +2347,66 @@ const loadComponentDataInBatches = async (items: DashboardComponent[], loadToken
   }
 }
 
+const mergeLibraryItems = <T extends { id: number }>(current: T[], incoming: T[]) => {
+  if (!current.length) return incoming
+  const incomingIds = new Set(incoming.map((item) => item.id))
+  const extras = current.filter((item) => !incomingIds.has(item.id))
+  return [...extras, ...incoming]
+}
+
+const refreshVisibleComponentDataAfterChartLoad = async () => {
+  if (!props.screenId || !components.value.length) return
+  _componentConfigCache.clear()
+  await nextTick()
+  if (!componentVisibilityObserver) {
+    await loadComponentDataInBatches(components.value, componentDataLoadToken)
+    return
+  }
+  components.value.forEach((component) => {
+    if (isComponentVisible(component.id) && componentRequiresPreviewData(component)) {
+      void loadComponentData(component)
+    }
+  })
+}
+
+const loadSidebarLibraryData = async () => {
+  const loadToken = ++sidebarLibraryLoadToken
+  sidebarLibraryLoading.value = true
+  try {
+    const [chartList, datasetList, templateList] = await Promise.all([
+      getChartList(),
+      getDatasetList(),
+      getTemplateList(),
+    ])
+    if (loadToken !== sidebarLibraryLoadToken) return
+    charts.value = mergeLibraryItems(charts.value, chartList)
+    datasets.value = mergeLibraryItems(datasets.value, datasetList)
+    templates.value = mergeLibraryItems(templates.value, templateList)
+    if (!selectedChartId.value && charts.value.length) selectedChartId.value = charts.value[0].id
+    sidebarLibraryReady.value = true
+    await refreshVisibleComponentDataAfterChartLoad()
+  } finally {
+    if (loadToken === sidebarLibraryLoadToken) {
+      sidebarLibraryLoading.value = false
+    }
+  }
+}
+
 const loadBaseData = async () => {
   loading.value = true
   try {
+    if (props.screenId) {
+      sidebarLibraryReady.value = false
+      charts.value = []
+      datasets.value = []
+      templates.value = []
+      const target = await getDashboardById(props.screenId)
+      dashboards.value = [target]
+      await selectDashboard(target)
+      void loadSidebarLibraryData()
+      return
+    }
+
     const [dashboardList, chartList, datasetList, templateList] = await Promise.all([
       getDashboardList(),
       getChartList(),
@@ -2160,20 +2417,11 @@ const loadBaseData = async () => {
     charts.value = chartList
     datasets.value = datasetList
     templates.value = templateList
+    sidebarLibraryReady.value = true
     if (!selectedChartId.value && chartList.length) selectedChartId.value = chartList[0].id
 
-    if (props.screenId) {
-      // 编辑器模式：直接加载指定大屏
-      const target = dashboardList.find((d) => d.id === props.screenId)
-      if (target) {
-        await selectDashboard(target)
-      } else {
-        ElMessage.error('未找到对应大屏')
-      }
-    } else {
-      await buildCounts()
-      if (dashboardList.length) await selectDashboard(dashboardList[0])
-    }
+    await buildCounts()
+    if (dashboardList.length) await selectDashboard(dashboardList[0])
   } finally {
     loading.value = false
   }
@@ -3363,6 +3611,26 @@ const handleDeleteDashboard = async (id: number) => {
   ElMessage.success('已删除数据大屏')
 }
 
+const saveCurrentScreen = async () => {
+  const dashboard = currentDashboard.value
+  if (!dashboard) return ElMessage.warning('请先选择大屏')
+
+  pageSaving.value = true
+  try {
+    const updated = await updateDashboard(dashboard.id, {
+      name: dashboard.name,
+      configJson: dashboard.configJson,
+    })
+    currentDashboard.value = updated
+    dashboards.value = dashboards.value.map((item) => item.id === updated.id ? updated : item)
+    ElMessage.success('页面已保存')
+  } catch {
+    ElMessage.error('页面保存失败，请重试')
+  } finally {
+    pageSaving.value = false
+  }
+}
+
 const openPreview = (usePublishedLink = false) => {
   if (!currentDashboard.value) return ElMessage.warning('请先选择大屏')
   window.open(usePublishedLink && isPublished.value ? shareLink.value : previewLink.value, '_blank', 'noopener,noreferrer')
@@ -3684,6 +3952,7 @@ const exportScreenJson = () => {
 const getChartDatasetName = (datasetId: number | '' | null | undefined, chartType: string) => {
   const datasetName = datasetMap.value.get(Number(datasetId) || -1)?.name
   if (datasetName) return datasetName
+  if (!sidebarLibraryReady.value && props.screenId && datasetId) return '数据集加载中'
   return isStaticWidgetChartType(chartType) ? '静态组件' : '未关联数据集'
 }
 
@@ -3801,10 +4070,7 @@ const addChartToScreen = async (
     ElMessage.warning('请先选择大屏')
     return
   }
-  const nextSize = size ?? {
-    width: chart.chartType === 'table' ? 760 : chart.chartType === 'filter_button' ? 200 : 520,
-    height: chart.chartType === 'table' ? 340 : chart.chartType === 'filter_button' ? 60 : 320,
-  }
+  const nextSize = size ?? defaultChartTemplateLayout(chart.chartType)
   const placement = resolveDropPlacement(nextSize.width, nextSize.height, point)
   const component = await addDashboardComponent(currentDashboard.value.id, {
     chartId: chart.id,
@@ -4055,6 +4321,12 @@ const summarizeTemplateConfig = (configJson: string) => {
 
 const handleWindowResize = () => {
   compactEditorMode.value = window.innerWidth <= COMPACT_EDITOR_BREAKPOINT
+  syncLeftPanelHeight()
+  const fallbackLeft = leftPanelPosition.left || getLeftPanelMinLeft()
+  const fallbackTop = leftPanelPosition.top || getLeftPanelMinTop()
+  const position = clampLeftPanelPosition(fallbackLeft, fallbackTop)
+  leftPanelPosition.left = position.left
+  leftPanelPosition.top = position.top
   chartInstances.forEach((instance) => instance.resize())
   scheduleCanvasFit()
 }
@@ -4062,6 +4334,8 @@ const handleWindowResize = () => {
 onMounted(async () => {
   document.addEventListener('mousedown', hideComponentContextMenu)
   window.addEventListener('resize', handleWindowResize)
+  resetLeftPanelPosition()
+  syncLeftPanelHeight()
   handleWindowResize()
   await loadBaseData()
   await nextTick()
@@ -4348,6 +4622,27 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.screen-inspector-loading {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 18px;
+  color: #607884;
+}
+
+.screen-inspector-loading-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #173246;
+}
+
+.screen-inspector-loading-text {
+  font-size: 12px;
+  line-height: 1.7;
+}
+
 /* ─── 背景版 属性面板 ─────────────────────────────────────────────────── */
 .bg-inspector {
   height: 100%;
@@ -4486,6 +4781,13 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.screen-tool-launchers {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
 }
 
 .screen-comp-count {
@@ -4827,7 +5129,7 @@ onBeforeUnmount(() => {
 .screen-stage-scroll {
   flex: 1;
   overflow: auto;
-  padding: 20px;
+  padding: 14px 16px 18px;
   background: linear-gradient(180deg, #f3f8f7 0%, #e9eff3 100%);
 }
 
@@ -5302,8 +5604,11 @@ onBeforeUnmount(() => {
 
 /* ─── 编辑器模式布局 ─────────────────────────────────────────────────────────── */
 .screen-root--editor {
+  position: relative;
+  --screen-layer-rail-width: 188px;
+  --screen-floating-gap: 14px;
   display: grid;
-  grid-template-columns: v-bind("effectiveSidebarCollapsed ? '60px' : leftPanelWidth + 'px'") minmax(0, 1fr) v-bind("inspectorCollapsed ? '0px' : 'minmax(320px, 22vw)'");
+  grid-template-columns: var(--screen-layer-rail-width) minmax(0, 1fr) v-bind("inspectorCollapsed ? '0px' : 'minmax(320px, 22vw)'");
   grid-template-rows: 1fr;
   gap: 0;
   height: 100%;
@@ -5312,10 +5617,18 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, #f5f9f8 0%, #edf2f6 100%);
 }
 
+.screen-root--editor .screen-layer-rail,
 .screen-root--editor .screen-main,
 .screen-root--editor .screen-inspector {
   position: relative;
+  min-width: 0;
+  min-height: 0;
   z-index: 2;
+}
+
+.screen-root--editor .screen-layer-rail {
+  grid-column: 1;
+  z-index: 3;
 }
 
 .screen-root--editor .screen-toolbar {
@@ -5335,10 +5648,12 @@ onBeforeUnmount(() => {
 }
 
 .screen-root--editor .screen-main {
+  grid-column: 2;
   background: linear-gradient(180deg, #f4f9f8 0%, #edf2f6 100%);
 }
 
 .screen-root--editor .screen-inspector {
+  grid-column: 3;
   min-width: 0;
   z-index: 3;
   background: linear-gradient(180deg, #fafcfc 0%, #f2f7f8 100%);
@@ -5357,12 +5672,16 @@ onBeforeUnmount(() => {
 }
 
 .screen-root--editor .screen-title-row {
-  flex: 1 1 260px;
+  flex: 0 1 auto;
   min-width: 0;
+  justify-content: flex-start;
+  padding-right: 8px;
 }
 
 .screen-root--editor .screen-actions {
-  flex: 1 1 480px;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
   justify-content: flex-end;
   row-gap: 8px;
 }
@@ -5372,9 +5691,10 @@ onBeforeUnmount(() => {
   --el-button-border-color: rgba(119, 145, 154, 0.16);
   --el-button-text-color: #4e6772;
   --el-button-hover-bg-color: #ffffff;
-  border-radius: 12px;
-  min-height: 32px;
-  box-shadow: 0 10px 20px rgba(60, 91, 99, 0.06);
+  border-radius: 11px;
+  min-height: 31px;
+  padding: 0 12px;
+  box-shadow: 0 8px 18px rgba(60, 91, 99, 0.05);
 }
 
 .screen-root--editor .screen-actions :deep(.el-button--primary) {
@@ -5385,6 +5705,32 @@ onBeforeUnmount(() => {
 
 .screen-root--editor .screen-actions :deep(.el-divider--vertical) {
   border-color: rgba(118, 144, 153, 0.16);
+}
+
+.screen-root--editor .screen-tool-launchers--action {
+  margin-right: 2px;
+}
+
+.screen-root--editor .screen-tool-launchers :deep(.el-button) {
+  --el-button-bg-color: rgba(255, 255, 255, 0.92);
+  --el-button-border-color: rgba(119, 145, 154, 0.16);
+  --el-button-text-color: #4e6772;
+  border-radius: 14px;
+  min-height: 38px;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 12px 24px rgba(60, 91, 99, 0.08);
+}
+
+.screen-root--editor .screen-tool-launchers :deep(.el-button--primary) {
+  --el-button-bg-color: linear-gradient(135deg, #58b5ab 0%, #6eaecf 100%);
+  --el-button-border-color: rgba(88,181,171,0.32);
+  --el-button-text-color: #fff;
+}
+
+.screen-root--editor .screen-tool-launchers :deep(.el-button .el-icon) {
+  font-size: 15px;
 }
 
 .screen-root--quiet .canvas-tb-tip,
@@ -5451,32 +5797,110 @@ onBeforeUnmount(() => {
 }
 
 /* ─── 左侧综合面板 ───────────────────────────────────────────────────────────── */
+.screen-layer-rail {
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(88, 181, 171, 0.08), transparent 34%),
+    linear-gradient(180deg, #f8fbfb 0%, #eef3f5 100%);
+  border-right: 1px solid rgba(118, 144, 153, 0.14);
+  box-shadow: inset -1px 0 0 rgba(255,255,255,0.68);
+  overflow: hidden;
+}
+
+.layer-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 10px 8px;
+  border-bottom: 1px solid rgba(118, 144, 153, 0.1);
+  background: linear-gradient(180deg, rgba(255,255,255,0.74), rgba(255,255,255,0.36));
+}
+
+.layer-rail-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(255,255,255,0.88);
+  border: 1px solid rgba(118, 144, 153, 0.14);
+  color: #4f6974;
+  flex-shrink: 0;
+}
+
+.layer-rail-head-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.layer-rail-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.layer-rail-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #173246;
+}
+
+.layer-rail-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(222, 244, 240, 0.92);
+  border: 1px solid rgba(88,181,171,0.18);
+  color: #2f6c72;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .screen-left-panel {
-  position: relative;
-  z-index: 1;
+  position: absolute;
+  left: calc(var(--screen-layer-rail-width) + var(--screen-floating-gap));
+  top: 72px;
+  bottom: 16px;
+  z-index: 6;
   display: flex;
   flex-direction: column;
   background:
     radial-gradient(circle at 0% 0%, rgba(88, 181, 171, 0.12), transparent 26%),
     radial-gradient(circle at 100% 12%, rgba(122, 174, 214, 0.12), transparent 24%),
     linear-gradient(180deg, #f7fbfa 0%, #eef4f6 100%);
-  border-right: 1px solid rgba(118, 144, 153, 0.14);
+  border: 1px solid rgba(118, 144, 153, 0.14);
+  border-radius: 20px;
+  box-shadow: 0 24px 48px rgba(48, 79, 87, 0.18);
+  backdrop-filter: blur(14px);
   overflow: hidden;
   min-height: 0;
   min-width: 0;
   user-select: none;
-  transition: width 0.22s ease;
-}
-
-.screen-left-panel--collapsed {
-  width: 60px !important;
-  min-width: 60px;
+  max-width: calc(100% - var(--screen-layer-rail-width) - 28px);
+  transition: width 0.22s ease, transform 0.18s ease, opacity 0.18s ease;
 }
 
 @media (max-width: 1440px) {
   .screen-root--editor {
-    grid-template-columns: 60px minmax(0, 1fr);
+    --screen-layer-rail-width: 92px;
+    --screen-floating-gap: 10px;
+    grid-template-columns: var(--screen-layer-rail-width) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .screen-left-panel {
+    left: calc(var(--screen-layer-rail-width) + 10px);
+    right: 10px;
+    top: 62px;
+    width: auto !important;
+    max-width: none;
   }
 
   .screen-root--editor .screen-toolbar {
@@ -5512,6 +5936,10 @@ onBeforeUnmount(() => {
     padding-bottom: 2px;
   }
 
+  .screen-tool-launchers {
+    flex: 0 0 auto;
+  }
+
   .canvas-topbar {
     gap: 8px;
     padding: 6px 10px;
@@ -5534,6 +5962,32 @@ onBeforeUnmount(() => {
   .screen-root--editor .bg-inspector {
     padding-bottom: 12px;
   }
+
+  .layer-rail-head {
+    padding: 10px 8px;
+  }
+
+  .layer-rail-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .layer-rail-title-row {
+    justify-content: flex-start;
+  }
+
+  .layer-rail-count,
+  .layer-rail-title,
+  .screen-layer-rail .lp-layer-badge,
+  .screen-layer-rail .lp-layer-actions,
+  .screen-layer-rail .lp-layer-order-tip,
+  .screen-layer-rail .lp-layer-meta {
+    display: none;
+  }
+
+  .screen-layer-rail .lp-layer-scroll {
+    padding: 8px 6px 10px;
+  }
 }
 
 .lp-head {
@@ -5545,6 +5999,11 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid rgba(118, 144, 153, 0.12);
   background: linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.2));
   flex-shrink: 0;
+  cursor: move;
+}
+
+.lp-head:active {
+  cursor: grabbing;
 }
 
 .lp-toggle-btn {
@@ -5615,6 +6074,12 @@ onBeforeUnmount(() => {
   color: #2f6c72;
 }
 
+.lp-library-loading-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #6a8a96;
+}
+
 /* 折叠状态图标菜单 */
 .lp-icon-menu {
   display: flex;
@@ -5662,12 +6127,13 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.95fr);
+  grid-template-columns: 68px minmax(0, 1fr);
   overflow: hidden;
   background: rgba(255,255,255,0.28);
 }
 
-.lp-shell--dual {
+.lp-shell--single {
+  display: flex;
   align-items: stretch;
 }
 
@@ -5725,7 +6191,8 @@ onBeforeUnmount(() => {
 }
 
 .lp-pane--components {
-  border-right: 1px solid rgba(118, 144, 153, 0.1);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .lp-pane--layers {
@@ -5776,62 +6243,80 @@ onBeforeUnmount(() => {
   color: #95a8af;
 }
 
-/* 分类折叠区 */
-.lp-cat-scroll {
+.lp-category-panel {
   flex-shrink: 0;
-  overflow-y: auto;
-  max-height: 44vh;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 10px 8px;
   border-bottom: 1px solid rgba(118, 144, 153, 0.1);
 }
 
-.lp-cat-section {
-  border-bottom: 1px solid rgba(118, 144, 153, 0.06);
-}
-
-.lp-cat-header {
+.lp-category-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 12px;
-  cursor: pointer;
-  transition: background 0.15s;
+  gap: 8px;
 }
 
-.lp-cat-header:hover {
-  background: rgba(255,255,255,0.42);
-}
-
-.lp-cat-header--open {
-  background: rgba(222, 244, 240, 0.8);
-}
-
-.lp-cat-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #647c87;
-  letter-spacing: 0.02em;
-}
-
-.lp-cat-header--open .lp-cat-label {
-  color: #2f6d73;
-}
-
-.lp-cat-arrow {
+.lp-category-kicker {
   font-size: 11px;
-  color: #9aadb4;
-  transition: transform 0.2s;
+  font-weight: 700;
+  color: #6f8791;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.lp-cat-arrow--open {
-  transform: rotate(90deg);
+.lp-category-clear {
+  padding: 0;
+  min-height: auto;
+}
+
+.lp-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 8px;
+}
+
+.lp-category-tab {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: fit-content;
+  padding: 7px 10px 9px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #708892;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.lp-category-tab:hover {
+  color: #416c77;
+}
+
+.lp-category-tab--active {
   color: #2f6d73;
+  border-bottom-color: #58b5ab;
 }
 
-.lp-type-grid {
+.lp-category-tab-label {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.lp-type-strip {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px 8px 8px;
+  align-items: stretch;
+  gap: 6px;
 }
 
 .lp-type-chip {
@@ -5861,6 +6346,17 @@ onBeforeUnmount(() => {
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.68), 0 10px 24px rgba(60, 91, 99, 0.12);
 }
 
+.lp-type-chip--compact {
+  flex: initial;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 5px 7px;
+  border-radius: 10px;
+  min-width: 0;
+}
+
 .lp-type-icon,
 .lp-type-visual {
   display: flex;
@@ -5876,8 +6372,19 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
+.lp-type-chip--compact .lp-type-icon,
+.lp-type-chip--compact .lp-type-visual {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
 .lp-type-icon {
   padding: 7px 12px;
+}
+
+.lp-type-chip--compact .lp-type-icon {
+  padding: 6px;
 }
 
 .lp-type-icon :deep(svg) {
@@ -5925,11 +6432,19 @@ onBeforeUnmount(() => {
   color: #6c858f;
   text-align: center;
   line-height: 1.2;
-  word-break: break-all;
+  word-break: break-word;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.lp-type-chip--compact .lp-type-label {
+  text-align: left;
+  font-size: 10px;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
 }
 
 /* 分隔行 */
@@ -5937,7 +6452,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px 4px;
+  padding: 6px 12px 2px;
   flex-shrink: 0;
 }
 
@@ -5950,19 +6465,19 @@ onBeforeUnmount(() => {
 }
 
 .lp-library-panel {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  gap: 10px;
-  padding: 0 8px 10px;
+  gap: 6px;
+  padding: 0 8px 12px;
 }
 
 .lp-library-head {
-  padding: 8px 6px 10px;
+  padding: 4px 6px 6px;
   border-bottom: 1px solid rgba(118, 144, 153, 0.08);
-  margin-bottom: 8px;
+  margin-bottom: 2px;
 }
 
 .lp-library-kicker {
@@ -5972,9 +6487,9 @@ onBeforeUnmount(() => {
 }
 
 .lp-library-note {
-  margin-top: 4px;
-  font-size: 11px;
-  line-height: 1.6;
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.45;
   color: #8aa0a8;
 }
 
@@ -6033,26 +6548,27 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 2px 2px 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 2px 2px 10px;
+  align-content: start;
 }
 
 .lp-preview-float {
   position: absolute;
-  width: 220px;
-  min-width: 220px;
+  width: 188px;
+  min-width: 188px;
   max-width: calc(100% - 24px);
   z-index: 8;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  border-radius: 16px;
+  gap: 8px;
+  border-radius: 14px;
   border: 1px solid rgba(118, 144, 153, 0.14);
   background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(246,250,250,0.96) 100%);
   box-shadow: 0 20px 48px rgba(60, 91, 99, 0.16);
-  padding: 12px;
+  padding: 10px;
 }
 
 .lp-preview-status-row {
@@ -6115,8 +6631,17 @@ onBeforeUnmount(() => {
   box-shadow: none;
 }
 
+.lp-asset-card--dense {
+  padding: 6px;
+  border-radius: 12px;
+}
+
 .lp-asset-card--compact .lp-ac-row {
   align-items: center;
+}
+
+.lp-asset-card--dense .lp-ac-row {
+  gap: 6px;
 }
 
 .lp-ac-mini-stage {
@@ -6127,6 +6652,12 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border: 1px solid rgba(118, 144, 153, 0.12);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.lp-asset-card--dense .lp-ac-mini-stage {
+  height: 44px;
+  margin-bottom: 5px;
+  border-radius: 10px;
 }
 
 .lp-ac-mini-stage::before {
@@ -6167,6 +6698,49 @@ onBeforeUnmount(() => {
   z-index: 1;
 }
 
+.lp-ac-mini-stage-placeholder {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 12px;
+  color: #35535f;
+}
+
+.lp-asset-card--dense .lp-ac-mini-stage-placeholder {
+  gap: 3px;
+  padding: 7px;
+}
+
+.lp-ac-mini-stage-placeholder-kicker {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(53, 83, 95, 0.72);
+}
+
+.lp-ac-mini-stage-placeholder-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.lp-asset-card--dense .lp-ac-mini-stage-placeholder-title {
+  font-size: 11px;
+}
+
+.lp-ac-mini-stage-placeholder-meta {
+  font-size: 11px;
+  color: rgba(53, 83, 95, 0.76);
+}
+
+.lp-asset-card--dense .lp-ac-mini-stage-placeholder-meta {
+  font-size: 9px;
+}
+
 .lp-ac-mini-stage :deep(.template-preview-table),
 .lp-ac-mini-stage :deep(.template-preview-filter),
 .lp-ac-mini-stage :deep(.fallback-widget) {
@@ -6191,12 +6765,30 @@ onBeforeUnmount(() => {
   letter-spacing: 0.04em;
 }
 
+.lp-asset-card--dense .lp-ac-mini-stage-badge {
+  top: 6px;
+  right: 6px;
+  height: 18px;
+  padding: 0 7px;
+  font-size: 9px;
+}
+
 .lp-ac-subline {
   margin-top: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.lp-asset-card--dense .lp-ac-subline {
+  margin-top: 4px;
+  gap: 6px;
+}
+
+.lp-asset-card--dense .lp-ac-size,
+.lp-asset-card--dense .lp-ac-field {
+  font-size: 9px;
 }
 
 .lp-ac-size {
@@ -6316,6 +6908,14 @@ onBeforeUnmount(() => {
   color: #6f8792;
 }
 
+.lp-asset-card--dense .lp-ac-desc {
+  margin-top: 3px;
+  font-size: 9px;
+  line-height: 1.35;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
 .lp-ac-field {
   color: #55818c;
   flex: 1;
@@ -6333,6 +6933,14 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.lp-asset-card--dense .lp-ac-name {
+  font-size: 10px;
+}
+
+.lp-asset-empty {
+  grid-column: 1 / -1;
 }
 
 .lp-ac-tags {
@@ -6429,6 +7037,16 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border: 1px solid rgba(110,188,255,0.12);
   background: radial-gradient(circle at top, rgba(77,179,255,0.12), transparent 36%), linear-gradient(180deg, rgba(10,24,40,0.95), rgba(8,17,28,0.96));
+}
+
+.lp-hover-stage-loading {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: #d8efff;
+  font-size: 12px;
+  letter-spacing: 0.04em;
 }
 
 .lp-hover-chart {
@@ -6624,6 +7242,37 @@ onBeforeUnmount(() => {
   gap: 2px;
 }
 
+.lp-layer-title-line {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lp-layer-order-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(231, 242, 244, 0.94);
+  border: 1px solid rgba(118, 144, 153, 0.14);
+  color: #63808a;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.lp-layer-order-index--fixed {
+  background: rgba(226, 245, 241, 0.94);
+  border-color: rgba(88, 181, 171, 0.22);
+  color: #3d7d81;
+}
+
 .lp-layer-name {
   font-size: 12px;
   font-weight: 600;
@@ -6694,6 +7343,84 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.92);
   color: #5e7983;
   font-size: 11px;
+}
+
+.screen-layer-rail .lp-layer-order-tip {
+  display: none;
+}
+
+.screen-layer-rail .lp-layer-scroll {
+  padding: 8px 6px 10px;
+  gap: 4px;
+}
+
+.screen-layer-rail .lp-layer-item {
+  justify-content: flex-start;
+  padding: 7px 8px;
+  border-radius: 10px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.screen-layer-rail .lp-layer-item-main {
+  gap: 2px;
+}
+
+.screen-layer-rail .lp-layer-item:hover {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(88, 181, 171, 0.14);
+  box-shadow: none;
+}
+
+.screen-layer-rail .lp-layer-item--active {
+  background: rgba(226, 245, 241, 0.94);
+  border-color: rgba(88, 181, 171, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.68);
+}
+
+.screen-layer-rail .lp-layer-item::before {
+  left: 4px;
+  width: 2px;
+}
+
+.screen-layer-rail .lp-layer-drag-handle {
+  font-size: 11px;
+  color: #90a4ad;
+}
+
+.screen-layer-rail .lp-layer-leading-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(118, 144, 153, 0.16);
+  background: rgba(255,255,255,0.92);
+  flex-shrink: 0;
+}
+
+.screen-layer-rail .lp-layer-order-index {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+.screen-layer-rail .lp-layer-leading-icon--background {
+  background: linear-gradient(180deg, rgba(88,181,171,0.28), rgba(88,181,171,0.1));
+  border-color: rgba(88,181,171,0.24);
+}
+
+.screen-layer-rail .lp-layer-name {
+  font-size: 11px;
+}
+
+.screen-layer-rail .lp-layer-meta {
+  font-size: 9px;
+}
+
+.screen-layer-rail .lp-layer-badge,
+.screen-layer-rail .lp-layer-actions {
+  display: none;
 }
 
 /* 拖拽缩放手柄 */

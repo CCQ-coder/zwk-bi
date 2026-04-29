@@ -270,7 +270,7 @@ const widgetStyle = computed(() => {
     '--static-widget-muted-color': mutedColor,
     background: isDecoration ? 'transparent' : (props.styleConfig?.bgColor || 'transparent'),
     border: !isDecoration && props.styleConfig?.borderShow ? `${borderWidth}px solid ${props.styleConfig.borderColor || accentColor}` : 'none',
-    borderRadius: `${radius}px`,
+    borderRadius: isDecoration ? '0px' : `${radius}px`,
     boxShadow: !isDecoration && props.styleConfig?.shadowShow
       ? `0 0 ${Math.max(0, Number(props.styleConfig.shadowBlur ?? 12))}px ${props.styleConfig.shadowColor || 'rgba(77, 179, 255, 0.18)'}`
       : 'none',
@@ -508,30 +508,15 @@ const themeName = computed(() => {
 
 .decor-shell {
   position: relative;
-  border-radius: 18px;
-  border: 1px solid rgba(102, 183, 255, 0.24);
-  background:
-    linear-gradient(180deg, rgba(6, 19, 35, 0.88), rgba(8, 24, 43, 0.36)),
-    radial-gradient(circle at 18% 0%, rgba(77, 179, 255, 0.2), transparent 42%),
-    radial-gradient(circle at 82% 100%, rgba(62, 228, 255, 0.12), transparent 44%);
-  box-shadow: inset 0 0 34px rgba(77, 179, 255, 0.08), 0 0 18px rgba(77, 179, 255, 0.08);
-  overflow: hidden;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
   isolation: isolate;
 }
 
 .decor-shell::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(123, 194, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(123, 194, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(115deg, transparent 24%, rgba(136, 232, 255, 0.24) 48%, transparent 72%);
-  background-size: 22px 22px, 22px 22px, 180% 180%;
-  background-position: 0 0, 0 0, -140% 0;
-  opacity: 0.36;
-  animation: decorGridFloat 14s linear infinite;
-  pointer-events: none;
+  display: none;
 }
 
 .decor-shell--decor_border_frame,
@@ -543,8 +528,11 @@ const themeName = computed(() => {
 .decor-shell--decor_border_bracket,
 .decor-shell--decor_border_circuit,
 .decor-shell--decor_border_panel {
+  border-radius: 18px;
+  border: 1px solid rgba(102, 183, 255, 0.24);
   background: transparent;
   box-shadow: none;
+  overflow: hidden;
 }
 
 .decor-shell--decor_border_frame::before,
@@ -613,10 +601,11 @@ const themeName = computed(() => {
   border-radius: 14px;
   border: 1px solid rgba(140, 228, 255, 0.24);
   background:
-    linear-gradient(90deg, transparent, rgba(155, 238, 255, 0.82), transparent) left center / 220% 2px no-repeat,
-    linear-gradient(180deg, transparent, rgba(155, 238, 255, 0.82), transparent) center top / 2px 220% no-repeat;
+    linear-gradient(90deg, rgba(155, 238, 255, 0.88), transparent) left center / 44px 2px no-repeat,
+    linear-gradient(90deg, transparent, rgba(155, 238, 255, 0.88)) right center / 44px 2px no-repeat,
+    radial-gradient(circle at 50% 50%, rgba(155, 238, 255, 0.22), transparent 34%);
+  box-shadow: inset 0 0 22px rgba(77, 179, 255, 0.16), 0 0 14px rgba(77, 179, 255, 0.1);
   mix-blend-mode: screen;
-  animation: decorGlowTrace 4.6s linear infinite;
   pointer-events: none;
 }
 
@@ -659,7 +648,22 @@ const themeName = computed(() => {
 }
 
 .decor-shell--decor_border_pulse {
-  box-shadow: inset 0 0 0 1px rgba(126, 220, 255, 0.16);
+  border-color: rgba(126, 220, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(126, 220, 255, 0.08), 0 0 18px rgba(77, 179, 255, 0.06);
+}
+
+.decor-shell--decor_border_pulse::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 12px 12px, rgba(145, 235, 255, 0.95) 0 2.4px, transparent 3.4px),
+    radial-gradient(circle at calc(100% - 12px) 12px, rgba(145, 235, 255, 0.95) 0 2.4px, transparent 3.4px),
+    radial-gradient(circle at 12px calc(100% - 12px), rgba(145, 235, 255, 0.95) 0 2.4px, transparent 3.4px),
+    radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), rgba(145, 235, 255, 0.95) 0 2.4px, transparent 3.4px);
+  animation: decorPulseNodes 2.1s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .decor-shell--decor_border_pulse::after {
@@ -667,9 +671,13 @@ const themeName = computed(() => {
   position: absolute;
   inset: 12px;
   border-radius: 14px;
-  border: 1px solid rgba(123, 220, 255, 0.38);
-  background: radial-gradient(circle at 50% 50%, rgba(135, 233, 255, 0.18), transparent 72%);
-  box-shadow: inset 0 0 22px rgba(77, 179, 255, 0.16), 0 0 12px rgba(77, 179, 255, 0.14);
+  border: 1px solid rgba(123, 220, 255, 0.2);
+  background:
+    linear-gradient(90deg, transparent 0 16%, rgba(145, 235, 255, 0.88) 16% 34%, transparent 34% 66%, rgba(145, 235, 255, 0.88) 66% 84%, transparent 84% 100%) center top / 100% 2px no-repeat,
+    linear-gradient(90deg, transparent 0 16%, rgba(145, 235, 255, 0.88) 16% 34%, transparent 34% 66%, rgba(145, 235, 255, 0.88) 66% 84%, transparent 84% 100%) center bottom / 100% 2px no-repeat,
+    linear-gradient(180deg, transparent 0 16%, rgba(145, 235, 255, 0.88) 16% 34%, transparent 34% 66%, rgba(145, 235, 255, 0.88) 66% 84%, transparent 84% 100%) left center / 2px 100% no-repeat,
+    linear-gradient(180deg, transparent 0 16%, rgba(145, 235, 255, 0.88) 16% 34%, transparent 34% 66%, rgba(145, 235, 255, 0.88) 66% 84%, transparent 84% 100%) right center / 2px 100% no-repeat;
+  box-shadow: inset 0 0 18px rgba(77, 179, 255, 0.08), 0 0 16px rgba(77, 179, 255, 0.14);
   animation: decorBorderPulse 2.4s ease-out infinite;
   pointer-events: none;
 }
@@ -775,46 +783,38 @@ const themeName = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 18px;
+  gap: 0;
+  padding: 0;
 }
 
 .decor-title-plate__bar {
   position: relative;
-  min-width: min(72%, 280px);
-  height: 48px;
-  padding: 0 26px;
+  min-width: 0;
+  height: auto;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(117, 201, 255, 0.42);
-  background: linear-gradient(90deg, rgba(21, 62, 102, 0.3), rgba(73, 171, 255, 0.18), rgba(21, 62, 102, 0.3));
-  box-shadow: inset 0 0 28px rgba(77, 179, 255, 0.18), 0 0 28px rgba(77, 179, 255, 0.12);
+  gap: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .decor-title-plate__label {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.12em;
   color: #dff4ff;
+  text-shadow: 0 0 10px rgba(77, 179, 255, 0.42);
 }
 
 .decor-title-plate__cap {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #9be7ff, #37b3ff);
-  box-shadow: 0 0 12px rgba(77, 179, 255, 0.7);
+  display: none;
 }
 
 .decor-title-plate__rail {
-  flex: 1;
-  height: 2px;
-  max-width: 96px;
-  background: linear-gradient(90deg, transparent, rgba(77, 179, 255, 0.8), transparent);
-  opacity: 0.88;
+  display: none;
 }
 
 .decor-divider {
@@ -907,9 +907,9 @@ const themeName = computed(() => {
   inset: 10px;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(109, 204, 255, 0.28);
-  background: linear-gradient(180deg, rgba(9, 27, 46, 0.68), rgba(9, 27, 46, 0.22));
-  box-shadow: inset 0 0 24px rgba(77, 179, 255, 0.08);
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .decor-scan__grid,
@@ -1031,24 +1031,11 @@ const themeName = computed(() => {
 }
 
 .icon-shell::before {
-  content: '';
-  position: absolute;
-  inset: 18% 22%;
-  border-radius: 28px;
-  background: radial-gradient(circle, rgba(77, 179, 255, 0.22), transparent 68%);
-  filter: blur(8px);
+  display: none;
 }
 
 .icon-shell::after {
-  content: '';
-  position: absolute;
-  inset: 14% 18%;
-  border-radius: 24px;
-  border: 1px solid rgba(126, 214, 255, 0.18);
-  background:
-    linear-gradient(90deg, transparent, rgba(136, 232, 255, 0.5), transparent) center / 220% 1px no-repeat,
-    linear-gradient(180deg, transparent, rgba(136, 232, 255, 0.45), transparent) center / 1px 220% no-repeat;
-  animation: iconHaloFlow 7.2s linear infinite;
+  display: none;
 }
 
 .icon-shell__stage {
@@ -1413,6 +1400,11 @@ const themeName = computed(() => {
   0% { transform: scale(0.98); opacity: 0.28; }
   50% { transform: scale(1); opacity: 0.9; }
   100% { transform: scale(1.02); opacity: 0.22; }
+}
+
+@keyframes decorPulseNodes {
+  0%, 100% { opacity: 0.44; filter: drop-shadow(0 0 0 rgba(145, 235, 255, 0)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 7px rgba(145, 235, 255, 0.62)); }
 }
 
 @keyframes decorBracketRail {
