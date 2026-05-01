@@ -287,11 +287,11 @@ VALUES
 ('动物信息面板底部左边框', NULL, 'decor_border_panel', '', '', ''),
 ('动物信息面板底部中边框', NULL, 'decor_border_panel', '', '', ''),
 ('动物信息面板底部右边框', NULL, 'decor_border_panel', '', '', ''),
-('动物信息面板-雪山狼犬档案', 12, 'text_block', '动物', '简介', ''),
+('动物信息面板-雪山狼犬档案', NULL, 'text_block', '', '', ''),
 ('动物信息面板-雪山狼犬体重', 12, 'metric_indicator', '指标', '数值', ''),
 ('动物信息面板-雪山狼犬速度', 12, 'metric_indicator', '指标', '数值', ''),
 ('动物信息面板-雪山狼犬嗅觉', 12, 'metric_indicator', '指标', '数值', ''),
-('动物信息面板-月影灵猫档案', 12, 'text_block', '动物', '简介', ''),
+('动物信息面板-月影灵猫档案', NULL, 'text_block', '', '', ''),
 ('动物信息面板-月影灵猫体重', 12, 'metric_indicator', '指标', '数值', ''),
 ('动物信息面板-月影灵猫跳跃', 12, 'metric_indicator', '指标', '数值', ''),
 ('动物信息面板-月影灵猫夜视', 12, 'metric_indicator', '指标', '数值', ''),
@@ -499,7 +499,7 @@ WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
 SELECT d.id, c.id, 1, 3, 5, 3, 20,
-'{"chart":{"name":"雪山狼犬档案","datasetId":12,"chartType":"text_block","xField":"动物","yField":"简介","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"雪山狼犬","titleColor":"#eef8ff","bgColor":"rgba(7,23,42,0.62)","borderShow":true,"borderColor":"rgba(92,218,255,0.32)","borderWidth":1,"cardRadius":18,"shadowShow":true,"shadowColor":"rgba(0,169,255,0.18)","shadowBlur":18},"interaction":{"dataFilters":[{"field":"模块","value":"档案卡"},{"field":"动物","value":"雪山狼犬"}]}}'
+'{"chart":{"name":"雪山狼犬档案","chartType":"text_block"},"style":{"showTitle":true,"titleText":"雪山狼犬","textContent":"高寒巡护型犬种，耐力和嗅觉表现突出，适合山地搜救、夜间巡视与长距离追踪。","titleColor":"#eef8ff","bgColor":"rgba(7,23,42,0.62)","borderShow":true,"borderColor":"rgba(92,218,255,0.32)","borderWidth":1,"cardRadius":18,"shadowShow":true,"shadowColor":"rgba(0,169,255,0.18)","shadowBlur":18},"interaction":{"dataFilters":[]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-雪山狼犬档案'
 WHERE d.name = '动物信息面板';
@@ -527,7 +527,7 @@ WHERE d.name = '动物信息面板';
 
 INSERT INTO bi_dashboard_component(dashboard_id, chart_id, pos_x, pos_y, width, height, z_index, config_json)
 SELECT d.id, c.id, 18, 3, 5, 3, 20,
-'{"chart":{"name":"月影灵猫档案","datasetId":12,"chartType":"text_block","xField":"动物","yField":"简介","groupField":"","sourceMode":"DATASET"},"style":{"showTitle":true,"titleText":"月影灵猫","titleColor":"#fff2cf","bgColor":"rgba(29,20,12,0.55)","borderShow":true,"borderColor":"rgba(255,202,104,0.3)","borderWidth":1,"cardRadius":18,"shadowShow":true,"shadowColor":"rgba(255,182,80,0.14)","shadowBlur":18},"interaction":{"dataFilters":[{"field":"模块","value":"档案卡"},{"field":"动物","value":"月影灵猫"}]}}'
+'{"chart":{"name":"月影灵猫档案","chartType":"text_block"},"style":{"showTitle":true,"titleText":"月影灵猫","textContent":"夜行潜伏型猫科样本，跃迁能力和夜视能力极强，擅长狭窄环境侦察与静默接近。","titleColor":"#fff2cf","bgColor":"rgba(29,20,12,0.55)","borderShow":true,"borderColor":"rgba(255,202,104,0.3)","borderWidth":1,"cardRadius":18,"shadowShow":true,"shadowColor":"rgba(255,182,80,0.14)","shadowBlur":18},"interaction":{"dataFilters":[]}}'
 FROM bi_dashboard d
 INNER JOIN bi_chart c ON c.name = '动物信息面板-月影灵猫档案'
 WHERE d.name = '动物信息面板';

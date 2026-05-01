@@ -1,5 +1,7 @@
 package com.aibi.bi.domain;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class BiDashboardComponent {
     private Long id;
     private Long dashboardId;
@@ -32,7 +34,10 @@ public class BiDashboardComponent {
     public Integer getHeight() { return height; }
     public void setHeight(Integer height) { this.height = height; }
 
+    @JsonProperty("zIndex")
     public Integer getZIndex() { return zIndex; }
+
+    @JsonProperty("zIndex")
     public void setZIndex(Integer zIndex) { this.zIndex = zIndex; }
 
     public String getConfigJson() { return configJson; }

@@ -61,7 +61,6 @@ public class ChartService {
             "table_summary",
             "table_pivot",
             "table_rank",
-            "text_block",
             "image_list",
             "text_list",
             "word_cloud",
@@ -107,11 +106,11 @@ public class ChartService {
         validateDatasetRequirement(request.getChartType(), request.getDatasetId());
         BiChart entity = new BiChart();
         entity.setName(request.getName());
-        entity.setDatasetId(request.getDatasetId());
+        entity.setDatasetId(normalizeDatasetId(request.getChartType(), request.getDatasetId()));
         entity.setChartType(request.getChartType());
-        entity.setXField(request.getXField());
-        entity.setYField(request.getYField());
-        entity.setGroupField(request.getGroupField());
+        entity.setXField(normalizeChartField(request.getChartType(), request.getXField()));
+        entity.setYField(normalizeChartField(request.getChartType(), request.getYField()));
+        entity.setGroupField(normalizeChartField(request.getChartType(), request.getGroupField()));
         biChartMapper.insert(entity);
         return entity;
     }
@@ -123,11 +122,11 @@ public class ChartService {
         }
         validateDatasetRequirement(request.getChartType(), request.getDatasetId());
         entity.setName(request.getName());
-        entity.setDatasetId(request.getDatasetId());
+        entity.setDatasetId(normalizeDatasetId(request.getChartType(), request.getDatasetId()));
         entity.setChartType(request.getChartType());
-        entity.setXField(request.getXField());
-        entity.setYField(request.getYField());
-        entity.setGroupField(request.getGroupField());
+        entity.setXField(normalizeChartField(request.getChartType(), request.getXField()));
+        entity.setYField(normalizeChartField(request.getChartType(), request.getYField()));
+        entity.setGroupField(normalizeChartField(request.getChartType(), request.getGroupField()));
         biChartMapper.update(entity);
         return entity;
     }
@@ -336,6 +335,9 @@ public class ChartService {
 
     private boolean requiresRawRowResponse(ResolvedChartConfig resolvedConfig) {
         String chartType = resolvedConfig.chartType();
+        if (isPureTextBlockType(chartType)) {
+            return false;
+        }
         if (AGGREGATED_RAW_ROW_TYPES.contains(chartType) || "gauge".equals(chartType) || "scatter".equals(chartType)) {
             return false;
         }
@@ -350,7 +352,7 @@ public class ChartService {
         if (Set.of("table", "table_summary", "table_pivot").contains(chartType)) {
             return clampInt(resolvedConfig.tableLoadLimit(), 1, MAX_TABLE_RUNTIME_ROW_LIMIT);
         }
-        if (Set.of("text_block", "single_field", "number_flipper", "metric_indicator", "iframe_single").contains(chartType)) {
+        if (Set.of("single_field", "number_flipper", "metric_indicator", "iframe_single").contains(chartType)) {
             return SINGLE_VALUE_RUNTIME_ROW_LIMIT;
         }
         return DEFAULT_RUNTIME_ROW_LIMIT;
@@ -693,7 +695,7 @@ public class ChartService {
         int tableLoadLimit = 100;
 
         if (configJson == null || configJson.isBlank()) {
-            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText, runtimeConfigText, tableLoadLimit);
+            return normalizeResolvedChartConfig(new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText, runtimeConfigText, tableLoadLimit));
         }
 
         try {
@@ -712,10 +714,40 @@ public class ChartService {
             sqlText = readText(chartNode.get("sqlText"), sqlText);
             runtimeConfigText = readText(chartNode.get("runtimeConfigText"), runtimeConfigText);
             tableLoadLimit = readInt(chartNode.get("tableLoadLimit"), tableLoadLimit);
-            return new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText, runtimeConfigText, tableLoadLimit);
+            return normalizeResolvedChartConfig(new ResolvedChartConfig(datasetId, chartType, xField, yField, groupField, sourceMode, datasourceId, sqlText, runtimeConfigText, tableLoadLimit));
         } catch (Exception ex) {
             throw new IllegalArgumentException("组件配置格式不正确");
         }
+    }
+
+    private ResolvedChartConfig normalizeResolvedChartConfig(ResolvedChartConfig config) {
+        if (!isPureTextBlockType(config.chartType())) {
+            return config;
+        }
+        return new ResolvedChartConfig(
+                null,
+                config.chartType(),
+                "",
+                "",
+                "",
+                "DATASET",
+                null,
+                "",
+                "",
+                config.tableLoadLimit()
+        );
+    }
+
+    private Long normalizeDatasetId(String chartType, Long datasetId) {
+        return isPureTextBlockType(chartType) ? null : datasetId;
+    }
+
+    private String normalizeChartField(String chartType, String value) {
+        return isPureTextBlockType(chartType) ? "" : value;
+    }
+
+    private boolean isPureTextBlockType(String chartType) {
+        return "text_block".equals(chartType);
     }
 
     private Long readLong(JsonNode node, Long fallback) {

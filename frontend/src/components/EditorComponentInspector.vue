@@ -25,14 +25,6 @@
               </div>
               <div class="summary-meta">实例 ID: {{ component.id }} / 引用组件 ID: {{ component.chartId }}</div>
             </div>
-            <div class="profile-card">
-              <div class="profile-kicker">属性模式</div>
-              <div class="profile-title">{{ componentKindLabel }}</div>
-              <div class="profile-desc">{{ componentKindDescription }}</div>
-              <div class="profile-chip-list">
-                <span v-for="tag in componentCapabilityTags" :key="tag" class="profile-chip">{{ tag }}</span>
-              </div>
-            </div>
           </section>
 
           <section class="inspector-section">
@@ -48,6 +40,21 @@
                   </el-option-group>
                 </el-select>
                 <div class="helper-text">{{ currentChartMeta.description }}</div>
+              </el-form-item>
+            </el-form>
+          </section>
+
+          <section v-if="isTextBlockType" class="inspector-section">
+            <div class="section-title">文本内容</div>
+            <el-form label-position="top" class="chart-form summary-form">
+              <el-form-item label="文字内容">
+                <el-input
+                  v-model="configForm.style.textContent"
+                  type="textarea"
+                  :rows="8"
+                  placeholder="在这里直接编辑文字内容"
+                />
+                <div class="helper-text">文本组件不参与取数，直接维护展示文案即可。</div>
               </el-form-item>
             </el-form>
           </section>
@@ -131,14 +138,6 @@
         <el-tab-pane v-if="showDataTab" label="数据" name="data">
           <section class="inspector-section">
             <div class="section-title">数据来源</div>
-            <div class="mode-card">
-              <div class="mode-card-kicker">绑定策略</div>
-              <div class="mode-card-title">{{ dataModeTitle }}</div>
-              <div class="mode-card-desc">{{ dataModeDescription }}</div>
-              <div class="mode-card-tags">
-                <span v-for="tag in dataCapabilityTags" :key="tag" class="mode-card-tag">{{ tag }}</span>
-              </div>
-            </div>
             <el-form label-position="top" class="chart-form">
               <el-form-item label="接入主模式">
                 <el-radio-group :model-value="bindingEntryMode" class="page-source-group page-source-group--mode" @change="onBindingEntryModeChange">
@@ -152,7 +151,7 @@
                 </div>
               </el-form-item>
 
-              <el-form-item v-if="bindingEntryMode === 'PAGE_SQL'" label="在线编辑方式">
+              <el-form-item v-if="bindingEntryMode === 'PAGE_SQL'" label="数据类型">
                 <el-radio-group :model-value="dataBindingMode" class="page-source-group page-source-group--submode" @change="onDataBindingModeChange">
                   <el-radio-button v-for="item in PAGE_SOURCE_OPTIONS" :key="item.value" :value="item.value">{{ item.label }}</el-radio-button>
                 </el-radio-group>
@@ -166,7 +165,7 @@
                 <div class="helper-text">{{ isStaticComponentType ? '静态组件可不绑定数据集；需要数据驱动时再选择数据集即可。' : '数据集模式仅使用已配置好的数据库型数据源与 SQL。' }}</div>
               </el-form-item>
               <template v-else>
-                <el-form-item :label="`${pageSourceKindLabel}数据源`">
+                <el-form-item :label="pageSourceSelectorLabel">
                   <el-select v-model="configForm.chart.datasourceId" placeholder="请选择数据源" style="width: 100%" filterable clearable @change="onPageDatasourceChange">
                     <el-option v-for="source in pageSourceDatasources" :key="source.id" :label="source.name" :value="source.id" />
                   </el-select>
@@ -292,6 +291,13 @@
                   </div>
                 </template>
 
+                <el-form-item v-if="isSingleFieldType" :label="dimensionFieldLabel">
+                  <el-select v-model="configForm.chart.xField" :placeholder="`选择${dimensionFieldLabel}`" clearable filterable style="width: 100%">
+                    <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
+                  </el-select>
+                  <div class="helper-text">单字段组件会读取查询结果首行的该字段值，并直接用于卡片主内容展示。</div>
+                </el-form-item>
+
                 <div class="action-row">
                   <el-button size="small" type="primary" :loading="previewLoading" @click="onPageSourceQuery">预览数据</el-button>
                 </div>
@@ -303,7 +309,7 @@
                 </div>
                 <div class="suggestion-body">{{ suggestionSummary.join(' · ') }}</div>
               </div>
-              <el-form-item label="刷新数据时间（秒）">
+              <el-form-item :label="dataRefreshLabel">
                 <el-input-number v-model="configForm.chart.dataRefreshInterval" :min="0" :max="86400" controls-position="right" style="width: 100%" />
                 <div class="helper-text">0 表示不自动刷新；设置后当前组件会按间隔重新取数。</div>
               </el-form-item>
@@ -357,17 +363,18 @@
                   </div>
                 </div>
               </div>
-              <el-form-item v-if="currentChartMeta.requiresDimension || currentChartMeta.allowsOptionalDimension || isFilterComponentType || isMetricComponentType" :label="dimensionFieldLabel">
+              <el-form-item v-if="showDimensionFieldBinding && !isSingleFieldType" :label="dimensionFieldLabel">
                 <el-select v-model="configForm.chart.xField" :placeholder="`选择${dimensionFieldLabel}`" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
               </el-form-item>
-              <el-form-item v-if="currentChartMeta.requiresMetric || isMetricComponentType" :label="metricFieldLabel">
+              <el-form-item v-if="showMetricFieldBinding" :label="metricFieldLabel">
                 <el-select v-model="configForm.chart.yField" :placeholder="`选择${metricFieldLabel}`" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
+                <div v-if="isNumberFlipperType" class="helper-text">翻牌器会读取查询结果首行的该字段值，并以翻牌动画作为主内容展示。</div>
               </el-form-item>
-              <el-form-item v-if="currentChartMeta.allowsGroup || isMetricComponentType" :label="groupFieldLabel">
+              <el-form-item v-if="showGroupFieldBinding" :label="groupFieldLabel">
                 <el-select v-model="configForm.chart.groupField" :placeholder="currentChartMeta.requiresGroup ? `选择${groupFieldLabel}` : '可选'" clearable filterable style="width: 100%">
                   <el-option v-for="column in previewColumns" :key="column" :label="column" :value="column" />
                 </el-select>
@@ -413,7 +420,7 @@
               </div>
               <div class="ss-row">
                 <span class="ss-key">图表背景</span>
-                <el-color-picker v-if="!isDecorationComponentType" v-model="configForm.style.bgColor" show-alpha size="small" />
+                <el-color-picker v-if="!isDecorationComponentType || isStyleDecorationComponentType" v-model="configForm.style.bgColor" show-alpha size="small" />
                 <span v-else class="helper-text">装饰组件背景固定透明</span>
               </div>
             </div>
@@ -425,18 +432,22 @@
                 <span class="ss-hd-label">标题</span>
                 <el-switch v-model="configForm.style.showTitle" size="small" @click.stop />
               </div>
-              <div v-show="openSections.has('title') && configForm.style.showTitle" class="ss-body">
-                <div class="ss-row">
+              <div v-show="openSections.has('title')" class="ss-body">
+                <div v-if="configForm.style.showTitle" class="ss-row">
                   <span class="ss-key">标题内容</span>
                   <el-input v-model="configForm.style.titleText" size="small" placeholder="默认用组件名" />
                 </div>
-                <div class="ss-row">
+                <div v-if="configForm.style.showTitle" class="ss-row">
                   <span class="ss-key">字号</span>
                   <el-input-number v-model="configForm.style.titleFontSize" :min="10" :max="32" size="small" controls-position="right" style="width:90px" />
                 </div>
                 <div class="ss-row">
-                  <span class="ss-key">颜色</span>
+                  <span class="ss-key">主文字色</span>
                   <el-color-picker v-model="configForm.style.titleColor" size="small" />
+                </div>
+                <div v-if="['hyperlink', 'iframe_single', 'iframe_tabs', 'image_list', 'text_list', 'word_cloud'].includes(currentChartType)" class="ss-row">
+                  <span class="ss-key">强调颜色</span>
+                  <el-color-picker v-model="configForm.style.metricValueColor" size="small" />
                 </div>
               </div>
             </div>
@@ -467,21 +478,6 @@
                     </div>
                   </div>
                 </template>
-              </div>
-            </div>
-
-            <!-- 文本内容 -->
-            <div v-if="isTextBlockType" class="ss-section">
-              <div class="ss-hd" @click="toggleSection('textcontent')">
-                <span class="ss-chevron" :class="{ open: openSections.has('textcontent') }">&#9654;</span>
-                <span class="ss-hd-label">文本内容</span>
-              </div>
-              <div v-show="openSections.has('textcontent')" class="ss-body">
-                <div class="ss-row ss-row--vertical">
-                  <span class="ss-key">静态内容</span>
-                  <el-input v-model="configForm.style.textContent" type="textarea" :rows="4" size="small" placeholder="输入文本内容，也可绑定数据源动态展示" />
-                </div>
-                <div class="helper-text" style="margin-top:4px">绑定数据后，此内容作为无数据时的默认文案。</div>
               </div>
             </div>
 
@@ -825,7 +821,7 @@
             </template>
 
             <!-- 装饰组件样式 -->
-            <template v-if="isDecorationComponentType">
+            <template v-if="isDecorationComponentType && !isStyleDecorationComponentType">
               <div class="ss-section-divider">装饰效果</div>
               <div class="ss-section">
                 <div class="ss-hd" @click="toggleSection('decor-style')">
@@ -1014,15 +1010,18 @@ import {
   getMissingChartFields,
   isBarFamilyChartType,
   isDecorationChartType,
+  isStyleDecorationChartType,
   isStaticWidgetChartType,
   normalizeComponentDataFilters,
   normalizeComponentConfig,
   resolveConfiguredTableColumns,
+  STYLE_DECORATION_STYLE_PRESETS,
   suggestChartFields,
   TABLE_LIKE_CHART_TYPES,
   type ComponentInstanceConfig,
   type TableColumnConfig,
 } from '../utils/component-config'
+import { SCREEN_COMPONENT_MIN_HEIGHT, SCREEN_COMPONENT_MIN_WIDTH } from '../utils/report-config'
 
 type LayoutField = 'posX' | 'posY' | 'width' | 'height' | 'zIndex'
 type TableColumnDragState = { sourceIndex: number }
@@ -1032,6 +1031,9 @@ const props = defineProps<{
   component: DashboardComponent | null
   chart: Chart | null
 }>()
+
+const layoutMinWidth = computed(() => props.scene === 'screen' ? SCREEN_COMPONENT_MIN_WIDTH : 160)
+const layoutMinHeight = computed(() => props.scene === 'screen' ? SCREEN_COMPONENT_MIN_HEIGHT : 120)
 
 const chartTypeGroups = [
   {
@@ -1088,6 +1090,8 @@ const chartTypeGroups = [
       { label: '目标环', value: 'decor_target_ring' },
       { label: '扫描面板', value: 'decor_scan_panel' },
       { label: '六边形徽记', value: 'decor_hex_badge' },
+      { label: '矩形', value: 'decor_shape_rect' },
+      { label: '圆形', value: 'decor_shape_circle' },
     ],
   },
   {
@@ -1150,7 +1154,7 @@ const chartTypeGroups = [
 
 const METRIC_WIDGET_TYPES = new Set(['single_field', 'number_flipper', 'metric_indicator', 'business_trend'])
 const CONTENT_WIDGET_TYPES = new Set(['text_block', 'hyperlink', 'iframe_single', 'iframe_tabs', 'image_list', 'text_list', 'clock_display', 'word_cloud', 'qr_code'])
-const PURE_STATIC_NO_DATA_TYPES = new Set(['hyperlink', 'clock_display', 'qr_code'])
+const PURE_STATIC_NO_DATA_TYPES = new Set(['text_block', 'hyperlink', 'clock_display', 'qr_code'])
 
 const PAGE_SOURCE_OPTIONS: Array<{ label: string; value: DatasourceSourceKind }> = [
   { label: '数据库', value: 'DATABASE' },
@@ -1258,11 +1262,14 @@ const apiRuntimeTab = ref<'headers' | 'query' | 'body'>('headers')
 const currentChartType = computed(() => configForm.chart.chartType || '')
 const currentChartMeta = computed(() => getChartTypeMeta(configForm.chart.chartType))
 const isDecorationComponentType = computed(() => isDecorationChartType(configForm.chart.chartType))
+const isStyleDecorationComponentType = computed(() => isStyleDecorationChartType(configForm.chart.chartType))
 const isStaticComponentType = computed(() => isStaticWidgetChartType(configForm.chart.chartType))
 const isVectorIconComponentType = computed(() => currentChartType.value.startsWith('icon_'))
 const isTableComponentType = computed(() => TABLE_LIKE_CHART_TYPES.has(currentChartType.value))
 const isFilterComponentType = computed(() => currentChartType.value === 'filter_button')
 const isMetricComponentType = computed(() => METRIC_WIDGET_TYPES.has(currentChartType.value))
+const isSingleFieldType = computed(() => currentChartType.value === 'single_field')
+const isNumberFlipperType = computed(() => currentChartType.value === 'number_flipper')
 const isContentComponentType = computed(() => CONTENT_WIDGET_TYPES.has(currentChartType.value))
 const isWordCloudType = computed(() => currentChartType.value === 'word_cloud')
 const isListType = computed(() => currentChartType.value === 'text_list' || currentChartType.value === 'image_list')
@@ -1289,42 +1296,6 @@ const componentKindLabel = computed(() => ({
   icon: '小装饰',
   control: '筛选控件',
 }[componentKind.value]))
-const componentKindDescription = computed(() => {
-  switch (componentKind.value) {
-    case 'table':
-      return '重点管理表头、行态、排序与容器边框，保留对数据结构的可读性。'
-    case 'metric':
-      return '以数值聚焦为主，突出标签、核心指标和卡片层级，不展示冗余图例。'
-    case 'content':
-      return '信息型组件优先关注容器层次与内容承载，字段绑定只保留必要项。'
-    case 'decoration':
-      return '装饰组件不参与取数，主要通过主题、边框、阴影与透明度塑造画面氛围。'
-    case 'icon':
-      return '小装饰不参与取数，只保留适合符号类组件的轮廓与光效设置。'
-    case 'control':
-      return '筛选控件只保留筛选字段与默认值绑定，交互逻辑由全局筛选系统接管。'
-    default:
-      return '分析图表保留完整的数据、图例、坐标轴和高级样式链路，适合 BI 可视化编排。'
-  }
-})
-const componentCapabilityTags = computed(() => {
-  switch (componentKind.value) {
-    case 'table':
-      return ['表头样式', '行态控制', '排序能力', '容器边框']
-    case 'metric':
-      return ['指标聚焦', '标签可选', '卡片边框', '阴影层级']
-    case 'content':
-      return ['信息承载', '内容字段', '容器样式', '透明度']
-    case 'decoration':
-      return ['无数据依赖', '透明背景', '边框动画', '光效强调']
-    case 'icon':
-      return ['无数据依赖', '符号化表达', '描边容器', '阴影增强']
-    case 'control':
-      return ['字段筛选', '默认值', '页面联动', '轻交互']
-    default:
-      return ['数据绑定', '图例控制', '坐标轴', '图表高级']
-  }
-})
 const styleCapabilityTags = computed(() => {
   switch (componentKind.value) {
     case 'table':
@@ -1334,6 +1305,7 @@ const styleCapabilityTags = computed(() => {
     case 'content':
       return ['主题配色', '标题', '边框描边', '透明度', '容器高级']
     case 'decoration':
+      if (isStyleDecorationComponentType.value) return ['主题配色', '背景填充', '边框描边', '圆角/阴影', '容器高级']
       return ['主题色', '透明容器', '边框描边', '光效阴影']
     case 'icon':
       return ['主题色', '描边容器', '阴影发光', '透明度']
@@ -1364,6 +1336,15 @@ const missingFields = computed(() => isStaticComponentType.value ? [] : getMissi
 const suggestedFields = computed(() => suggestChartFields(previewColumns.value, configForm.chart.chartType))
 const pageSourceDatasources = computed(() => datasources.value.filter((item) => resolveDatasourceKind(item) === configForm.chart.pageSourceKind))
 const pageSourceKindLabel = computed(() => PAGE_SOURCE_OPTIONS.find((item) => item.value === configForm.chart.pageSourceKind)?.label ?? '页面')
+const pageSourceSelectorLabel = computed(() => {
+  if (bindingEntryMode.value === 'PAGE_SQL' && (isSingleFieldType.value || isNumberFlipperType.value)) return '选择数据源'
+  return `${pageSourceKindLabel.value}数据源`
+})
+const dataRefreshLabel = computed(() => (
+  bindingEntryMode.value === 'PAGE_SQL' && configForm.chart.pageSourceKind === 'DATABASE'
+    ? 'SQL 刷新间隔（秒）'
+    : '刷新数据时间（秒）'
+))
 const pageSourceHelperText = computed(() => {
   switch (configForm.chart.pageSourceKind) {
     case 'DATABASE':
@@ -1486,9 +1467,9 @@ const onTableColumnDrop = (targetIndex: number) => {
 
 const suggestionSummary = computed(() => {
   const entries = [
-    suggestedFields.value.xField ? `${chartFieldLabels.value.x} ${suggestedFields.value.xField}` : '',
-    suggestedFields.value.yField ? `${chartFieldLabels.value.y} ${suggestedFields.value.yField}` : '',
-    suggestedFields.value.groupField ? `分组 ${suggestedFields.value.groupField}` : '',
+    showDimensionFieldBinding.value && suggestedFields.value.xField ? `${chartFieldLabels.value.x} ${suggestedFields.value.xField}` : '',
+    showMetricFieldBinding.value && suggestedFields.value.yField ? `${chartFieldLabels.value.y} ${suggestedFields.value.yField}` : '',
+    showGroupFieldBinding.value && suggestedFields.value.groupField ? `${chartFieldLabels.value.group} ${suggestedFields.value.groupField}` : '',
   ]
   return entries.filter(Boolean)
 })
@@ -1533,13 +1514,30 @@ const dataCapabilityTags = computed(() => {
 })
 const chartFieldLabels = computed(() => getChartFieldLabels(configForm.chart.chartType))
 const isBarFamilyComponentType = computed(() => isBarFamilyChartType(configForm.chart.chartType))
+const showDimensionFieldBinding = computed(() => (
+  currentChartMeta.value.requiresDimension
+  || currentChartMeta.value.allowsOptionalDimension
+  || isFilterComponentType.value
+  || (isMetricComponentType.value && !isSingleFieldType.value && !isNumberFlipperType.value)
+))
+const showMetricFieldBinding = computed(() => (
+  currentChartMeta.value.requiresMetric
+  || (isMetricComponentType.value && !isSingleFieldType.value)
+))
+const showGroupFieldBinding = computed(() => (
+  currentChartMeta.value.requiresGroup
+  || currentChartMeta.value.allowsGroup
+  || (isMetricComponentType.value && !isSingleFieldType.value && !isNumberFlipperType.value)
+))
 const dimensionFieldLabel = computed(() => {
+  if (isSingleFieldType.value) return '字段内容'
   if (isFilterComponentType.value) return '筛选字段'
   if (isIframeType.value) return 'src字段'
   if (isMetricComponentType.value) return currentChartMeta.value.requiresDimension ? '标签字段' : '标签字段（可选）'
   return currentChartMeta.value.requiresDimension ? chartFieldLabels.value.x : `${chartFieldLabels.value.x}（可选）`
 })
 const metricFieldLabel = computed(() => {
+  if (isNumberFlipperType.value) return '翻牌器字段'
   if (isMetricComponentType.value) return '数值字段'
   return chartFieldLabels.value.y
 })
@@ -1628,6 +1626,24 @@ const buildCurrentConfigJson = () => buildComponentConfig(
   }
 )
 
+const flushPendingDraft = () => {
+  if (!props.component || !currentComponentChartId.value) return null
+  if (previewTimer !== null) {
+    window.clearTimeout(previewTimer)
+    previewTimer = null
+  }
+  const draft = {
+    chartId: currentComponentChartId.value as number,
+    configJson: buildCurrentConfigJson(),
+  }
+  emit('preview-component', draft)
+  return draft
+}
+
+defineExpose({
+  flushPendingDraft,
+})
+
 const queuePreview = () => {
   if (syncingFromProps.value || !props.component || !currentComponentChartId.value) return
   if (previewTimer !== null) {
@@ -1635,10 +1651,7 @@ const queuePreview = () => {
   }
   previewTimer = window.setTimeout(() => {
     previewTimer = null
-    emit('preview-component', {
-      chartId: currentComponentChartId.value as number,
-      configJson: buildCurrentConfigJson(),
-    })
+    flushPendingDraft()
   }, 300)
 }
 
@@ -1856,15 +1869,35 @@ watch(isPureStaticNoDataComponentType, (disabled) => {
   if (!disabled || isDecorationComponentType.value) return
   clearChartDataBinding()
   if (activeTab.value === 'data' || activeTab.value === 'interaction') {
-    activeTab.value = 'style'
+    activeTab.value = isTextBlockType.value ? 'summary' : 'style'
+  }
+})
+watch(showDataTab, (visible) => {
+  if (visible) return
+  if (activeTab.value === 'data' || activeTab.value === 'interaction') {
+    activeTab.value = isTextBlockType.value ? 'summary' : 'style'
   }
 })
 watch(isDecorationComponentType, (isDecoration) => {
   if (!isDecoration) return
   clearChartDataBinding()
-  configForm.style.bgColor = 'rgba(0,0,0,0)'
+  if (!isStyleDecorationComponentType.value) {
+    configForm.style.bgColor = 'rgba(0,0,0,0)'
+  } else {
+    const preset = STYLE_DECORATION_STYLE_PRESETS[currentChartType.value]
+    if (preset && configForm.style.bgColor === 'rgba(0,0,0,0)' && !configForm.style.borderShow) {
+      configForm.style = { ...configForm.style, ...preset }
+    }
+  }
   if (activeTab.value === 'data' || activeTab.value === 'interaction') {
     activeTab.value = 'style'
+  }
+})
+watch(currentChartType, (chartType, previousType) => {
+  if (chartType === previousType || !isStyleDecorationChartType(chartType)) return
+  const preset = STYLE_DECORATION_STYLE_PRESETS[chartType]
+  if (preset && configForm.style.bgColor === 'rgba(0,0,0,0)' && !configForm.style.borderShow) {
+    configForm.style = { ...configForm.style, ...preset }
   }
 })
 watch(isFilterComponentType, (isFilter) => {
@@ -1875,6 +1908,17 @@ watch(isFilterComponentType, (isFilter) => {
   configForm.interaction.linkageField = ''
   if (activeTab.value === 'interaction') {
     activeTab.value = 'data'
+  }
+})
+watch([showDimensionFieldBinding, showMetricFieldBinding, showGroupFieldBinding], ([showDimension, showMetric, showGroup]) => {
+  if (!showDimension && configForm.chart.xField) {
+    configForm.chart.xField = ''
+  }
+  if (!showMetric && configForm.chart.yField) {
+    configForm.chart.yField = ''
+  }
+  if (!showGroup && configForm.chart.groupField) {
+    configForm.chart.groupField = ''
   }
 })
 watch(isTableComponentType, (isTable) => {
@@ -2275,7 +2319,6 @@ onBeforeUnmount(() => {
 }
 
 .summary-card,
-.profile-card,
 .mode-card,
 .style-family-card {
   padding: 16px;
@@ -2470,7 +2513,6 @@ onBeforeUnmount(() => {
   word-break: break-word;
 }
 
-.profile-kicker,
 .mode-card-kicker {
   font-size: 11px;
   font-weight: 700;
@@ -2479,7 +2521,6 @@ onBeforeUnmount(() => {
   color: #6a9e9a;
 }
 
-.profile-title,
 .mode-card-title {
   margin-top: 8px;
   font-size: 15px;
@@ -2487,7 +2528,6 @@ onBeforeUnmount(() => {
   color: #173246;
 }
 
-.profile-desc,
 .mode-card-desc {
   margin-top: 6px;
   font-size: 12px;
@@ -2495,7 +2535,6 @@ onBeforeUnmount(() => {
   color: #7d939d;
 }
 
-.profile-chip-list,
 .mode-card-tags,
 .style-family-tags {
   display: flex;
@@ -2504,7 +2543,6 @@ onBeforeUnmount(() => {
   margin-top: 10px;
 }
 
-.profile-chip,
 .mode-card-tag,
 .style-family-tag {
   padding: 6px 10px;

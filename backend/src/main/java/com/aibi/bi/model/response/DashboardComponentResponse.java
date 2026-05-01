@@ -1,5 +1,7 @@
 package com.aibi.bi.model.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class DashboardComponentResponse {
 
     private Long id;
@@ -68,10 +70,12 @@ public class DashboardComponentResponse {
         this.height = height;
     }
 
+    @JsonProperty("zIndex")
     public Integer getZIndex() {
         return zIndex;
     }
 
+    @JsonProperty("zIndex")
     public void setZIndex(Integer zIndex) {
         this.zIndex = zIndex;
     }

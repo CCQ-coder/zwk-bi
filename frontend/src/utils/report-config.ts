@@ -55,6 +55,11 @@ export const SCREEN_CANVAS_PRESETS: ReportCanvasPreset[] = [
   { id: '4k', label: '3840 x 2160', width: 3840, height: 2160 },
 ]
 
+// Keep these above the legacy grid thresholds so persisted tiny components
+// are not mistaken for old grid-unit layouts when the editor reopens them.
+export const SCREEN_COMPONENT_MIN_WIDTH = 32
+export const SCREEN_COMPONENT_MIN_HEIGHT = 24
+
 const DEFAULT_SCREEN_CANVAS: ReportCanvasConfig = { width: 1920, height: 1080 }
 const DEFAULT_DASHBOARD_CANVAS: ReportCanvasConfig = { width: 1440, height: 900 }
 

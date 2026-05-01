@@ -1,5 +1,8 @@
 package com.aibi.bi.model.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import jakarta.validation.constraints.NotNull;
 
 public class CreateDashboardComponentRequest {
@@ -59,10 +62,13 @@ public class CreateDashboardComponentRequest {
         this.height = height;
     }
 
+    @JsonProperty("zIndex")
     public Integer getZIndex() {
         return zIndex;
     }
 
+    @JsonProperty("zIndex")
+    @JsonAlias("zindex")
     public void setZIndex(Integer zIndex) {
         this.zIndex = zIndex;
     }

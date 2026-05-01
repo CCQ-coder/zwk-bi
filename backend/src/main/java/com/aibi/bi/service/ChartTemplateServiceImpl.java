@@ -66,8 +66,8 @@ public class ChartTemplateServiceImpl implements ChartTemplateService {
         if (existing == null) {
             throw new IllegalArgumentException("模板不存在: " + id);
         }
-        if (Boolean.TRUE.equals(existing.getBuiltIn())) {
-            throw new IllegalArgumentException("默认组件不允许直接修改");
+        if (Boolean.TRUE.equals(existing.getBuiltIn()) && !"ADMIN".equalsIgnoreCase(AuthContext.role())) {
+            throw new IllegalArgumentException("默认组件仅管理员可修改");
         }
         if (StringUtils.hasText(req.getName())) {
             existing.setName(req.getName());
@@ -91,8 +91,8 @@ public class ChartTemplateServiceImpl implements ChartTemplateService {
         if (existing == null) {
             return;
         }
-        if (Boolean.TRUE.equals(existing.getBuiltIn())) {
-            throw new IllegalArgumentException("默认组件不允许删除");
+        if (Boolean.TRUE.equals(existing.getBuiltIn()) && !"ADMIN".equalsIgnoreCase(AuthContext.role())) {
+            throw new IllegalArgumentException("默认组件仅管理员可删除");
         }
         mapper.deleteById(id);
     }

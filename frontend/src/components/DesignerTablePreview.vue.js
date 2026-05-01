@@ -45,6 +45,9 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ style: (__VLS_ctx.wrapperStyle) },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "designer-table__scroll" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "designer-table__header" },
     ...{ style: (__VLS_ctx.gridStyle) },
 });
@@ -96,6 +99,7 @@ else {
     });
 }
 /** @type {__VLS_StyleScopedClasses['designer-table']} */ ;
+/** @type {__VLS_StyleScopedClasses['designer-table__scroll']} */ ;
 /** @type {__VLS_StyleScopedClasses['designer-table__header']} */ ;
 /** @type {__VLS_StyleScopedClasses['designer-table__cell']} */ ;
 /** @type {__VLS_StyleScopedClasses['designer-table__cell--header']} */ ;

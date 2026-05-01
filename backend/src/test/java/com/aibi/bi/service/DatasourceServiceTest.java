@@ -1,6 +1,7 @@
 package com.aibi.bi.service;
 
 import com.aibi.bi.domain.BiDatasource;
+import com.aibi.bi.mapper.BiDatasourceGroupMapper;
 import com.aibi.bi.mapper.BiDatasourceMapper;
 import com.aibi.bi.mapper.BiDatasetMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +21,8 @@ import static org.mockito.Mockito.when;
 class DatasourceServiceTest {
 
     @Mock
+    private BiDatasourceGroupMapper biDatasourceGroupMapper;
+    @Mock
     private BiDatasourceMapper biDatasourceMapper;
     @Mock
     private BiDatasetMapper biDatasetMapper;
@@ -31,6 +34,7 @@ class DatasourceServiceTest {
     @BeforeEach
     void setUp() {
         datasourceService = new DatasourceService(
+                biDatasourceGroupMapper,
                 biDatasourceMapper,
                 biDatasetMapper,
                 jdbcPreviewService,

@@ -47,12 +47,12 @@
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button link type="primary" @click="cloneTemplate(row)">复制</el-button>
           <el-popconfirm
-            :title="row.builtIn ? '默认组件不允许删除' : '确认删除该组件资产？'"
-            :disabled="row.builtIn"
+            :title="row.builtIn ? '默认组件删除后不可恢复，确认删除？' : '确认删除该组件资产？'"
+            :disabled="!canMutateBuiltin(row)"
             @confirm="handleDelete(row)"
           >
             <template #reference>
-              <el-button link type="danger" :disabled="row.builtIn">删除</el-button>
+              <el-button link type="danger" :disabled="!canMutateBuiltin(row)">删除</el-button>
             </template>
           </el-popconfirm>
         </template>
@@ -86,17 +86,19 @@
             </el-select>
             <div style="font-size:12px;color:#909399;margin-top:6px">{{ isStaticAssetType ? '静态资产可不绑定数据集。' : '数据驱动资产需要绑定数据集。' }}</div>
           </el-form-item>
-          <el-form-item :label="fieldLabels.x">
+          <el-form-item v-if="showDimensionField" :label="fieldLabels.x">
             <el-select v-model="form.xField" clearable filterable style="width: 100%">
               <el-option v-for="field in datasetFields" :key="field.fieldName" :label="field.fieldName" :value="field.fieldName" />
             </el-select>
+            <div v-if="form.chartType === 'single_field'" style="font-size:12px;color:#909399;margin-top:6px">单字段组件只读取该字段的首条结果值作为主内容。</div>
           </el-form-item>
-          <el-form-item :label="fieldLabels.y">
+          <el-form-item v-if="showMetricField" :label="fieldLabels.y">
             <el-select v-model="form.yField" clearable filterable style="width: 100%">
               <el-option v-for="field in datasetFields" :key="field.fieldName" :label="field.fieldName" :value="field.fieldName" />
             </el-select>
+            <div v-if="form.chartType === 'number_flipper'" style="font-size:12px;color:#909399;margin-top:6px">数字翻牌器会读取该字段的首条数值结果作为翻牌内容。</div>
           </el-form-item>
-          <el-form-item v-if="showGroupField" label="分组字段">
+          <el-form-item v-if="showGroupField" :label="fieldLabels.group">
             <el-select v-model="form.groupField" clearable filterable style="width: 100%">
               <el-option v-for="field in datasetFields" :key="field.fieldName" :label="field.fieldName" :value="field.fieldName" />
             </el-select>
@@ -154,6 +156,10 @@ import { getChartList, type Chart } from '../api/chart'
 import { getDatasetFields, getDatasetList, getDatasetPreviewData, type Dataset, type DatasetField } from '../api/dataset'
 import { buildComponentOption, COLOR_THEMES, chartTypeLabel, getChartFieldLabels, getChartTypeMeta, isCanvasRenderableChartType, isStaticWidgetChartType, materializeChartData, normalizeComponentAssetConfig } from '../utils/component-config'
 import { echarts, type ECharts } from '../utils/echarts'
+import { getAuthRole } from '../utils/auth-session'
+
+const isAdmin = computed(() => (getAuthRole() || '').toUpperCase() === 'ADMIN')
+const canMutateBuiltin = (row: ChartTemplate) => !row.builtIn || isAdmin.value
 
 interface TemplateFormState {
   name: string
@@ -190,10 +196,13 @@ const formRef = ref<FormInstance>()
 const themeOptions = Object.keys(COLOR_THEMES)
 const currentChartMeta = computed(() => getChartTypeMeta(form.chartType))
 const fieldLabels = computed(() => getChartFieldLabels(form.chartType))
+const showDimensionField = computed(() => currentChartMeta.value.requiresDimension || currentChartMeta.value.allowsOptionalDimension)
+const showMetricField = computed(() => currentChartMeta.value.requiresMetric)
 const showGroupField = computed(() => currentChartMeta.value.requiresGroup || currentChartMeta.value.allowsGroup)
 const staticChartTypeValues = [
   'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
   'decor_border_stream', 'decor_border_pulse', 'decor_border_bracket', 'decor_border_circuit', 'decor_border_panel',
+  'decor_shape_rect', 'decor_shape_circle',
   'text_block', 'single_field', 'number_flipper', 'table_rank', 'iframe_single', 'iframe_tabs',
   'hyperlink', 'image_list', 'text_list', 'clock_display', 'word_cloud', 'qr_code',
   'business_trend', 'metric_indicator', 'icon_arrow_trend', 'icon_warning_badge',
@@ -344,9 +353,14 @@ const buildPayloadConfig = () => {
 const getTemplateSummary = (item: ChartTemplate) => {
   const parsed = normalizeComponentAssetConfig(item.configJson)
   const dataset = datasets.value.find((entry) => entry.id === parsed.chart.datasetId)
+  const fieldSummary = parsed.chart.chartType === 'single_field'
+    ? (parsed.chart.xField || '-')
+    : parsed.chart.chartType === 'number_flipper'
+      ? (parsed.chart.yField || '-')
+    : `${parsed.chart.xField || '-'} → ${parsed.chart.yField || '-'}`
   return {
     datasetName: dataset
-      ? `${dataset.name} / ${parsed.chart.xField || '-'} → ${parsed.chart.yField || '-'}`
+      ? `${dataset.name} / ${fieldSummary}`
       : (isStaticWidgetChartType(parsed.chart.chartType || item.chartType) ? '静态组件' : '未绑定数据集'),
     sizeText: `${parsed.layout.width} x ${parsed.layout.height}`,
   }
@@ -464,9 +478,13 @@ const previewChartRef = ref<HTMLElement | null>(null)
 let previewChartInstance: ECharts | null = null
 const previewLoading = ref(false)
 
-const isPreviewRenderable = computed(() =>
-  !!form.datasetId && !!form.xField && !!form.yField && isCanvasRenderableChartType(form.chartType)
-)
+const isPreviewRenderable = computed(() => {
+  if (!form.datasetId || !isCanvasRenderableChartType(form.chartType)) return false
+  if (currentChartMeta.value.requiresDimension && !form.xField) return false
+  if (currentChartMeta.value.requiresMetric && !form.yField) return false
+  if (currentChartMeta.value.requiresGroup && !form.groupField) return false
+  return true
+})
 
 let previewTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -502,6 +520,12 @@ const updatePreview = () => {
 watch(
   () => [form.chartType, form.groupField],
   () => {
+    if (!showDimensionField.value && form.xField) {
+      form.xField = ''
+    }
+    if (!showMetricField.value && form.yField) {
+      form.yField = ''
+    }
     if (!showGroupField.value && form.groupField) {
       form.groupField = ''
     }

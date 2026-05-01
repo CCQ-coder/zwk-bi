@@ -253,6 +253,28 @@ export const DEFAULT_COMPONENT_STYLE: ComponentStyleConfig = {
   padding: 6,
 }
 
+export const STYLE_DECORATION_STYLE_PRESETS: Partial<Record<string, Partial<ComponentStyleConfig>>> = {
+  decor_shape_rect: {
+    bgColor: 'rgba(56,131,255,0.34)',
+    borderShow: true,
+    borderColor: 'rgba(92,214,255,0.94)',
+    borderWidth: 1,
+    cardRadius: 12,
+    shadowShow: true,
+    shadowColor: 'rgba(56,131,255,0.22)',
+    shadowBlur: 18,
+  },
+  decor_shape_circle: {
+    bgColor: 'rgba(56,131,255,0.3)',
+    borderShow: true,
+    borderColor: 'rgba(92,214,255,0.94)',
+    borderWidth: 1,
+    shadowShow: true,
+    shadowColor: 'rgba(56,131,255,0.2)',
+    shadowBlur: 18,
+  },
+}
+
 export const DEFAULT_COMPONENT_INTERACTION: ComponentInteractionConfig = {
   clickAction: 'filter',
   enableClickLinkage: true,
@@ -332,6 +354,30 @@ const buildXYGroupDescription = (
 export const isBarFamilyChartType = (chartType: string) => chartType.startsWith('bar')
 
 export const getChartFieldLabels = (chartType: string) => {
+  if (chartType === 'single_field') {
+    return {
+      x: '字段内容',
+      y: '数值字段',
+      group: '对比字段',
+    }
+  }
+
+  if (chartType === 'number_flipper') {
+    return {
+      x: '标签字段',
+      y: '翻牌器字段',
+      group: '对比字段',
+    }
+  }
+
+  if (chartType === 'metric_indicator' || chartType === 'business_trend') {
+    return {
+      x: '标签字段',
+      y: '数值字段',
+      group: '对比字段',
+    }
+  }
+
   if (chartType === 'iframe_single') {
     return {
       x: 'src字段',
@@ -901,6 +947,16 @@ export const CHART_TYPE_META: Record<string, ChartTypeMeta> = {
     label: '六边形徽记',
     description: '适合做标签、徽章和中心标识装饰。',
   },
+  decor_shape_rect: {
+    ...STATIC_NO_FIELD_META,
+    label: '矩形',
+    description: '基础矩形底板，可通过背景、边框、圆角和阴影快速搭建色块。',
+  },
+  decor_shape_circle: {
+    ...STATIC_NO_FIELD_META,
+    label: '圆形',
+    description: '基础圆形底板，适合状态点、徽章承载和圆形高亮。',
+  },
   text_block: {
     ...STATIC_NO_FIELD_META,
     label: '文本组件',
@@ -1161,6 +1217,11 @@ export const DECORATION_CHART_TYPES = new Set([
   'decor_border_frame', 'decor_border_corner', 'decor_border_glow', 'decor_border_grid',
   'decor_border_stream', 'decor_border_pulse', 'decor_border_bracket', 'decor_border_circuit', 'decor_border_panel',
   'decor_title_plate', 'decor_divider_glow', 'decor_target_ring', 'decor_scan_panel', 'decor_hex_badge',
+  'decor_shape_rect', 'decor_shape_circle',
+])
+
+export const STYLE_DECORATION_CHART_TYPES = new Set([
+  'decor_shape_rect', 'decor_shape_circle',
 ])
 
 export const TEXT_WIDGET_CHART_TYPES = new Set([
@@ -1200,6 +1261,7 @@ export const getChartTypeMeta = (type: string) => CHART_TYPE_META[type] ?? {
 
 export const isCanvasRenderableChartType = (type: string) => CANVAS_RENDERABLE_CHART_TYPES.has(type)
 export const isDecorationChartType = (type: string) => DECORATION_CHART_TYPES.has(type)
+export const isStyleDecorationChartType = (type: string) => STYLE_DECORATION_CHART_TYPES.has(type)
 export const isTextWidgetChartType = (type: string) => TEXT_WIDGET_CHART_TYPES.has(type)
 export const isVectorIconChartType = (type: string) => VECTOR_ICON_CHART_TYPES.has(type)
 export const isStaticWidgetChartType = (type: string) =>
@@ -1330,8 +1392,7 @@ export const resolveConfiguredTableColumns = (chartConfig: ComponentChartConfig,
   const availableSet = new Set(availableColumns)
   const selectedColumns = normalizedColumns.filter((column) => availableSet.has(column.field))
 
-  if (selectedColumns.length) return selectedColumns
-  return availableColumns.map((field, index) => createTableColumnConfig(field, index))
+  return selectedColumns
 }
 
 export const getConfiguredTableColumns = (chartConfig: ComponentChartConfig, availableColumns: string[]) => {
@@ -1690,6 +1751,8 @@ export const chartTypeLabel = (type: string) => ({
   decor_target_ring: '目标环',
   decor_scan_panel: '扫描面板',
   decor_hex_badge: '六边形徽记',
+  decor_shape_rect: '矩形',
+  decor_shape_circle: '圆形',
   text_block: '文本组件',
   single_field: '单字段组件',
   number_flipper: '数字翻牌器',
@@ -1895,6 +1958,15 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
   // Force transparent component board globally; charts only render data/decoration content.
   const style: ComponentStyleConfig = { ...styleInput, bgColor: 'rgba(0,0,0,0)' }
   const colors = COLOR_THEMES[style.theme] ?? COLOR_THEMES['默认蓝']
+  const textColor = style.titleColor || '#e8f4ff'
+  const withLegendTextColor = (legend?: Record<string, any>) => legend
+    ? { ...legend, textStyle: { ...(legend.textStyle ?? {}), color: textColor } }
+    : undefined
+  const withAxisTextColor = (axis: Record<string, any>) => ({
+    ...axis,
+    axisLabel: { ...(axis.axisLabel ?? {}), color: textColor },
+    nameTextStyle: { ...(axis.nameTextStyle ?? {}), color: textColor },
+  })
   if (data.chartType === 'pie' || data.chartType === 'doughnut' || data.chartType === 'rose') {
     const isRose = data.chartType === 'rose'
     const pieData = data.series[0]?.data.map((value, index) => ({ name: data.labels[index] ?? String(index), value })) ?? []
@@ -1907,13 +1979,13 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
       color: colors,
       backgroundColor: style.bgColor,
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      legend: style.showLegend ? legend : undefined,
+      legend: withLegendTextColor(style.showLegend ? legend : undefined),
       series: [{
         type: 'pie',
         radius: data.chartType === 'doughnut' ? ['40%', '68%'] : isRose ? ['12%', '68%'] : '64%',
         roseType: isRose ? ('area' as const) : undefined,
         data: pieData,
-        label: style.showLabel ? { show: true, fontSize: style.labelSize, formatter: '{b}: {d}%' } : { show: false },
+        label: style.showLabel ? { show: true, fontSize: style.labelSize, formatter: '{b}: {d}%', color: textColor } : { show: false },
       }],
     }
   }
@@ -1933,7 +2005,7 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
         roam: false,
         leafDepth: 1,
         levels: [{ itemStyle: { gapWidth: 4 } }],
-        label: style.showLabel ? { show: true, fontSize: style.labelSize } : { show: false },
+        label: style.showLabel ? { show: true, fontSize: style.labelSize, color: textColor } : { show: false },
       }],
     }
   }
@@ -1947,7 +2019,7 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
         type: 'funnel',
         left: '10%',
         width: '80%',
-        label: style.showLabel ? { show: true, fontSize: style.labelSize } : { show: false },
+        label: style.showLabel ? { show: true, fontSize: style.labelSize, color: textColor } : { show: false },
         data: data.series[0]?.data.map((value, index) => ({ name: data.labels[index] ?? String(index), value })) ?? [],
       }],
     }
@@ -1965,8 +2037,8 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
         progress: { show: true, roundCap: true, width: 14 },
         axisLine: { lineStyle: { width: 14, color: [[0.35, '#f56c6c'], [0.7, '#facc14'], [1, colors[0]]] } },
         pointer: { itemStyle: { color: colors[1] ?? colors[0] } },
-        title: { show: style.showLabel, fontSize: 14, color: '#52637a', offsetCenter: [0, '72%'] },
-        detail: { show: style.showLabel, formatter: '{value}', fontSize: 26, color: '#183153', offsetCenter: [0, '34%'] },
+        title: { show: style.showLabel, fontSize: 14, color: textColor, offsetCenter: [0, '72%'] },
+        detail: { show: style.showLabel, formatter: '{value}', fontSize: 26, color: style.metricValueColor, offsetCenter: [0, '34%'] },
         data: [{ value: Number(data.series[0]?.data[0] ?? 0), name: data.labels[0] ?? chartConfig.name }],
       }],
     }
@@ -1977,17 +2049,18 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
       color: colors,
       backgroundColor: style.bgColor,
       tooltip: { trigger: 'item' },
-      legend: style.showLegend && data.series.length ? { top: 6 } : undefined,
+      legend: withLegendTextColor(style.showLegend && data.series.length ? { top: 6 } : undefined),
       radar: {
         radius: '66%',
         splitNumber: 4,
         indicator: data.labels.map((label) => ({ name: label, max: Math.max(...data.series.flatMap((item) => item.data.map((value) => Number(value) || 0)), 1) })),
+        axisName: { color: textColor },
         splitArea: { areaStyle: { color: ['rgba(31,122,224,0.02)', 'rgba(31,122,224,0.04)'] } },
       },
       series: [{
         type: 'radar',
         data: data.series.map((item) => ({ value: item.data, name: item.name })),
-        label: style.showLabel ? { show: true, fontSize: style.labelSize } : { show: false },
+        label: style.showLabel ? { show: true, fontSize: style.labelSize, color: textColor } : { show: false },
         areaStyle: { opacity: 0.12 },
       }],
     }
@@ -1998,24 +2071,24 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
       color: colors,
       backgroundColor: style.bgColor,
       tooltip: { trigger: 'item' },
-      legend: style.showLegend && data.series.length ? { top: 6 } : undefined,
+      legend: withLegendTextColor(style.showLegend && data.series.length ? { top: 6 } : undefined),
       grid: { left: 28, right: 20, bottom: 28, top: data.series.length > 1 ? 40 : 18, containLabel: true },
-      xAxis: {
+      xAxis: withAxisTextColor({
         type: 'value',
         name: style.showXName ? chartConfig.xField : '',
         splitLine: style.showGrid ? {} : { show: false },
-      },
-      yAxis: {
+      }),
+      yAxis: withAxisTextColor({
         type: 'value',
         name: style.showYName ? chartConfig.yField : '',
         splitLine: style.showGrid ? {} : { show: false },
-      },
+      }),
       series: data.series.map((item) => ({
         name: item.name,
         type: 'scatter',
         data: item.data,
         symbolSize: 16,
-        label: style.showLabel ? { show: true, fontSize: style.labelSize, position: 'top' } : { show: false },
+        label: style.showLabel ? { show: true, fontSize: style.labelSize, position: 'top', color: textColor } : { show: false },
       })),
     }
   }
@@ -2049,10 +2122,10 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
       backgroundColor: style.bgColor,
       tooltip: { position: 'top' },
       grid: { left: 60, right: 20, bottom: style.showLegend ? 52 : 22, top: 20 },
-      xAxis: { type: 'category', data: xCats, splitArea: { show: true } },
-      yAxis: { type: 'category', data: yCats, splitArea: { show: true } },
-      visualMap: { min: minVal, max: maxVal, show: style.showLegend, orient: 'horizontal', left: 'center', bottom: 2, inRange: { color: heatColors } },
-      series: [{ type: 'heatmap', data: heatData, label: style.showLabel ? { show: true, fontSize: style.labelSize } : { show: false }, emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.4)' } } }],
+      xAxis: withAxisTextColor({ type: 'category', data: xCats, splitArea: { show: true } }),
+      yAxis: withAxisTextColor({ type: 'category', data: yCats, splitArea: { show: true } }),
+      visualMap: { min: minVal, max: maxVal, show: style.showLegend, orient: 'horizontal', left: 'center', bottom: 2, textStyle: { color: textColor }, inRange: { color: heatColors } },
+      series: [{ type: 'heatmap', data: heatData, label: style.showLabel ? { show: true, fontSize: style.labelSize, color: textColor } : { show: false }, emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.4)' } } }],
     }
   }
 
@@ -2070,16 +2143,16 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
       color: colors,
       backgroundColor: style.bgColor,
       tooltip: { trigger: 'axis' },
-      legend,
+      legend: withLegendTextColor(legend),
       grid: { left: 24, right: 60, bottom: shouldShowLegend && style.legendPos === 'bottom' ? 32 : 22, top: shouldShowLegend && style.legendPos !== 'bottom' ? 42 : 18, containLabel: true },
-      xAxis: { type: 'category', data: data.labels, axisLabel: { rotate: data.labels.length > 8 ? 28 : 0 } },
+      xAxis: withAxisTextColor({ type: 'category', data: data.labels, axisLabel: { rotate: data.labels.length > 8 ? 28 : 0 } }),
       yAxis: [
-        { type: 'value', ...gridSplit, name: style.showYName ? chartConfig.yField : '' },
-        { type: 'value', splitLine: { show: false } },
+        withAxisTextColor({ type: 'value', ...gridSplit, name: style.showYName ? chartConfig.yField : '' }),
+        withAxisTextColor({ type: 'value', splitLine: { show: false } }),
       ],
       series: [
-        ...barSeries.map((item) => ({ name: item.name, type: 'bar' as const, stack: isComboStack ? 'combo' : undefined, barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [style.barRadius, style.barRadius, 0, 0] }, label: style.showLabel ? { show: true, position: 'top' as const, fontSize: style.labelSize } : { show: false }, data: item.data })),
-        ...lineSeries.map((item) => ({ name: item.name, type: 'line' as const, yAxisIndex: 1, smooth: style.smooth, symbol: 'circle', symbolSize: 6, label: style.showLabel ? { show: true, position: 'top' as const, fontSize: style.labelSize } : { show: false }, data: item.data })),
+        ...barSeries.map((item) => ({ name: item.name, type: 'bar' as const, stack: isComboStack ? 'combo' : undefined, barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [style.barRadius, style.barRadius, 0, 0] }, label: style.showLabel ? { show: true, position: 'top' as const, fontSize: style.labelSize, color: textColor } : { show: false }, data: item.data })),
+        ...lineSeries.map((item) => ({ name: item.name, type: 'line' as const, yAxisIndex: 1, smooth: style.smooth, symbol: 'circle', symbolSize: 6, label: style.showLabel ? { show: true, position: 'top' as const, fontSize: style.labelSize, color: textColor } : { show: false }, data: item.data })),
       ],
     }
   }
@@ -2102,11 +2175,11 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
       backgroundColor: style.bgColor,
       tooltip: { trigger: 'axis', formatter: (p: any[]) => `${p[1]?.axisValue}: ${p[1]?.value}` },
       grid: { left: 24, right: 18, bottom: 22, top: 18, containLabel: true },
-      xAxis: { type: 'category', data: data.labels },
-      yAxis: { type: 'value', splitLine: style.showGrid ? {} : { show: false } },
+      xAxis: withAxisTextColor({ type: 'category', data: data.labels }),
+      yAxis: withAxisTextColor({ type: 'value', splitLine: style.showGrid ? {} : { show: false } }),
       series: [
         { type: 'bar', stack: 'wf', itemStyle: { borderColor: 'transparent', color: 'transparent' }, emphasis: { itemStyle: { color: 'transparent', borderColor: 'transparent' } }, data: helper2 },
-        { type: 'bar', stack: 'wf', barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [style.barRadius, style.barRadius, 0, 0], color: (p: any) => rawVals[p.dataIndex] >= 0 ? (colors[0] ?? '#5470c6') : (colors[2] ?? '#ee6666') as any }, label: style.showLabel ? { show: true, position: 'top' as const, fontSize: style.labelSize } : { show: false }, data: bar2 },
+        { type: 'bar', stack: 'wf', barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [style.barRadius, style.barRadius, 0, 0], color: (p: any) => rawVals[p.dataIndex] >= 0 ? (colors[0] ?? '#5470c6') : (colors[2] ?? '#ee6666') as any }, label: style.showLabel ? { show: true, position: 'top' as const, fontSize: style.labelSize, color: textColor } : { show: false }, data: bar2 },
       ],
     }
   }
@@ -2121,8 +2194,8 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       grid: { left: 16, right: 16, bottom: 8, top: 8, containLabel: true },
       xAxis: { type: 'value', max: maxVal, splitLine: { show: false }, axisLabel: { show: false }, axisTick: { show: false }, axisLine: { show: false } },
-      yAxis: { type: 'category', data: data.labels, axisTick: { show: false }, axisLine: { show: false } },
-      series: [{ type: 'bar', data: data.series[0].data.map((v) => Number(v) || 0), barMaxWidth: 20, itemStyle: { borderRadius: 10, color: colors[0] ?? '#5470c6' }, label: style.showLabel ? { show: true, position: 'insideRight' as const, fontSize: style.labelSize, color: '#fff' } : { show: false }, showBackground: true, backgroundStyle: { color: 'rgba(200,200,200,0.15)', borderRadius: 10 } }],
+      yAxis: withAxisTextColor({ type: 'category', data: data.labels, axisTick: { show: false }, axisLine: { show: false } }),
+      series: [{ type: 'bar', data: data.series[0].data.map((v) => Number(v) || 0), barMaxWidth: 20, itemStyle: { borderRadius: 10, color: colors[0] ?? '#5470c6' }, label: style.showLabel ? { show: true, position: 'insideRight' as const, fontSize: style.labelSize, color: textColor } : { show: false }, showBackground: true, backgroundStyle: { color: 'rgba(200,200,200,0.15)', borderRadius: 10 } }],
     }
   }
 
@@ -2136,13 +2209,13 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
       color: colors,
       backgroundColor: style.bgColor,
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      legend: shouldShowLegend ? (style.legendPos === 'top' ? { top: 6 } : { bottom: 0 }) : undefined,
+      legend: withLegendTextColor(shouldShowLegend ? (style.legendPos === 'top' ? { top: 6 } : { bottom: 0 }) : undefined),
       grid: { left: 16, right: 16, bottom: shouldShowLegend && style.legendPos === 'bottom' ? 32 : 22, top: shouldShowLegend ? 42 : 22, containLabel: true },
-      xAxis: { type: 'value', splitLine: style.showGrid ? {} : { show: false }, axisLabel: { formatter: (v: number) => Math.abs(v).toString() } },
-      yAxis: { type: 'category', data: data.labels },
+      xAxis: withAxisTextColor({ type: 'value', splitLine: style.showGrid ? {} : { show: false }, axisLabel: { formatter: (v: number) => Math.abs(v).toString() } }),
+      yAxis: withAxisTextColor({ type: 'category', data: data.labels }),
       series: [
-        { name: data.series[0]?.name ?? '系列1', type: 'bar' as const, barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [0, style.barRadius, style.barRadius, 0], color: colors[0] }, label: style.showLabel ? { show: true, position: 'left' as const, fontSize: style.labelSize, formatter: (p: any) => Math.abs(p.value).toString() } : { show: false }, data: leftData },
-        { name: (data.series[1] ?? data.series[0])?.name ?? '系列2', type: 'bar' as const, barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [style.barRadius, 0, 0, style.barRadius], color: colors[1] ?? colors[0] }, label: style.showLabel ? { show: true, position: 'right' as const, fontSize: style.labelSize } : { show: false }, data: rightData },
+        { name: data.series[0]?.name ?? '系列1', type: 'bar' as const, barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [0, style.barRadius, style.barRadius, 0], color: colors[0] }, label: style.showLabel ? { show: true, position: 'left' as const, fontSize: style.labelSize, formatter: (p: any) => Math.abs(p.value).toString(), color: textColor } : { show: false }, data: leftData },
+        { name: (data.series[1] ?? data.series[0])?.name ?? '系列2', type: 'bar' as const, barMaxWidth: style.barMaxWidth, itemStyle: { borderRadius: [style.barRadius, 0, 0, style.barRadius], color: colors[1] ?? colors[0] }, label: style.showLabel ? { show: true, position: 'right' as const, fontSize: style.labelSize, color: textColor } : { show: false }, data: rightData },
       ],
     }
   }
@@ -2156,11 +2229,11 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
       color: colors,
       backgroundColor: style.bgColor,
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      legend: shouldShowLegend ? (style.legendPos === 'top' ? { top: 6 } : { bottom: 0 }) : undefined,
+      legend: withLegendTextColor(shouldShowLegend ? (style.legendPos === 'top' ? { top: 6 } : { bottom: 0 }) : undefined),
       grid: { left: 24, right: 18, bottom: shouldShowLegend && style.legendPos === 'bottom' ? 32 : 22, top: shouldShowLegend && style.legendPos !== 'bottom' ? 42 : 18, containLabel: true },
-      xAxis: { type: 'value', max: Math.max(...totals, 1), splitLine: style.showGrid ? {} : { show: false } },
-      yAxis: { type: 'category', data: data.labels },
-      series: data.series.map((item) => ({ name: item.name, type: 'bar' as const, stack: 'total', barMaxWidth: style.barMaxWidth, label: style.showLabel ? { show: true, fontSize: style.labelSize, formatter: (p: any) => `${((p.value / totals[p.dataIndex]) * 100).toFixed(1)}%` } : { show: false }, data: item.data })),
+      xAxis: withAxisTextColor({ type: 'value', max: Math.max(...totals, 1), splitLine: style.showGrid ? {} : { show: false } }),
+      yAxis: withAxisTextColor({ type: 'category', data: data.labels }),
+      series: data.series.map((item) => ({ name: item.name, type: 'bar' as const, stack: 'total', barMaxWidth: style.barMaxWidth, label: style.showLabel ? { show: true, fontSize: style.labelSize, formatter: (p: any) => `${((p.value / totals[p.dataIndex]) * 100).toFixed(1)}%`, color: textColor } : { show: false }, data: item.data })),
     }
   }
 
@@ -2184,7 +2257,7 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
     color: colors,
     backgroundColor: style.bgColor,
     tooltip: { trigger: 'axis' },
-    legend,
+    legend: withLegendTextColor(legend),
     grid: {
       left: 24,
       right: shouldShowLegend && style.legendPos === 'right' ? 80 : 18,
@@ -2194,12 +2267,12 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
     },
     ...(horizontal
       ? {
-          xAxis: { type: 'value', ...gridSplitLine, name: style.showXName ? chartConfig.yField : '' },
-          yAxis: { type: 'category', data: data.labels, name: style.showYName ? chartConfig.xField : '' },
+          xAxis: withAxisTextColor({ type: 'value', ...gridSplitLine, name: style.showXName ? chartConfig.yField : '' }),
+          yAxis: withAxisTextColor({ type: 'category', data: data.labels, name: style.showYName ? chartConfig.xField : '' }),
         }
       : {
-          xAxis: { type: 'category', data: data.labels, axisLabel: { rotate: data.labels.length > 8 ? 28 : 0 }, name: style.showXName ? chartConfig.xField : '' },
-          yAxis: { type: 'value', ...gridSplitLine, name: style.showYName ? chartConfig.yField : '' },
+          xAxis: withAxisTextColor({ type: 'category', data: data.labels, axisLabel: { rotate: data.labels.length > 8 ? 28 : 0 }, name: style.showXName ? chartConfig.xField : '' }),
+          yAxis: withAxisTextColor({ type: 'value', ...gridSplitLine, name: style.showYName ? chartConfig.yField : '' }),
         }),
     series: (() => {
       if (isPercent && data.series.length > 0) {
@@ -2216,7 +2289,7 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
           }),
           itemStyle: { borderRadius: style.barRadius },
           barMaxWidth: style.barMaxWidth,
-          label: { show: true, fontSize: style.labelSize, formatter: '{c}%', position: horizontal ? 'right' : 'inside' },
+          label: { show: true, fontSize: style.labelSize, formatter: '{c}%', position: horizontal ? 'right' : 'inside', color: textColor },
         }))
       }
       return data.series.map((item) => ({
@@ -2228,7 +2301,7 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
         areaStyle: (baseType === 'line' && (style.areaFill || data.chartType === 'line_stack' || isAreaType)) ? { opacity: 0.22 } : undefined,
         itemStyle: baseType === 'bar' ? { borderRadius: style.barRadius } : undefined,
         barMaxWidth: baseType === 'bar' ? style.barMaxWidth : undefined,
-        label: style.showLabel ? { show: true, fontSize: style.labelSize, position: horizontal ? 'right' : 'top' } : { show: false },
+        label: style.showLabel ? { show: true, fontSize: style.labelSize, position: horizontal ? 'right' : 'top', color: textColor } : { show: false },
       }))
     })(),
   }
@@ -2238,10 +2311,83 @@ export const buildComponentOption = (data: ChartDataResult, chartConfig: Compone
  * 对 ECharts option 追加标题 / 提示框可见性后处理（就地修改）
  * 在 renderChart 调用 setOption 之前执行
  */
+const parseOptionTop = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) return Number(trimmed)
+  if (/^\d+(?:\.\d+)?px$/.test(trimmed)) return Number.parseFloat(trimmed)
+  return null
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const withMinimumTop = (target: any, minTop: number) => {
+  if (!target || typeof target !== 'object') {
+    return { top: minTop }
+  }
+  const currentTop = parseOptionTop(target.top)
+  if (currentTop !== null && currentTop >= minTop) {
+    return target
+  }
+  return {
+    ...target,
+    top: minTop,
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const shouldShiftTopLegend = (legend: any) => Boolean(
+  legend
+  && typeof legend === 'object'
+  && legend.right == null
+  && legend.bottom == null
+  && legend.top !== 'center',
+)
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const postProcessChartOption = (option: any, style: ComponentStyleConfig, chartName: string): void => {
-  // Force chart titles hidden for screen clean-room visual style.
-  delete option.title
+  const titleText = String(style.titleText || chartName || '').trim()
+  if (style.showTitle && titleText) {
+    const titleFontSize = Math.max(10, Number(style.titleFontSize) || 14)
+    const currentTitle = Array.isArray(option.title) ? (option.title[0] ?? {}) : (option.title ?? {})
+    option.title = {
+      ...currentTitle,
+      show: true,
+      text: titleText,
+      left: currentTitle.left ?? 'center',
+      top: currentTitle.top ?? 10,
+      textStyle: {
+        ...(currentTitle.textStyle ?? {}),
+        color: style.titleColor || '#e8f4ff',
+        fontSize: titleFontSize,
+        fontWeight: 700,
+      },
+    }
+
+    const titleSpace = titleFontSize + 18
+    let shiftedLegend = false
+    if (Array.isArray(option.legend)) {
+      option.legend = option.legend.map((legend: any) => {
+        if (!shouldShiftTopLegend(legend)) return legend
+        shiftedLegend = true
+        return withMinimumTop(legend, titleSpace)
+      })
+    } else if (shouldShiftTopLegend(option.legend)) {
+      shiftedLegend = true
+      option.legend = withMinimumTop(option.legend, titleSpace)
+    }
+
+    const minGridTop = titleSpace + (shiftedLegend ? 28 : 0)
+    if (Array.isArray(option.grid)) {
+      option.grid = option.grid.map((grid: any) => withMinimumTop(grid, minGridTop))
+    } else if (option.grid) {
+      option.grid = withMinimumTop(option.grid, minGridTop)
+    }
+  } else {
+    delete option.title
+  }
+
   if (!style.showTooltip) {
     delete option.tooltip
   }

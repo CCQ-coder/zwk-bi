@@ -2,7 +2,10 @@
   <div class="static-widget" :class="[`static-widget--${themeName}`, { 'static-widget--dark': dark }]" :style="widgetStyle">
     <template v-if="isDecorationChartType(chartType)">
       <div class="decor-shell" :class="`decor-shell--${chartType}`">
-        <template v-if="chartType === 'decor_title_plate'">
+        <template v-if="chartType === 'decor_shape_rect' || chartType === 'decor_shape_circle'">
+          <div class="decor-shape" :class="`decor-shape--${chartType}`" />
+        </template>
+        <template v-else-if="chartType === 'decor_title_plate'">
           <div class="decor-title-plate">
             <span class="decor-title-plate__rail decor-title-plate__rail--left" />
             <div class="decor-title-plate__bar">
@@ -60,7 +63,7 @@
     </template>
 
     <template v-else-if="isVectorIconChartType(chartType)">
-      <div class="icon-shell">
+      <div class="icon-shell" :class="iconShellClass">
         <div class="icon-shell__stage" v-html="iconMarkup" />
         <template v-if="shouldShowTitle">
           <div class="icon-shell__label">{{ titleText }}</div>
@@ -71,6 +74,7 @@
 
     <template v-else-if="chartType === 'clock_display'">
       <div class="time-shell">
+        <div v-if="shouldShowTitle" class="time-shell__title">{{ titleText }}</div>
         <div class="time-shell__date">{{ nowDate }}</div>
         <div class="time-shell__time">{{ nowTime }}</div>
         <div class="time-shell__meta">系统时间</div>
@@ -79,6 +83,7 @@
 
     <template v-else-if="chartType === 'qr_code'">
       <div class="qr-shell">
+        <div v-if="shouldShowTitle" class="qr-shell__title">{{ titleText }}</div>
         <div class="qr-grid">
           <span
             v-for="cell in qrCells"
@@ -101,6 +106,7 @@
 
     <template v-else-if="chartType === 'iframe_single' || chartType === 'iframe_tabs'">
       <div class="frame-shell">
+        <div v-if="shouldShowTitle" class="frame-shell__title">{{ titleText }}</div>
         <template v-if="chartType === 'iframe_tabs' && iframeTabList.length">
           <div class="frame-shell__tabs">
             <span
@@ -155,10 +161,24 @@
       </div>
     </template>
 
-    <template v-else-if="chartType === 'single_field' || chartType === 'metric_indicator' || chartType === 'number_flipper'">
+    <template v-else-if="chartType === 'single_field'">
+      <div class="metric-shell metric-shell--single-field">
+        <div v-if="shouldShowTitle" class="metric-shell__title">{{ titleText }}</div>
+        <div class="metric-shell__value">{{ singleFieldValue }}</div>
+      </div>
+    </template>
+
+    <template v-else-if="chartType === 'number_flipper'">
+      <div class="metric-shell metric-shell--flipper">
+        <div v-if="shouldShowTitle" class="metric-shell__title">{{ titleText }}</div>
+        <div class="metric-shell__value metric-shell__value--flipper">{{ primaryMetric }}</div>
+      </div>
+    </template>
+
+    <template v-else-if="chartType === 'metric_indicator'">
       <div class="metric-shell">
         <div v-if="shouldShowTitle" class="metric-shell__title">{{ titleText }}</div>
-        <div class="metric-shell__value" :class="{ 'metric-shell__value--flipper': chartType === 'number_flipper' }">{{ primaryMetric }}</div>
+        <div class="metric-shell__value">{{ primaryMetric }}</div>
         <div class="metric-shell__trend">较昨日 <span>+12.6%</span></div>
       </div>
     </template>
@@ -182,6 +202,7 @@
 
     <template v-else-if="chartType === 'word_cloud'">
       <div class="cloud-shell">
+        <div v-if="shouldShowTitle" class="cloud-shell__title">{{ titleText }}</div>
         <span v-for="item in cloudItems" :key="item.word" class="cloud-shell__word" :style="{ fontSize: item.size, opacity: item.opacity }">
           {{ item.word }}
         </span>
@@ -215,6 +236,7 @@ import type { ChartDataResult } from '../api/chart'
 import {
   chartTypeLabel,
   isDecorationChartType,
+  isStyleDecorationChartType,
   isVectorIconChartType,
   type ComponentChartConfig,
   type ComponentStyleConfig,
@@ -254,24 +276,65 @@ onBeforeUnmount(() => {
 const titleText = computed(() => props.styleConfig?.titleText || props.chartConfig.name || chartTypeLabel(props.chartType))
 const shouldShowTitle = computed(() => Boolean(props.showTitle || props.styleConfig?.titleText))
 const rawRows = computed(() => props.data?.rawRows ?? [])
+const withAlpha = (color: string | undefined, alpha: number, fallback: string) => {
+  const normalized = String(color ?? '').trim()
+  if (!normalized) return fallback
+
+  if (normalized.startsWith('#')) {
+    const hex = normalized.slice(1)
+    const toChannel = (value: string) => Number.parseInt(value, 16)
+    if (hex.length === 3 || hex.length === 4) {
+      const red = toChannel(hex[0] + hex[0])
+      const green = toChannel(hex[1] + hex[1])
+      const blue = toChannel(hex[2] + hex[2])
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+    }
+    if (hex.length === 6 || hex.length === 8) {
+      const red = toChannel(hex.slice(0, 2))
+      const green = toChannel(hex.slice(2, 4))
+      const blue = toChannel(hex.slice(4, 6))
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+    }
+  }
+
+  const rgbaMatch = normalized.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*[\d.]+)?\s*\)$/i)
+  if (rgbaMatch) {
+    return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${alpha})`
+  }
+
+  return normalized
+}
+
 const widgetStyle = computed(() => {
   const borderWidth = Math.max(0, Number(props.styleConfig?.borderWidth ?? 1))
   const radius = Math.max(0, Number(props.styleConfig?.cardRadius ?? 14))
+  const titleFontSize = Math.max(10, Number(props.styleConfig?.titleFontSize ?? 14))
+  const metricFontSize = Math.max(16, Number(props.styleConfig?.metricValueFontSize ?? 36))
   const isDecoration = isDecorationChartType(props.chartType)
+  const isStyleDecoration = isStyleDecorationChartType(props.chartType)
+  const isTransparentDecoration = isDecoration && !isStyleDecoration
   const baseColor = props.styleConfig?.titleColor || (props.dark ? '#eaf4ff' : '#18324d')
-  const accentColor = props.styleConfig?.metricValueColor || props.styleConfig?.iconStrokeColor || (props.dark ? '#4fdfff' : '#4db3ff')
+  const accentColor = isVectorIconChartType(props.chartType)
+    ? (props.styleConfig?.iconStrokeColor || (props.dark ? '#4fdfff' : '#4db3ff'))
+    : (props.styleConfig?.metricValueColor || (props.dark ? '#4fdfff' : '#4db3ff'))
   const successColor = props.styleConfig?.metricTrendUpColor || '#29c27c'
-  const mutedColor = props.dark ? 'rgba(234, 244, 255, 0.72)' : 'rgba(24, 50, 77, 0.72)'
+  const mutedColor = withAlpha(baseColor, 0.72, props.dark ? 'rgba(234, 244, 255, 0.72)' : 'rgba(24, 50, 77, 0.72)')
 
   return {
     '--static-widget-text-color': baseColor,
     '--static-widget-accent-color': accentColor,
     '--static-widget-success-color': successColor,
     '--static-widget-muted-color': mutedColor,
-    background: isDecoration ? 'transparent' : (props.styleConfig?.bgColor || 'transparent'),
-    border: !isDecoration && props.styleConfig?.borderShow ? `${borderWidth}px solid ${props.styleConfig.borderColor || accentColor}` : 'none',
-    borderRadius: isDecoration ? '0px' : `${radius}px`,
-    boxShadow: !isDecoration && props.styleConfig?.shadowShow
+    '--static-widget-title-font-size': `${titleFontSize}px`,
+    '--static-widget-metric-font-size': `${metricFontSize}px`,
+    background: isTransparentDecoration ? 'transparent' : (props.styleConfig?.bgColor || 'transparent'),
+    border: !isTransparentDecoration && props.styleConfig?.borderShow ? `${borderWidth}px solid ${props.styleConfig.borderColor || accentColor}` : 'none',
+    borderRadius: isTransparentDecoration
+      ? '0px'
+      : props.chartType === 'decor_shape_circle'
+        ? '9999px'
+        : `${radius}px`,
+    boxShadow: !isTransparentDecoration && props.styleConfig?.shadowShow
       ? `0 0 ${Math.max(0, Number(props.styleConfig.shadowBlur ?? 12))}px ${props.styleConfig.shadowColor || 'rgba(77, 179, 255, 0.18)'}`
       : 'none',
   }
@@ -329,23 +392,8 @@ const activeIframeTabUrl = computed(() => {
 
 // ─── text block ───────────────────────────────────────────────────────
 const textBlockContent = computed(() => {
-  // Priority: data source > static text content > default placeholder
-  if (rawRows.value.length) {
-    const firstRow = rawRows.value[0]
-    // If yField is set, show its value
-    if (props.chartConfig.yField && firstRow[props.chartConfig.yField] != null) {
-      return String(firstRow[props.chartConfig.yField])
-    }
-    // If xField is set, show its value
-    if (props.chartConfig.xField && firstRow[props.chartConfig.xField] != null) {
-      return String(firstRow[props.chartConfig.xField])
-    }
-    // Show first column value
-    const cols = props.data?.columns ?? Object.keys(firstRow)
-    if (cols.length) return String(firstRow[cols[0]] ?? '')
-  }
   if (props.styleConfig?.textContent) return props.styleConfig.textContent
-  return '本区域适合展示公告、提示信息、模块说明或重点摘要，支持作为独立文字组件进行视觉编排。'
+  return '在右侧基础设置中输入文本内容'
 })
 
 const primaryMetric = computed(() => {
@@ -365,6 +413,23 @@ const primaryMetric = computed(() => {
     return Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(seriesValues.reduce((sum, value) => sum + value, 0))
   }
   return '128,560'
+})
+
+const singleFieldValue = computed(() => {
+  if (rawRows.value.length) {
+    const firstRow = rawRows.value[0]
+    if (props.chartConfig.xField && firstRow[props.chartConfig.xField] != null) {
+      return String(firstRow[props.chartConfig.xField])
+    }
+    if (props.chartConfig.yField && firstRow[props.chartConfig.yField] != null) {
+      return String(firstRow[props.chartConfig.yField])
+    }
+    const columns = props.data?.columns ?? Object.keys(firstRow)
+    if (columns.length) {
+      return String(firstRow[columns[0]] ?? '--')
+    }
+  }
+  return '--'
 })
 
 const listItems = computed(() => {
@@ -465,6 +530,55 @@ const iconMarkup = computed(() => ({
   icon_wave_ribbon: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M18 70C28 52 40 46 52 58C64 70 76 76 88 58C96 46 102 42 102 42" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 92C28 74 40 68 52 80C64 92 76 98 88 80C96 68 102 64 102 64" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.52"/></svg>',
 }[props.chartType] ?? '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="60" r="28" fill="none" stroke="currentColor" stroke-width="10"/></svg>'))
 
+const COMPACT_ACCENT_ICON_TYPES = new Set([
+  'icon_plus',
+  'icon_minus',
+  'icon_search',
+  'icon_focus_frame',
+  'icon_home_badge',
+  'icon_share_nodes',
+  'icon_link_chain',
+  'icon_message_chat',
+  'icon_eye_watch',
+  'icon_lock_safe',
+  'icon_bell_notice',
+  'icon_user_profile',
+  'icon_check_mark',
+  'icon_alert_mark',
+  'icon_close_mark',
+  'icon_settings_gear',
+])
+const FOCUS_ACCENT_ICON_TYPES = new Set([
+  'icon_arrow_trend',
+  'icon_warning_badge',
+  'icon_location_pin',
+  'icon_data_signal',
+  'icon_user_badge',
+  'icon_chart_mark',
+])
+const FEATURE_MD_ACCENT_ICON_TYPES = new Set([
+  'icon_chevron_double',
+  'icon_shield_guard',
+  'icon_lightning_bolt',
+])
+const FEATURE_LG_ACCENT_ICON_TYPES = new Set([
+  'icon_orbit_ring',
+  'icon_compass_star',
+  'icon_database_stack',
+  'icon_globe_grid',
+  'icon_radar_pulse',
+  'icon_cube_wire',
+])
+
+const iconShellClass = computed(() => {
+  if (COMPACT_ACCENT_ICON_TYPES.has(props.chartType)) return 'icon-shell--compact'
+  if (FOCUS_ACCENT_ICON_TYPES.has(props.chartType)) return 'icon-shell--focus'
+  if (FEATURE_MD_ACCENT_ICON_TYPES.has(props.chartType)) return 'icon-shell--feature-md'
+  if (FEATURE_LG_ACCENT_ICON_TYPES.has(props.chartType)) return 'icon-shell--feature-lg'
+  if (props.chartType === 'icon_wave_ribbon') return 'icon-shell--ribbon'
+  return ''
+})
+
 const themeName = computed(() => {
   if (isDecorationChartType(props.chartType)) return 'decor'
   if (isVectorIconChartType(props.chartType)) return 'icon'
@@ -477,6 +591,7 @@ const themeName = computed(() => {
   position: relative;
   width: 100%;
   height: 100%;
+  container-type: size;
   display: flex;
   align-items: stretch;
   justify-content: stretch;
@@ -513,6 +628,20 @@ const themeName = computed(() => {
   box-shadow: none;
   overflow: visible;
   isolation: isolate;
+}
+
+.decor-shell--decor_shape_rect,
+.decor-shell--decor_shape_circle {
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.decor-shape {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: transparent;
 }
 
 .decor-shell::before {
@@ -802,7 +931,8 @@ const themeName = computed(() => {
 }
 
 .decor-title-plate__label {
-  font-size: 14px;
+  font-size: clamp(14px, 32cqh, 24px);
+  line-height: 1.05;
   font-weight: 800;
   letter-spacing: 0.12em;
   color: #dff4ff;
@@ -821,8 +951,8 @@ const themeName = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 0 18px;
+  gap: clamp(8px, 4cqw, 14px);
+  padding: 0 clamp(14px, 4cqw, 22px);
 }
 
 .decor-divider__tail,
@@ -832,7 +962,7 @@ const themeName = computed(() => {
 }
 
 .decor-divider__tail {
-  width: 52px;
+  width: clamp(34px, 11cqw, 56px);
   opacity: 0.5;
 }
 
@@ -841,8 +971,8 @@ const themeName = computed(() => {
 }
 
 .decor-divider__core {
-  width: 18px;
-  height: 18px;
+  width: clamp(14px, 7cqh, 20px);
+  height: clamp(14px, 7cqh, 20px);
   border-radius: 50%;
   border: 1px solid rgba(122, 214, 255, 0.9);
   background: radial-gradient(circle, rgba(139, 231, 255, 0.95) 0%, rgba(77, 179, 255, 0.55) 48%, rgba(77, 179, 255, 0.08) 100%);
@@ -863,18 +993,18 @@ const themeName = computed(() => {
 }
 
 .decor-target__ring--outer {
-  width: min(72%, 180px);
+  width: min(76%, 186px);
   aspect-ratio: 1;
 }
 
 .decor-target__ring--middle {
-  width: min(48%, 120px);
+  width: min(54%, 132px);
   aspect-ratio: 1;
   border-style: dashed;
 }
 
 .decor-target__ring--inner {
-  width: min(24%, 56px);
+  width: min(30%, 64px);
   aspect-ratio: 1;
   background: radial-gradient(circle, rgba(94, 211, 255, 0.24), transparent 70%);
 }
@@ -885,18 +1015,18 @@ const themeName = computed(() => {
 }
 
 .decor-target__cross--h {
-  width: 70%;
+  width: 74%;
   height: 1px;
 }
 
 .decor-target__cross--v {
   width: 1px;
-  height: 70%;
+  height: 74%;
 }
 
 .decor-target__dot {
-  width: 8px;
-  height: 8px;
+  width: clamp(6px, 4cqh, 10px);
+  height: clamp(6px, 4cqh, 10px);
   border-radius: 50%;
   background: #8fe8ff;
   box-shadow: 0 0 14px rgba(143, 232, 255, 0.9);
@@ -972,7 +1102,7 @@ const themeName = computed(() => {
 
 .decor-hex__halo {
   position: absolute;
-  width: min(54%, 150px);
+  width: min(60%, 164px);
   aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(77, 179, 255, 0.2), transparent 68%);
@@ -981,7 +1111,7 @@ const themeName = computed(() => {
 
 .decor-hex__core {
   position: relative;
-  width: min(42%, 118px);
+  width: min(50%, 138px);
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -994,7 +1124,7 @@ const themeName = computed(() => {
 
 .decor-hex__inner {
   position: absolute;
-  inset: 14px;
+  inset: clamp(12px, 6cqw, 18px);
   clip-path: inherit;
   border: 1px solid rgba(126, 214, 255, 0.3);
 }
@@ -1003,7 +1133,7 @@ const themeName = computed(() => {
   position: relative;
   z-index: 1;
   color: #dff6ff;
-  font-size: 14px;
+  font-size: clamp(14px, 9cqh, 18px);
   font-weight: 800;
   letter-spacing: 0.22em;
 }
@@ -1026,7 +1156,8 @@ const themeName = computed(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: clamp(8px, 5cqh, 14px);
+  padding: clamp(10px, 8cqh, 18px);
   overflow: hidden;
 }
 
@@ -1041,8 +1172,8 @@ const themeName = computed(() => {
 .icon-shell__stage {
   position: relative;
   z-index: 1;
-  width: 90px;
-  height: 90px;
+  width: clamp(76px, 54cqw, 110px);
+  height: clamp(76px, 54cqw, 110px);
   color: var(--static-widget-accent-color, #4db3ff);
   filter: drop-shadow(0 0 18px rgba(77, 179, 255, 0.26));
   animation: iconStageFloat 3.6s ease-in-out infinite;
@@ -1054,13 +1185,45 @@ const themeName = computed(() => {
 }
 
 .icon-shell__label {
-  font-size: 16px;
+  font-size: clamp(12px, 9cqh, 16px);
   font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .icon-shell__meta {
-  font-size: 12px;
+  font-size: clamp(10px, 6cqh, 12px);
   color: var(--static-widget-muted-color, rgba(24, 50, 77, 0.72));
+}
+
+.icon-shell--compact {
+  gap: clamp(4px, 3cqh, 8px);
+  padding: clamp(6px, 6cqh, 10px);
+}
+
+.icon-shell--compact .icon-shell__stage {
+  width: clamp(40px, 42cqw, 58px);
+  height: clamp(40px, 42cqw, 58px);
+}
+
+.icon-shell--focus .icon-shell__stage {
+  width: clamp(92px, 58cqw, 130px);
+  height: clamp(92px, 58cqw, 130px);
+}
+
+.icon-shell--feature-md .icon-shell__stage {
+  width: clamp(76px, 56cqw, 98px);
+  height: clamp(76px, 56cqw, 98px);
+}
+
+.icon-shell--feature-lg .icon-shell__stage {
+  width: clamp(88px, 58cqw, 114px);
+  height: clamp(88px, 58cqw, 114px);
+}
+
+.icon-shell--ribbon .icon-shell__stage {
+  width: clamp(72px, 50cqh, 96px);
+  height: clamp(72px, 50cqh, 96px);
 }
 
 .time-shell {
@@ -1124,12 +1287,32 @@ const themeName = computed(() => {
 }
 
 .link-shell__title,
+.frame-shell__title,
+.time-shell__title,
+.qr-shell__title,
 .text-shell__title,
 .metric-shell__title,
 .list-shell__title,
+.cloud-shell__title,
 .trend-shell__title {
-  font-size: 14px;
+  font-size: var(--static-widget-title-font-size, 16px);
+  line-height: 1.3;
   font-weight: 700;
+}
+
+.frame-shell__title,
+.time-shell__title,
+.qr-shell__title,
+.cloud-shell__title {
+  text-align: center;
+}
+
+.frame-shell__title {
+  padding: 12px 12px 0;
+}
+
+.cloud-shell__title {
+  flex-basis: 100%;
 }
 
 .link-shell__url {
@@ -1171,7 +1354,7 @@ const themeName = computed(() => {
 
 .frame-shell__tab--active {
   background: rgba(77, 179, 255, 0.18);
-  color: #4db3ff;
+  color: var(--static-widget-accent-color, #4db3ff);
 }
 
 .frame-shell__iframe {
@@ -1189,7 +1372,7 @@ const themeName = computed(() => {
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  color: rgba(255,255,255,0.35);
+  color: var(--static-widget-muted-color, rgba(24, 50, 77, 0.72));
 }
 
 .frame-shell__bar {
@@ -1232,12 +1415,14 @@ const themeName = computed(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 12px;
+  gap: clamp(8px, 4cqh, 14px);
+  padding: clamp(14px, 8cqh, 22px);
+  box-sizing: border-box;
 }
 
 .text-shell__paragraph {
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: clamp(13px, 8cqh, 18px);
+  line-height: 1.72;
   color: inherit;
   opacity: 0.82;
 }
@@ -1246,21 +1431,45 @@ const themeName = computed(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: clamp(6px, 3cqh, 10px);
+  padding: clamp(12px, 8cqh, 20px);
+  box-sizing: border-box;
+}
+
+.metric-shell--single-field {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: clamp(8px, 4cqh, 12px);
+  padding: clamp(16px, 10cqh, 24px);
+}
+
+.metric-shell--flipper {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: clamp(8px, 4cqh, 12px);
 }
 
 .metric-shell__value {
-  font-size: 34px;
+  font-size: var(--static-widget-metric-font-size, 36px);
+  line-height: 1.02;
   font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--static-widget-accent-color, #4db3ff);
 }
 
+.metric-shell--single-field .metric-shell__value {
+  font-size: calc(var(--static-widget-metric-font-size, 36px) * 1.18);
+}
+
 .metric-shell__value--flipper {
-  letter-spacing: 0.08em;
+  font-size: calc(var(--static-widget-metric-font-size, 36px) * 1.05);
+  letter-spacing: 0.06em;
 }
 
 .metric-shell__trend {
-  font-size: 13px;
+  font-size: clamp(12px, 8cqh, 15px);
   color: var(--static-widget-muted-color, rgba(24, 50, 77, 0.72));
 }
 
@@ -1272,16 +1481,19 @@ const themeName = computed(() => {
 .list-shell {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  justify-content: center;
+  gap: clamp(8px, 4cqh, 12px);
+  padding: clamp(12px, 7cqh, 18px);
+  box-sizing: border-box;
 }
 
 .list-shell__row {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: clamp(8px, 3cqw, 12px);
   align-items: center;
-  padding: 8px 10px;
-  border-radius: 10px;
+  padding: clamp(8px, 4cqh, 12px) clamp(10px, 4cqw, 14px);
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -1290,23 +1502,29 @@ const themeName = computed(() => {
 }
 
 .list-shell__index {
-  font-size: 12px;
+  font-size: clamp(11px, 6cqh, 14px);
   font-weight: 700;
   color: var(--static-widget-accent-color, #4db3ff);
 }
 
 .list-shell__thumb {
-  width: 34px;
-  height: 22px;
+  width: clamp(34px, 12cqw, 48px);
+  height: clamp(22px, 8cqh, 32px);
   border-radius: 6px;
   background: linear-gradient(135deg, rgba(77, 179, 255, 0.8), rgba(114, 92, 255, 0.72));
 }
 
 .list-shell__label {
   min-width: 0;
+  font-size: clamp(12px, 7cqh, 15px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.list-shell__value {
+  font-size: clamp(12px, 7cqh, 15px);
+  font-weight: 700;
 }
 
 .cloud-shell {
@@ -1328,15 +1546,17 @@ const themeName = computed(() => {
 .trend-shell {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: clamp(10px, 5cqh, 16px);
+  padding: clamp(14px, 8cqh, 20px);
+  box-sizing: border-box;
 }
 
 .trend-shell__bars {
   flex: 1;
   display: flex;
   align-items: end;
-  gap: 10px;
-  min-height: 120px;
+  gap: clamp(8px, 3cqw, 12px);
+  min-height: clamp(96px, 52cqh, 148px);
 }
 
 .trend-shell__bar {
@@ -1347,8 +1567,8 @@ const themeName = computed(() => {
 
 .trend-shell__axis {
   display: flex;
-  gap: 10px;
-  font-size: 11px;
+  gap: clamp(8px, 3cqw, 12px);
+  font-size: clamp(11px, 6cqh, 13px);
   color: var(--static-widget-muted-color, rgba(24, 50, 77, 0.72));
 }
 

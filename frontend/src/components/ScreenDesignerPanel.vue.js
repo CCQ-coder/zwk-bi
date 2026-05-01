@@ -8,9 +8,9 @@ import { addDashboardComponent, createDashboard, deleteDashboard, getDashboardBy
 import { createChart, getChartData, getChartList } from '../api/chart';
 import { createTemplate, getTemplateList } from '../api/chart-template';
 import { getDatasetList } from '../api/dataset';
-import { buildComponentAssetConfig, buildChartSnapshot, buildComponentConfig, buildComponentOption, chartTypeLabel, getChartFieldLabels, getConfiguredTableRows, getConfiguredTableStepCount, getMissingChartFields, isCanvasRenderableChartType, isDecorationChartType, isStaticWidgetChartType, isVectorIconChartType, mergeComponentRequestFilters, normalizeRuntimeChartData, normalizeComponentAssetConfig, normalizeComponentConfig, postProcessChartOption, resolveConfiguredTableColumns, } from '../utils/component-config';
+import { buildComponentAssetConfig, buildChartSnapshot, buildComponentConfig, buildComponentOption, chartTypeLabel, DEFAULT_COMPONENT_STYLE, getChartFieldLabels, getConfiguredTableRows, getConfiguredTableStepCount, getMissingChartFields, isCanvasRenderableChartType, isDecorationChartType, isStaticWidgetChartType, isVectorIconChartType, mergeComponentRequestFilters, normalizeRuntimeChartData, normalizeComponentAssetConfig, normalizeComponentConfig, postProcessChartOption, resolveConfiguredTableColumns, STYLE_DECORATION_STYLE_PRESETS, } from '../utils/component-config';
 import { echarts } from '../utils/echarts';
-import { buildPublishedLink, buildReportConfig, normalizeCanvasConfig, normalizeCoverConfig, normalizePublishConfig, parseReportConfig, SCREEN_CANVAS_PRESETS, } from '../utils/report-config';
+import { buildPublishedLink, buildReportConfig, normalizeCanvasConfig, normalizeCoverConfig, normalizePublishConfig, parseReportConfig, SCREEN_COMPONENT_MIN_HEIGHT, SCREEN_COMPONENT_MIN_WIDTH, SCREEN_CANVAS_PRESETS, } from '../utils/report-config';
 import { uploadImage } from '../api/upload';
 const AsyncComponentTemplatePreview = defineAsyncComponent(() => import('./ComponentTemplatePreview.vue'));
 const AsyncEditorComponentInspector = defineAsyncComponent(() => import('./EditorComponentInspector.vue'));
@@ -18,6 +18,72 @@ const props = withDefaults(defineProps(), {
     screenId: null,
 });
 const emit = defineEmits();
+const STATIC_TEMPLATE_LAYOUT_MATRIX = {
+    panel: {
+        frame: { width: 520, height: 220 },
+        surface: { width: 520, height: 260 },
+        iframe: { width: 520, height: 320 },
+        iframeTabs: { width: 560, height: 340 },
+        copy: { width: 460, height: 240 },
+        ranking: { width: 460, height: 280 },
+        list: { width: 460, height: 260 },
+        wordCloud: { width: 420, height: 260 },
+        media: { width: 480, height: 300 },
+        trend: { width: 400, height: 220 },
+    },
+    card: {
+        metric: { width: 360, height: 200 },
+        info: { width: 360, height: 180 },
+        link: { width: 420, height: 180 },
+        square: { width: 280, height: 280 },
+    },
+    accent: {
+        banner: { width: 420, height: 96 },
+        strip: { width: 520, height: 64 },
+        focus: { width: 220, height: 220 },
+        shapeRect: { width: 300, height: 150 },
+        shapeCircle: { width: 180, height: 180 },
+        compactIcon: { width: 120, height: 120 },
+        featureIconMd: { width: 160, height: 160 },
+        featureIconLg: { width: 180, height: 180 },
+        ribbon: { width: 180, height: 120 },
+    },
+};
+const STATIC_TEMPLATE_LEGACY_LAYOUT_MATRIX = {
+    panel: {
+        frame: { width: 520, height: 220 },
+        surface: { width: 520, height: 260 },
+        iframe: { width: 520, height: 320 },
+        iframeTabs: { width: 560, height: 340 },
+        copy: { width: 420, height: 220 },
+        ranking: { width: 420, height: 260 },
+        list: { width: 420, height: 240 },
+        wordCloud: { width: 420, height: 260 },
+        media: { width: 440, height: 260 },
+        trend: { width: 420, height: 240 },
+    },
+    card: {
+        metric: { width: 320, height: 180 },
+        info: { width: 360, height: 180 },
+        link: { width: 420, height: 180 },
+        square: { width: 280, height: 280 },
+    },
+    accent: {
+        banner: { width: 420, height: 96 },
+        strip: { width: 520, height: 64 },
+        focus: { width: 220, height: 220 },
+        shapeRect: { width: 300, height: 150 },
+        shapeCircle: { width: 180, height: 180 },
+        compactIcon: { width: 120, height: 120 },
+        featureIconMd: { width: 160, height: 160 },
+        featureIconLg: { width: 180, height: 180 },
+        ribbon: { width: 180, height: 120 },
+    },
+};
+const resolveStaticAssetLayout = (group, profile, matrix = STATIC_TEMPLATE_LAYOUT_MATRIX) => {
+    const layout = matrix[group]?.[profile];
+    return layout ? { width: layout.width, height: layout.height } : { width: 520, height: 320 };
+};
 const makeBarComboIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="18" width="6" height="10" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="18" fill="currentColor" rx="1"/><rect x="20" y="14" width="6" height="14" fill="currentColor" rx="1"/><rect x="28" y="6" width="6" height="22" fill="currentColor" rx="1"/><polyline points="7,12 15,8 23,11 31,4" fill="none" stroke="currentColor" stroke-width="2" opacity=".7" stroke-linecap="round"/></svg>`;
 const makeHeatmapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="7" height="7" fill="currentColor" opacity=".9" rx="1"/><rect x="13" y="4" width="7" height="7" fill="currentColor" opacity=".5" rx="1"/><rect x="22" y="4" width="7" height="7" fill="currentColor" opacity=".2" rx="1"/><rect x="31" y="4" width="7" height="7" fill="currentColor" opacity=".7" rx="1"/><rect x="4" y="13" width="7" height="7" fill="currentColor" opacity=".3" rx="1"/><rect x="13" y="13" width="7" height="7" fill="currentColor" opacity=".8" rx="1"/><rect x="22" y="13" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="31" y="13" width="7" height="7" fill="currentColor" opacity=".15" rx="1"/><rect x="4" y="22" width="7" height="7" fill="currentColor" opacity=".6" rx="1"/><rect x="13" y="22" width="7" height="7" fill="currentColor" opacity=".25" rx="1"/><rect x="22" y="22" width="7" height="7" fill="currentColor" opacity=".95" rx="1"/><rect x="31" y="22" width="7" height="7" fill="currentColor" opacity=".4" rx="1"/></svg>`;
 const makeMapIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M5,6 L15,4 L25,8 L35,5 L35,26 L25,23 L15,27 L5,25 Z" fill="currentColor" opacity=".3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M15,4 L15,27" stroke="currentColor" stroke-width="1" opacity=".5"/><path d="M25,8 L25,23" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="22" cy="13" r="3" fill="currentColor" opacity=".8"/></svg>`;
@@ -50,6 +116,8 @@ const makeDecorDividerIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w
 const makeDecorTargetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".68"/><circle cx="20" cy="16" r="5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".4"/><path d="M20 4V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M20 22V28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 16H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M26 16H32" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 const makeDecorScanIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="currentColor" opacity=".08" stroke="currentColor" stroke-width="1.4"/><path d="M9 12H31" stroke="currentColor" stroke-width="2" opacity=".72"/><path d="M9 18H31" stroke="currentColor" stroke-width="1" opacity=".32"/><path d="M9 24H23" stroke="currentColor" stroke-width="1" opacity=".22"/></svg>`;
 const makeDecorHexIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M15 5H25L32 16L25 27H15L8 16Z" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="1.4"/><path d="M18 11H22L25 16L22 21H18L15 16Z" fill="currentColor" opacity=".55"/></svg>`;
+const makeDecorRectShapeIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="7" width="26" height="18" rx="4" fill="currentColor" opacity=".22" stroke="currentColor" stroke-width="1.5"/><path d="M11 12H29" stroke="currentColor" stroke-width="1.3" opacity=".48"/><path d="M11 20H24" stroke="currentColor" stroke-width="1.3" opacity=".3"/></svg>`;
+const makeDecorCircleShapeIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="16" r="10" fill="currentColor" opacity=".22" stroke="currentColor" stroke-width="1.5"/><circle cx="20" cy="16" r="4" fill="currentColor" opacity=".5"/></svg>`;
 const makeDecorPanelIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/><path d="M9 9H18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M24 9H31V16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M29 20V23H25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const makeDecorStreamIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"/><path d="M8 10H24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 22H32" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".75"/></svg>`;
 const makeDecorPulseIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="7" width="26" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".24"/><path d="M13 11H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M22 11H27" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M13 21H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M22 21H27" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M11 13V19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M29 13V19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><circle cx="13" cy="11" r="1.4" fill="currentColor" opacity=".86"/><circle cx="27" cy="11" r="1.4" fill="currentColor" opacity=".86"/><circle cx="13" cy="21" r="1.4" fill="currentColor" opacity=".86"/><circle cx="27" cy="21" r="1.4" fill="currentColor" opacity=".86"/></svg>`;
@@ -148,6 +216,8 @@ const DECORATION_COMPONENT_ITEMS = [
     createTypeItem('decor_target_ring', makeDecorTargetIcon()),
     createTypeItem('decor_scan_panel', makeDecorScanIcon()),
     createTypeItem('decor_hex_badge', makeDecorHexIcon()),
+    createTypeItem('decor_shape_rect', makeDecorRectShapeIcon()),
+    createTypeItem('decor_shape_circle', makeDecorCircleShapeIcon()),
 ];
 const TEXT_COMPONENT_ITEMS = [
     createTypeItem('text_block', makeTextBlockIcon()),
@@ -242,6 +312,7 @@ const getTypeChipPreviewChartConfig = (type) => {
     }
     return cached;
 };
+const getTypeChipPreviewStyleConfig = (type) => STYLE_DECORATION_STYLE_PRESETS[type];
 // 缓存模板/组件配置解析结果，避免 v-for 内多次 JSON.parse
 const _templateConfigCache = new WeakMap();
 const getTemplateAssetConfig = (template) => {
@@ -253,68 +324,84 @@ const getTemplateAssetConfig = (template) => {
     return cached;
 };
 const isTemplateStaticAsset = (template) => isStaticWidgetChartType(getTemplateAssetConfig(template).chart.chartType || template.chartType);
-const STATIC_TEMPLATE_LIBRARY = [
-    { type: 'decor_border_frame', name: '边框1', description: '基础外框边界，适合做模块包裹。', layout: { width: 520, height: 220 } },
-    { type: 'decor_border_corner', name: '边框2', description: '四角强调型边框。', layout: { width: 520, height: 220 } },
-    { type: 'decor_border_glow', name: '边框3', description: '带发光效果的高亮边框。', layout: { width: 520, height: 220 } },
-    { type: 'decor_border_grid', name: '边框4', description: '带网格和刻度肌理的科技边框。', layout: { width: 520, height: 220 } },
-    { type: 'decor_border_stream', name: '边框5', description: '带流光扫过效果的动效边框。', layout: { width: 520, height: 220 } },
-    { type: 'decor_border_pulse', name: '边框6', description: '带脉冲感的提示边框。', layout: { width: 520, height: 220 } },
-    { type: 'decor_border_bracket', name: '边框7', description: '结构支架感边框。', layout: { width: 520, height: 220 } },
-    { type: 'decor_border_circuit', name: '边框8', description: '链路电路风格边框。', layout: { width: 520, height: 220 } },
-    { type: 'decor_border_panel', name: '边框9', description: '折角面板风格边框。', layout: { width: 520, height: 220 } },
-    { type: 'decor_title_plate', name: '标题牌', description: '适合章节标题、指标模块抬头和栏位标识。', layout: { width: 420, height: 96 } },
-    { type: 'decor_divider_glow', name: '发光分隔条', description: '适合区块之间的节奏分隔和视觉导向。', layout: { width: 520, height: 64 } },
-    { type: 'decor_target_ring', name: '目标环', description: '适合重点指标、地图落点和雷达锁定效果。', layout: { width: 220, height: 220 } },
-    { type: 'decor_scan_panel', name: '扫描面板', description: '带扫描流光的科技底板，可作为信息区背景。', layout: { width: 520, height: 260 } },
-    { type: 'decor_hex_badge', name: '六边形徽记', description: '适合中心徽章、状态标签和图标承载。', layout: { width: 220, height: 220 } },
-    { type: 'text_block', name: '文本组件', description: '用于公告、说明和长文本排版。', layout: { width: 420, height: 220 } },
-    { type: 'single_field', name: '单字段组件', description: '适合展示单值和摘要。', layout: { width: 320, height: 180 } },
-    { type: 'number_flipper', name: '数字翻牌器', description: '适合大屏 KPI 强调。', layout: { width: 320, height: 180 } },
-    { type: 'table_rank', name: '排名表格', description: '适合榜单和排名列表。', layout: { width: 420, height: 260 } },
-    { type: 'iframe_single', name: '单页 iframe', description: '嵌入单个外部页面。', layout: { width: 520, height: 320 } },
-    { type: 'iframe_tabs', name: '页签 iframe', description: '适合多页面切换展示。', layout: { width: 560, height: 340 } },
-    { type: 'hyperlink', name: '超级链接', description: '适合门户跳转和深链入口。', layout: { width: 420, height: 180 } },
-    { type: 'image_list', name: '图片列表', description: '适合图文卡片流。', layout: { width: 440, height: 260 } },
-    { type: 'text_list', name: '文字列表', description: '适合公告、列表和摘要。', layout: { width: 420, height: 240 } },
-    { type: 'clock_display', name: '显示时间', description: '实时展示当前日期与时间。', layout: { width: 360, height: 180 } },
-    { type: 'word_cloud', name: '词云图', description: '展示业务高频关键词。', layout: { width: 420, height: 260 } },
-    { type: 'qr_code', name: '二维码', description: '适合扫码跳转和分享。', layout: { width: 280, height: 280 } },
-    { type: 'business_trend', name: '业务趋势', description: '适合轻量趋势占位和摘要。', layout: { width: 420, height: 240 } },
-    { type: 'metric_indicator', name: '指标组件', description: '适合关键经营指标展示。', layout: { width: 320, height: 180 } },
-    { type: 'icon_arrow_trend', name: '趋势箭头图标', description: '用于强调涨跌趋势。', layout: { width: 220, height: 220 } },
-    { type: 'icon_warning_badge', name: '预警图标', description: '适合告警和异常提醒。', layout: { width: 220, height: 220 } },
-    { type: 'icon_location_pin', name: '定位图标', description: '适合地图和区域说明。', layout: { width: 220, height: 220 } },
-    { type: 'icon_data_signal', name: '数据信号图标', description: '适合状态和联通性提示。', layout: { width: 220, height: 220 } },
-    { type: 'icon_user_badge', name: '用户徽章图标', description: '适合人物、角色和身份展示。', layout: { width: 220, height: 220 } },
-    { type: 'icon_chart_mark', name: '图表标记图标', description: '适合图例和图表注记。', layout: { width: 220, height: 220 } },
-    { type: 'icon_plus', name: '加号', description: '用于新增和叠加提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_minus', name: '减号', description: '用于收起和减弱提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_search', name: '搜索', description: '用于检索和放大提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_focus_frame', name: '聚焦框', description: '用于聚焦和框选区域提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_home_badge', name: '主页', description: '用于门户和首页标识。', layout: { width: 140, height: 140 } },
-    { type: 'icon_share_nodes', name: '分享', description: '用于分享传播和连接提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_link_chain', name: '链接', description: '用于链路与跳转提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_message_chat', name: '消息', description: '用于评论和消息提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_eye_watch', name: '可视', description: '用于可见状态和查看提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_lock_safe', name: '锁定', description: '用于权限和安全提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_bell_notice', name: '铃铛', description: '用于通知和提醒入口。', layout: { width: 140, height: 140 } },
-    { type: 'icon_user_profile', name: '用户', description: '用于用户身份标识。', layout: { width: 140, height: 140 } },
-    { type: 'icon_check_mark', name: '勾选', description: '用于通过和完成状态。', layout: { width: 140, height: 140 } },
-    { type: 'icon_alert_mark', name: '提醒', description: '用于警示和注意提示。', layout: { width: 140, height: 140 } },
-    { type: 'icon_close_mark', name: '关闭', description: '用于关闭和移除动作。', layout: { width: 140, height: 140 } },
-    { type: 'icon_settings_gear', name: '设置', description: '用于参数与系统设置入口。', layout: { width: 140, height: 140 } },
-    { type: 'icon_chevron_double', name: '双箭头', description: '适合流程引导、方向强调和切换提示。', layout: { width: 160, height: 160 } },
-    { type: 'icon_orbit_ring', name: '轨道环', description: '适合中心视觉、指标环绕和焦点装饰。', layout: { width: 180, height: 180 } },
-    { type: 'icon_compass_star', name: '星芒标', description: '适合目标点、中心徽标和章节强调。', layout: { width: 180, height: 180 } },
-    { type: 'icon_database_stack', name: '数据仓', description: '适合仓储、底座和数据中心语义提示。', layout: { width: 180, height: 180 } },
-    { type: 'icon_shield_guard', name: '安全盾牌', description: '适合权限、安全和守护状态提示。', layout: { width: 160, height: 160 } },
-    { type: 'icon_lightning_bolt', name: '闪电', description: '适合速度、告警和瞬时动作强调。', layout: { width: 160, height: 160 } },
-    { type: 'icon_globe_grid', name: '地球网格', description: '适合全球视角、网络和空间连接表达。', layout: { width: 180, height: 180 } },
-    { type: 'icon_radar_pulse', name: '雷达脉冲', description: '适合扫描、侦测和动态响应提示。', layout: { width: 180, height: 180 } },
-    { type: 'icon_cube_wire', name: '立方线框', description: '适合模型、容器和模块化结构表达。', layout: { width: 180, height: 180 } },
-    { type: 'icon_wave_ribbon', name: '波纹带', description: '适合流向、波动和连续态势装饰。', layout: { width: 180, height: 120 } },
+const STATIC_TEMPLATE_SIZE_DEFINITIONS = [
+    { type: 'decor_border_frame', name: '边框1', description: '基础外框边界，适合做模块包裹。', sizeGroup: 'panel', sizeProfile: 'frame' },
+    { type: 'decor_border_corner', name: '边框2', description: '四角强调型边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+    { type: 'decor_border_glow', name: '边框3', description: '带发光效果的高亮边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+    { type: 'decor_border_grid', name: '边框4', description: '带网格和刻度肌理的科技边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+    { type: 'decor_border_stream', name: '边框5', description: '带流光扫过效果的动效边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+    { type: 'decor_border_pulse', name: '边框6', description: '带脉冲感的提示边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+    { type: 'decor_border_bracket', name: '边框7', description: '结构支架感边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+    { type: 'decor_border_circuit', name: '边框8', description: '链路电路风格边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+    { type: 'decor_border_panel', name: '边框9', description: '折角面板风格边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+    { type: 'decor_scan_panel', name: '扫描面板', description: '带扫描流光的科技底板，可作为信息区背景。', sizeGroup: 'panel', sizeProfile: 'surface' },
+    { type: 'text_block', name: '文本组件', description: '用于公告、说明和长文本排版。', sizeGroup: 'panel', sizeProfile: 'copy' },
+    { type: 'table_rank', name: '排名表格', description: '适合榜单和排名列表。', sizeGroup: 'panel', sizeProfile: 'ranking' },
+    { type: 'iframe_single', name: '单页 iframe', description: '嵌入单个外部页面。', sizeGroup: 'panel', sizeProfile: 'iframe' },
+    { type: 'iframe_tabs', name: '页签 iframe', description: '适合多页面切换展示。', sizeGroup: 'panel', sizeProfile: 'iframeTabs' },
+    { type: 'image_list', name: '图片列表', description: '适合图文卡片流。', sizeGroup: 'panel', sizeProfile: 'media' },
+    { type: 'text_list', name: '文字列表', description: '适合公告、列表和摘要。', sizeGroup: 'panel', sizeProfile: 'list' },
+    { type: 'word_cloud', name: '词云图', description: '展示业务高频关键词。', sizeGroup: 'panel', sizeProfile: 'wordCloud' },
+    { type: 'business_trend', name: '业务趋势', description: '适合轻量趋势占位和摘要。', sizeGroup: 'panel', sizeProfile: 'trend' },
+    { type: 'single_field', name: '单字段组件', description: '适合展示单值和摘要。', sizeGroup: 'card', sizeProfile: 'metric' },
+    { type: 'number_flipper', name: '数字翻牌器', description: '适合大屏 KPI 强调。', sizeGroup: 'card', sizeProfile: 'metric' },
+    { type: 'metric_indicator', name: '指标组件', description: '适合关键经营指标展示。', sizeGroup: 'card', sizeProfile: 'metric' },
+    { type: 'clock_display', name: '显示时间', description: '实时展示当前日期与时间。', sizeGroup: 'card', sizeProfile: 'info' },
+    { type: 'hyperlink', name: '超级链接', description: '适合门户跳转和深链入口。', sizeGroup: 'card', sizeProfile: 'link' },
+    { type: 'qr_code', name: '二维码', description: '适合扫码跳转和分享。', sizeGroup: 'card', sizeProfile: 'square' },
+    { type: 'decor_title_plate', name: '标题牌', description: '适合章节标题、指标模块抬头和栏位标识。', sizeGroup: 'accent', sizeProfile: 'banner' },
+    { type: 'decor_divider_glow', name: '发光分隔条', description: '适合区块之间的节奏分隔和视觉导向。', sizeGroup: 'accent', sizeProfile: 'strip' },
+    { type: 'decor_target_ring', name: '目标环', description: '适合重点指标、地图落点和雷达锁定效果。', sizeGroup: 'accent', sizeProfile: 'focus' },
+    { type: 'decor_hex_badge', name: '六边形徽记', description: '适合中心徽章、状态标签和图标承载。', sizeGroup: 'accent', sizeProfile: 'focus' },
+    { type: 'decor_shape_rect', name: '矩形', description: '只保留样式属性的基础矩形底板。', sizeGroup: 'accent', sizeProfile: 'shapeRect' },
+    { type: 'decor_shape_circle', name: '圆形', description: '只保留样式属性的基础圆形底板。', sizeGroup: 'accent', sizeProfile: 'shapeCircle' },
+    { type: 'icon_arrow_trend', name: '趋势箭头图标', description: '用于强调涨跌趋势。', sizeGroup: 'accent', sizeProfile: 'focus' },
+    { type: 'icon_warning_badge', name: '预警图标', description: '适合告警和异常提醒。', sizeGroup: 'accent', sizeProfile: 'focus' },
+    { type: 'icon_location_pin', name: '定位图标', description: '适合地图和区域说明。', sizeGroup: 'accent', sizeProfile: 'focus' },
+    { type: 'icon_data_signal', name: '数据信号图标', description: '适合状态和联通性提示。', sizeGroup: 'accent', sizeProfile: 'focus' },
+    { type: 'icon_user_badge', name: '用户徽章图标', description: '适合人物、角色和身份展示。', sizeGroup: 'accent', sizeProfile: 'focus' },
+    { type: 'icon_chart_mark', name: '图表标记图标', description: '适合图例和图表注记。', sizeGroup: 'accent', sizeProfile: 'focus' },
+    { type: 'icon_plus', name: '加号', description: '用于新增和叠加提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_minus', name: '减号', description: '用于收起和减弱提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_search', name: '搜索', description: '用于检索和放大提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_focus_frame', name: '聚焦框', description: '用于聚焦和框选区域提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_home_badge', name: '主页', description: '用于门户和首页标识。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_share_nodes', name: '分享', description: '用于分享传播和连接提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_link_chain', name: '链接', description: '用于链路与跳转提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_message_chat', name: '消息', description: '用于评论和消息提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_eye_watch', name: '可视', description: '用于可见状态和查看提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_lock_safe', name: '锁定', description: '用于权限和安全提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_bell_notice', name: '铃铛', description: '用于通知和提醒入口。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_user_profile', name: '用户', description: '用于用户身份标识。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_check_mark', name: '勾选', description: '用于通过和完成状态。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_alert_mark', name: '提醒', description: '用于警示和注意提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_close_mark', name: '关闭', description: '用于关闭和移除动作。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_settings_gear', name: '设置', description: '用于参数与系统设置入口。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+    { type: 'icon_chevron_double', name: '双箭头', description: '适合流程引导、方向强调和切换提示。', sizeGroup: 'accent', sizeProfile: 'featureIconMd' },
+    { type: 'icon_orbit_ring', name: '轨道环', description: '适合中心视觉、指标环绕和焦点装饰。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+    { type: 'icon_compass_star', name: '星芒标', description: '适合目标点、中心徽标和章节强调。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+    { type: 'icon_database_stack', name: '数据仓', description: '适合仓储、底座和数据中心语义提示。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+    { type: 'icon_shield_guard', name: '安全盾牌', description: '适合权限、安全和守护状态提示。', sizeGroup: 'accent', sizeProfile: 'featureIconMd' },
+    { type: 'icon_lightning_bolt', name: '闪电', description: '适合速度、告警和瞬时动作强调。', sizeGroup: 'accent', sizeProfile: 'featureIconMd' },
+    { type: 'icon_globe_grid', name: '地球网格', description: '适合全球视角、网络和空间连接表达。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+    { type: 'icon_radar_pulse', name: '雷达脉冲', description: '适合扫描、侦测和动态响应提示。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+    { type: 'icon_cube_wire', name: '立方线框', description: '适合模型、容器和模块化结构表达。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+    { type: 'icon_wave_ribbon', name: '波纹带', description: '适合流向、波动和连续态势装饰。', sizeGroup: 'accent', sizeProfile: 'ribbon' },
 ];
+const STATIC_TEMPLATE_LIBRARY = STATIC_TEMPLATE_SIZE_DEFINITIONS.map((item) => ({
+    type: item.type,
+    name: item.name,
+    description: item.description,
+    layout: resolveStaticAssetLayout(item.sizeGroup, item.sizeProfile),
+}));
+const LEGACY_STATIC_TEMPLATE_LAYOUTS = Object.fromEntries(STATIC_TEMPLATE_SIZE_DEFINITIONS.flatMap((item) => {
+    const legacyLayout = resolveStaticAssetLayout(item.sizeGroup, item.sizeProfile, STATIC_TEMPLATE_LEGACY_LAYOUT_MATRIX);
+    const currentLayout = resolveStaticAssetLayout(item.sizeGroup, item.sizeProfile);
+    if (legacyLayout.width === currentLayout.width && legacyLayout.height === currentLayout.height) {
+        return [];
+    }
+    return [[item.type, legacyLayout]];
+}));
 const defaultChartTemplateLayout = (chartType) => {
     const staticAsset = STATIC_TEMPLATE_LIBRARY.find((item) => item.type === chartType);
     if (staticAsset) {
@@ -376,9 +463,9 @@ const clearAssetFilters = () => {
     selectedAssetCategoryLabel.value = '';
     assetType.value = '';
 };
-const sidebarCollapsed = ref(Boolean(props.screenId));
+const sidebarCollapsed = ref(false);
 const compactEditorMode = ref(false);
-const inspectorCollapsed = ref(true);
+const inspectorCollapsed = ref(false);
 const autoFitCanvas = ref(true);
 let sidebarHoverTimer = null;
 const COMPACT_EDITOR_BREAKPOINT = 1440;
@@ -454,8 +541,15 @@ const clampLeftPanelPosition = (left, top) => {
     };
 };
 const resetLeftPanelPosition = () => {
-    leftPanelPosition.left = getLeftPanelMinLeft();
-    leftPanelPosition.top = getLeftPanelMinTop();
+    const top = getLeftPanelMinTop();
+    if (!compactEditorMode.value && typeof window !== 'undefined') {
+        // 默认停靠到右侧浮层（不占网格空间）
+        leftPanelPosition.left = Math.max(getLeftPanelMinLeft(), window.innerWidth - leftPanelWidth.value - 16);
+    }
+    else {
+        leftPanelPosition.left = getLeftPanelMinLeft();
+    }
+    leftPanelPosition.top = top;
 };
 const leftPanelStyle = computed(() => {
     const position = clampLeftPanelPosition(leftPanelPosition.left, leftPanelPosition.top);
@@ -562,6 +656,9 @@ const localStaticTemplates = computed(() => BUILTIN_TEMPLATE_LIBRARY.map((item, 
             tableCarouselInterval: 20000,
             dataRefreshInterval: 0,
         },
+        style: STYLE_DECORATION_STYLE_PRESETS[item.type]
+            ? { ...DEFAULT_COMPONENT_STYLE, ...STYLE_DECORATION_STYLE_PRESETS[item.type] }
+            : undefined,
     }, item.layout),
     builtIn: true,
     sortOrder: index + 1,
@@ -578,6 +675,7 @@ const stageScrollRef = ref(null);
 const stageScrollOffset = reactive({ left: 0, top: 0 });
 const activeCompId = ref(null);
 const selectedComponentIds = ref([]);
+const draggingCompId = ref(null);
 const dashboardSearch = ref('');
 const shareVisible = ref(false);
 const publishVisible = ref(false);
@@ -588,6 +686,7 @@ const coverSaving = ref(false);
 const capturingCover = ref(false);
 const bgImgInputRef = ref(null);
 const bgImgUploading = ref(false);
+const componentInspectorRef = ref(null);
 const libraryTab = ref('templates');
 const assetSearch = ref('');
 const assetType = ref('');
@@ -797,8 +896,15 @@ const startCurtainResize = (e, handle) => {
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
 };
-const MIN_CARD_WIDTH = 160;
-const MIN_CARD_HEIGHT = 120;
+const MIN_CARD_WIDTH = SCREEN_COMPONENT_MIN_WIDTH;
+const MIN_CARD_HEIGHT = SCREEN_COMPONENT_MIN_HEIGHT;
+const COMPACT_VECTOR_ICON_TYPES = new Set(STATIC_TEMPLATE_LIBRARY
+    .filter((item) => isVectorIconChartType(item.type) && item.layout.width <= 140 && item.layout.height <= 140)
+    .map((item) => item.type));
+const getComponentMinLayout = (_chartType) => ({
+    width: MIN_CARD_WIDTH,
+    height: MIN_CARD_HEIGHT,
+});
 const LEGACY_GRID_COL_PX = 42;
 const LEGACY_GRID_ROW_PX = 70;
 const chartTypeOptions = Array.from(new Map(CHART_CATEGORIES
@@ -1035,39 +1141,62 @@ const getDashboardCoverUrl = (dashboard) => normalizeCoverConfig(parseReportConf
 const normalizeLayout = (component) => {
     const rawWidth = Number(component.width) || 0;
     const rawHeight = Number(component.height) || 0;
+    const chartType = getComponentChartConfig(component).chartType ?? '';
+    const minLayout = getComponentMinLayout(chartType);
     const isLegacyGridLayout = rawWidth > 0 && rawHeight > 0 && (rawWidth <= 24 || rawHeight <= 12);
     if (isLegacyGridLayout) {
         if (rawWidth <= 24)
-            component.width = Math.max(MIN_CARD_WIDTH, rawWidth * LEGACY_GRID_COL_PX);
+            component.width = Math.max(minLayout.width, rawWidth * LEGACY_GRID_COL_PX);
         if (rawHeight <= 12)
-            component.height = Math.max(MIN_CARD_HEIGHT, rawHeight * LEGACY_GRID_ROW_PX);
+            component.height = Math.max(minLayout.height, rawHeight * LEGACY_GRID_ROW_PX);
         if ((Number(component.posX) || 0) <= 24)
             component.posX = (Number(component.posX) || 0) * LEGACY_GRID_COL_PX;
         if ((Number(component.posY) || 0) <= 24)
             component.posY = (Number(component.posY) || 0) * LEGACY_GRID_ROW_PX;
     }
-    const chartType = getComponentChartConfig(component).chartType ?? '';
     const preferredLayout = defaultChartTemplateLayout(chartType);
+    const legacyStaticLayout = LEGACY_STATIC_TEMPLATE_LAYOUTS[chartType];
     const shouldNormalizeStaticFallbackSize = rawWidth === 520 && rawHeight === 320
         && (preferredLayout.width !== 520 || preferredLayout.height !== 320)
         && (isStaticWidgetChartType(chartType) || isVectorIconChartType(chartType));
+    const shouldNormalizeLegacyStaticSize = !!legacyStaticLayout
+        && rawWidth === legacyStaticLayout.width
+        && rawHeight === legacyStaticLayout.height
+        && (preferredLayout.width !== legacyStaticLayout.width || preferredLayout.height !== legacyStaticLayout.height);
+    const shouldNormalizeCompactVectorIconSize = COMPACT_VECTOR_ICON_TYPES.has(chartType)
+        && rawHeight === 140
+        && (rawWidth === 140 || rawWidth === 160)
+        && preferredLayout.width === 120
+        && preferredLayout.height === 120;
     if (shouldNormalizeStaticFallbackSize) {
+        component.width = preferredLayout.width;
+        component.height = preferredLayout.height;
+    }
+    if (shouldNormalizeLegacyStaticSize) {
+        component.width = preferredLayout.width;
+        component.height = preferredLayout.height;
+    }
+    if (shouldNormalizeCompactVectorIconSize) {
         component.width = preferredLayout.width;
         component.height = preferredLayout.height;
     }
     component.posX = Math.max(0, Number(component.posX) || 0);
     component.posY = Math.max(0, Number(component.posY) || 0);
-    component.width = Math.max(MIN_CARD_WIDTH, Number(component.width) || MIN_CARD_WIDTH);
-    component.height = Math.max(MIN_CARD_HEIGHT, Number(component.height) || MIN_CARD_HEIGHT);
+    component.width = Math.max(minLayout.width, Number(component.width) || minLayout.width);
+    component.height = Math.max(minLayout.height, Number(component.height) || minLayout.height);
     component.zIndex = Number(component.zIndex) || 0;
 };
-const cloneComponentLayout = (component) => ({
-    posX: Math.max(0, Math.round(Number(component.posX) || 0)),
-    posY: Math.max(0, Math.round(Number(component.posY) || 0)),
-    width: Math.max(MIN_CARD_WIDTH, Math.round(Number(component.width) || MIN_CARD_WIDTH)),
-    height: Math.max(MIN_CARD_HEIGHT, Math.round(Number(component.height) || MIN_CARD_HEIGHT)),
-    zIndex: Math.max(0, Math.round(Number(component.zIndex) || 0)),
-});
+const cloneComponentLayout = (component) => {
+    const chartType = getComponentChartConfig(component).chartType ?? '';
+    const minLayout = getComponentMinLayout(chartType);
+    return {
+        posX: Math.max(0, Math.round(Number(component.posX) || 0)),
+        posY: Math.max(0, Math.round(Number(component.posY) || 0)),
+        width: Math.max(minLayout.width, Math.round(Number(component.width) || minLayout.width)),
+        height: Math.max(minLayout.height, Math.round(Number(component.height) || minLayout.height)),
+        zIndex: Math.max(0, Math.round(Number(component.zIndex) || 0)),
+    };
+};
 const cloneComponentSnapshot = (component) => ({
     id: component.id,
     chartId: component.chartId,
@@ -1144,7 +1273,7 @@ const getCardStyle = (component) => {
         top: `${component.posY}px`,
         width: `${component.width}px`,
         height: `${component.height}px`,
-        zIndex: String(Math.max(2, component.zIndex ?? 2)),
+        zIndex: draggingCompId.value === component.id ? '9999' : String(Math.max(2, component.zIndex ?? 2)),
         borderRadius: !isDecoration && style.cardRadius != null ? `${style.cardRadius}px` : undefined,
         border: !isDecoration && style.borderShow ? `${style.borderWidth}px solid ${style.borderColor}` : undefined,
         opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
@@ -1295,7 +1424,11 @@ const handleComponentVisibilityChange = (componentId, visible) => {
     scheduleComponentRefreshSync();
 };
 const setupComponentVisibilityObserver = () => {
-    disposeComponentVisibilityObserver();
+    // Only reset the observer; preserve stageCardRefs so the new observer can observe them.
+    // disposeComponentVisibilityObserver() would clear stageCardRefs, leaving nothing to observe.
+    componentVisibilityObserver?.disconnect();
+    componentVisibilityObserver = null;
+    clearVisibleComponentIds();
     if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined')
         return false;
     if (!stageScrollRef.value)
@@ -1491,6 +1624,17 @@ const loadComponentData = async (component, loadToken = componentDataLoadToken) 
             return;
         ElMessage.warning(`组件 ${chart.name} 数据加载失败`);
     }
+};
+const persistComponentSnapshot = async (dashboardId, component) => {
+    await updateDashboardComponent(dashboardId, component.id, {
+        chartId: component.chartId,
+        configJson: component.configJson ?? '',
+        posX: component.posX,
+        posY: component.posY,
+        width: component.width,
+        height: component.height,
+        zIndex: component.zIndex,
+    });
 };
 const renderChart = (component, data) => {
     const el = chartRefs.get(component.id);
@@ -1778,6 +1922,7 @@ const getStageCardMemo = (component) => {
         component.chartId,
         component.configJson ?? '',
         activeCompId.value === component.id,
+        draggingCompId.value === component.id,
         isComponentSelected(component.id),
         shouldDeferComponentPreview(component),
         isComponentPreviewLoading(component),
@@ -1864,6 +2009,7 @@ const handleCurtainPointerDown = (event) => {
     startStageMarquee(event, { selectOverlayOnClick: true });
 };
 const focusComponent = (component, options = {}) => {
+    const zBefore = component.zIndex ?? 0;
     const preserveSelection = options.preserveSelection === true && isComponentSelected(component.id);
     if (preserveSelection) {
         overlaySelected.value = false;
@@ -1872,11 +2018,15 @@ const focusComponent = (component, options = {}) => {
     else {
         setSelectedComponents([component.id], component.id);
     }
-    if (options.bringToFront === false)
+    if (options.bringToFront === false) {
+        console.debug('[Layer] focusComponent: bringToFront=false, zIndex unchanged', component.id, zBefore);
         return;
+    }
     const nextZ = getMaxZ() + 1;
-    if ((component.zIndex ?? 0) < nextZ)
+    if ((component.zIndex ?? 0) < nextZ) {
         component.zIndex = nextZ;
+        console.warn('[Layer] focusComponent: zIndex RAISED', component.id, zBefore, '->', nextZ);
+    }
 };
 const selectOverlayLayer = () => {
     overlaySelected.value = true;
@@ -1893,7 +2043,7 @@ const handleStageCardMouseDown = (event, component) => {
     if (event.button !== 0)
         return;
     const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id);
-    focusComponent(component, { preserveSelection, bringToFront: !preserveSelection });
+    focusComponent(component, { preserveSelection, bringToFront: false });
 };
 const openComponentContextMenu = (event, component) => {
     if (!isComponentSelected(component.id)) {
@@ -1911,14 +2061,16 @@ const openComponentContextMenu = (event, component) => {
 };
 const buildPatchedLayoutSnapshot = (component, patch) => {
     const next = cloneComponentLayout(component);
+    const chartType = getComponentChartConfig(component).chartType ?? '';
+    const minLayout = getComponentMinLayout(chartType);
     if (typeof patch.posX === 'number')
         next.posX = Math.max(0, Math.round(patch.posX));
     if (typeof patch.posY === 'number')
         next.posY = Math.max(0, Math.round(patch.posY));
     if (typeof patch.width === 'number')
-        next.width = Math.max(MIN_CARD_WIDTH, Math.round(patch.width));
+        next.width = Math.max(minLayout.width, Math.round(patch.width));
     if (typeof patch.height === 'number')
-        next.height = Math.max(MIN_CARD_HEIGHT, Math.round(patch.height));
+        next.height = Math.max(minLayout.height, Math.round(patch.height));
     if (typeof patch.zIndex === 'number')
         next.zIndex = Math.max(0, Math.round(patch.zIndex));
     return next;
@@ -2107,7 +2259,14 @@ const saveActiveComponent = async (payload) => {
         chartId: component.chartId,
         configJson: component.configJson ?? '',
     };
-    const updated = await updateDashboardComponent(currentDashboard.value.id, component.id, payload);
+    const updated = await updateDashboardComponent(currentDashboard.value.id, component.id, {
+        posX: component.posX,
+        posY: component.posY,
+        width: component.width,
+        height: component.height,
+        ...payload,
+        zIndex: component.zIndex,
+    });
     const next = {
         chartId: updated.chartId ?? payload.chartId,
         configJson: updated.configJson ?? payload.configJson,
@@ -2211,6 +2370,7 @@ const applyInteractionFrame = () => {
     const component = findComponent(interaction.compId);
     if (!component)
         return;
+    const minLayout = getComponentMinLayout(getComponentChartConfig(component).chartType ?? '');
     const scale = canvasScale.value || 1;
     const dx = (pendingPointer.x - interaction.startMouseX) / scale;
     const dy = (pendingPointer.y - interaction.startMouseY) / scale;
@@ -2265,36 +2425,36 @@ const applyInteractionFrame = () => {
         let snapVerticalLine;
         let snapHorizontalLine;
         if (handle.includes('e')) {
-            nextWidth = Math.min(Math.max(MIN_CARD_WIDTH, interaction.startWidth + dx), Math.max(MIN_CARD_WIDTH, canvasWidth - interaction.startX));
+            nextWidth = Math.min(Math.max(minLayout.width, interaction.startWidth + dx), Math.max(minLayout.width, canvasWidth - interaction.startX));
             const match = findNearestSnapMatch([nextX + nextWidth], snapTargets.vertical);
             if (match) {
                 const snappedWidth = match.line - nextX;
-                if (snappedWidth >= MIN_CARD_WIDTH && nextX + snappedWidth <= canvasWidth) {
+                if (snappedWidth >= minLayout.width && nextX + snappedWidth <= canvasWidth) {
                     nextWidth = snappedWidth;
                     snapVerticalLine = [match.line];
                 }
             }
         }
         if (handle.includes('s')) {
-            nextHeight = Math.max(MIN_CARD_HEIGHT, interaction.startHeight + dy);
+            nextHeight = Math.max(minLayout.height, interaction.startHeight + dy);
             const match = findNearestSnapMatch([nextY + nextHeight], snapTargets.horizontal);
             if (match) {
                 const snappedHeight = match.line - nextY;
-                if (snappedHeight >= MIN_CARD_HEIGHT) {
+                if (snappedHeight >= minLayout.height) {
                     nextHeight = snappedHeight;
                     snapHorizontalLine = [match.line];
                 }
             }
         }
         if (handle.includes('w')) {
-            const maxLeft = interaction.startX + interaction.startWidth - MIN_CARD_WIDTH;
+            const maxLeft = interaction.startX + interaction.startWidth - minLayout.width;
             nextX = Math.min(Math.max(0, interaction.startX + dx), maxLeft);
             nextWidth = interaction.startWidth - (nextX - interaction.startX);
             const match = findNearestSnapMatch([nextX], snapTargets.vertical);
             if (match) {
                 const snappedX = Math.min(Math.max(0, match.line), maxLeft);
                 const snappedWidth = interaction.startWidth - (snappedX - interaction.startX);
-                if (snappedWidth >= MIN_CARD_WIDTH) {
+                if (snappedWidth >= minLayout.width) {
                     nextX = snappedX;
                     nextWidth = snappedWidth;
                     snapVerticalLine = [snappedX];
@@ -2302,14 +2462,14 @@ const applyInteractionFrame = () => {
             }
         }
         if (handle.includes('n')) {
-            const maxTop = interaction.startY + interaction.startHeight - MIN_CARD_HEIGHT;
+            const maxTop = interaction.startY + interaction.startHeight - minLayout.height;
             nextY = Math.min(Math.max(0, interaction.startY + dy), maxTop);
             nextHeight = interaction.startHeight - (nextY - interaction.startY);
             const match = findNearestSnapMatch([nextY], snapTargets.horizontal);
             if (match) {
                 const snappedY = Math.min(Math.max(0, match.line), maxTop);
                 const snappedHeight = interaction.startHeight - (snappedY - interaction.startY);
-                if (snappedHeight >= MIN_CARD_HEIGHT) {
+                if (snappedHeight >= minLayout.height) {
                     nextY = snappedY;
                     nextHeight = snappedHeight;
                     snapHorizontalLine = [snappedY];
@@ -2362,7 +2522,8 @@ const startDrag = (event, component) => {
     hideComponentContextMenu();
     const startZIndex = component.zIndex ?? 0;
     const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id);
-    focusComponent(component, { preserveSelection, bringToFront: !preserveSelection });
+    focusComponent(component, { preserveSelection, bringToFront: false });
+    draggingCompId.value = component.id;
     interaction = {
         mode: 'move',
         compId: component.id,
@@ -2383,7 +2544,8 @@ const startResize = (event, component, handle = 'se') => {
     hideComponentContextMenu();
     const startZIndex = component.zIndex ?? 0;
     const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id);
-    focusComponent(component, { preserveSelection, bringToFront: !preserveSelection });
+    focusComponent(component, { preserveSelection, bringToFront: false });
+    draggingCompId.value = component.id;
     interaction = {
         mode: 'resize',
         compId: component.id,
@@ -2417,6 +2579,7 @@ const onPointerUp = async () => {
     }
     const preview = interactionPreviewSnapshot?.compId === finalizedInteraction.compId ? { ...interactionPreviewSnapshot } : null;
     interaction = null;
+    draggingCompId.value = null;
     document.removeEventListener('mousemove', onPointerMove);
     document.removeEventListener('mouseup', onPointerUp);
     cleanupInteractionFrame(false);
@@ -2428,6 +2591,7 @@ const onPointerUp = async () => {
             height: finalizedInteraction.startHeight,
             zIndex: finalizedInteraction.startZIndex,
         };
+        console.debug('[Layer] onPointerUp before:', component.id, 'zIndex=', before.zIndex);
         const next = preview
             ? {
                 posX: preview.nextX,
@@ -2437,6 +2601,7 @@ const onPointerUp = async () => {
                 zIndex: Math.max(0, Math.round(Number(component.zIndex) || before.zIndex)),
             }
             : cloneComponentLayout(component);
+        console.debug('[Layer] onPointerUp next:', component.id, 'zIndex=', next.zIndex, '(before=', before.zIndex, ')');
         clearInteractionPreviewFromCard(component.id);
         interactionPreviewSnapshot = null;
         applyComponentLayoutSnapshot(component, next);
@@ -2496,13 +2661,15 @@ const saveCurrentScreen = async () => {
         return ElMessage.warning('请先选择大屏');
     pageSaving.value = true;
     try {
+        componentInspectorRef.value?.flushPendingDraft();
+        await Promise.all(components.value.map((component) => persistComponentSnapshot(dashboard.id, component)));
         const updated = await updateDashboard(dashboard.id, {
             name: dashboard.name,
             configJson: dashboard.configJson,
         });
         currentDashboard.value = updated;
         dashboards.value = dashboards.value.map((item) => item.id === updated.id ? updated : item);
-        ElMessage.success('页面已保存');
+        ElMessage.success('页面与组件实例已保存');
     }
     catch {
         ElMessage.error('页面保存失败，请重试');
@@ -2950,18 +3117,20 @@ const addChartToScreen = async (chart, configJson, size, point, options = {}) =>
     }
     const nextSize = size ?? defaultChartTemplateLayout(chart.chartType);
     const placement = resolveDropPlacement(nextSize.width, nextSize.height, point);
+    const nextZIndex = getMaxZ() + 1;
     const component = await addDashboardComponent(currentDashboard.value.id, {
         chartId: chart.id,
         posX: placement.posX,
         posY: placement.posY,
         width: placement.width,
         height: placement.height,
-        zIndex: getMaxZ() + 1,
+        zIndex: nextZIndex,
         configJson: configJson ?? buildComponentConfig(chart, undefined, {
             chart: buildChartSnapshot(chart),
         }),
     });
     normalizeLayout(component);
+    component.zIndex = Math.max(nextZIndex, Number(component.zIndex) || 0);
     components.value.push(component);
     setSelectedComponents([component.id], component.id);
     dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length);
@@ -3996,12 +4165,14 @@ if (__VLS_ctx.screenId && !__VLS_ctx.effectiveSidebarCollapsed) {
                 const __VLS_32 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
                     chartType: (item.type),
                     chartConfig: (__VLS_ctx.getTypeChipPreviewChartConfig(item.type)),
+                    styleConfig: (__VLS_ctx.getTypeChipPreviewStyleConfig(item.type)),
                     showTitle: (false),
                     dark: true,
                 }));
                 const __VLS_33 = __VLS_32({
                     chartType: (item.type),
                     chartConfig: (__VLS_ctx.getTypeChipPreviewChartConfig(item.type)),
+                    styleConfig: (__VLS_ctx.getTypeChipPreviewStyleConfig(item.type)),
                     showTitle: (false),
                     dark: true,
                 }, ...__VLS_functionalComponentArgsRest(__VLS_32));
@@ -4119,11 +4290,13 @@ if (__VLS_ctx.screenId && !__VLS_ctx.effectiveSidebarCollapsed) {
                 const __VLS_43 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
                     chartType: (__VLS_ctx.getTemplateAssetConfig(template).chart.chartType),
                     chartConfig: (__VLS_ctx.getTemplateAssetConfig(template).chart),
+                    styleConfig: (__VLS_ctx.getTemplateAssetConfig(template).style),
                     showTitle: (false),
                 }));
                 const __VLS_44 = __VLS_43({
                     chartType: (__VLS_ctx.getTemplateAssetConfig(template).chart.chartType),
                     chartConfig: (__VLS_ctx.getTemplateAssetConfig(template).chart),
+                    styleConfig: (__VLS_ctx.getTemplateAssetConfig(template).style),
                     showTitle: (false),
                 }, ...__VLS_functionalComponentArgsRest(__VLS_43));
             }
@@ -4317,12 +4490,14 @@ if (__VLS_ctx.screenId && !__VLS_ctx.effectiveSidebarCollapsed) {
             const __VLS_70 = __VLS_asFunctionalComponent(ComponentStaticPreview, new ComponentStaticPreview({
                 chartType: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart.chartType),
                 chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart),
+                styleConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).style),
                 showTitle: (false),
                 dark: true,
             }));
             const __VLS_71 = __VLS_70({
                 chartType: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart.chartType),
                 chartConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).chart),
+                styleConfig: (__VLS_ctx.getTemplateAssetConfig(__VLS_ctx.hoveredTemplate).style),
                 showTitle: (false),
                 dark: true,
             }, ...__VLS_functionalComponentArgsRest(__VLS_70));
@@ -6358,6 +6533,7 @@ if (!__VLS_ctx.inspectorCollapsed) {
                 ...{ 'onRemove': {} },
                 ...{ 'onPreviewComponent': {} },
                 ...{ 'onSaveComponent': {} },
+                ref: "componentInspectorRef",
                 scene: "screen",
                 component: (__VLS_ctx.activeComponent),
                 chart: (__VLS_ctx.activeChart),
@@ -6368,6 +6544,7 @@ if (!__VLS_ctx.inspectorCollapsed) {
                 ...{ 'onRemove': {} },
                 ...{ 'onPreviewComponent': {} },
                 ...{ 'onSaveComponent': {} },
+                ref: "componentInspectorRef",
                 scene: "screen",
                 component: (__VLS_ctx.activeComponent),
                 chart: (__VLS_ctx.activeChart),
@@ -6390,6 +6567,8 @@ if (!__VLS_ctx.inspectorCollapsed) {
             const __VLS_525 = {
                 onSaveComponent: (__VLS_ctx.saveActiveComponent)
             };
+            /** @type {typeof __VLS_ctx.componentInspectorRef} */ ;
+            var __VLS_526 = {};
             var __VLS_517;
         }
         {
@@ -6407,16 +6586,16 @@ if (!__VLS_ctx.inspectorCollapsed) {
         var __VLS_513;
     }
 }
-const __VLS_526 = {}.teleport;
+const __VLS_528 = {}.teleport;
 /** @type {[typeof __VLS_components.Teleport, typeof __VLS_components.teleport, typeof __VLS_components.Teleport, typeof __VLS_components.teleport, ]} */ ;
 // @ts-ignore
-const __VLS_527 = __VLS_asFunctionalComponent(__VLS_526, new __VLS_526({
+const __VLS_529 = __VLS_asFunctionalComponent(__VLS_528, new __VLS_528({
     to: "body",
 }));
-const __VLS_528 = __VLS_527({
+const __VLS_530 = __VLS_529({
     to: "body",
-}, ...__VLS_functionalComponentArgsRest(__VLS_527));
-__VLS_529.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_529));
+__VLS_531.slots.default;
 if (__VLS_ctx.componentContextMenu.visible) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onMousedown: () => { } },
@@ -6458,239 +6637,239 @@ if (__VLS_ctx.componentContextMenu.visible) {
         ...{ class: "screen-context-menu__item screen-context-menu__item--danger" },
     });
 }
-var __VLS_529;
-const __VLS_530 = {}.ElDialog;
+var __VLS_531;
+const __VLS_532 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_531 = __VLS_asFunctionalComponent(__VLS_530, new __VLS_530({
+const __VLS_533 = __VLS_asFunctionalComponent(__VLS_532, new __VLS_532({
     modelValue: (__VLS_ctx.createDashVisible),
     title: "新建数据大屏",
     width: "420px",
     destroyOnClose: true,
 }));
-const __VLS_532 = __VLS_531({
+const __VLS_534 = __VLS_533({
     modelValue: (__VLS_ctx.createDashVisible),
     title: "新建数据大屏",
     width: "420px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_531));
-__VLS_533.slots.default;
-const __VLS_534 = {}.ElForm;
+}, ...__VLS_functionalComponentArgsRest(__VLS_533));
+__VLS_535.slots.default;
+const __VLS_536 = {}.ElForm;
 /** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
-const __VLS_535 = __VLS_asFunctionalComponent(__VLS_534, new __VLS_534({
+const __VLS_537 = __VLS_asFunctionalComponent(__VLS_536, new __VLS_536({
     model: (__VLS_ctx.dashForm),
     labelWidth: "80px",
 }));
-const __VLS_536 = __VLS_535({
+const __VLS_538 = __VLS_537({
     model: (__VLS_ctx.dashForm),
     labelWidth: "80px",
-}, ...__VLS_functionalComponentArgsRest(__VLS_535));
-__VLS_537.slots.default;
-const __VLS_538 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_537));
+__VLS_539.slots.default;
+const __VLS_540 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_539 = __VLS_asFunctionalComponent(__VLS_538, new __VLS_538({
+const __VLS_541 = __VLS_asFunctionalComponent(__VLS_540, new __VLS_540({
     label: "名称",
 }));
-const __VLS_540 = __VLS_539({
+const __VLS_542 = __VLS_541({
     label: "名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_539));
-__VLS_541.slots.default;
-const __VLS_542 = {}.ElInput;
+}, ...__VLS_functionalComponentArgsRest(__VLS_541));
+__VLS_543.slots.default;
+const __VLS_544 = {}.ElInput;
 /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
-const __VLS_543 = __VLS_asFunctionalComponent(__VLS_542, new __VLS_542({
+const __VLS_545 = __VLS_asFunctionalComponent(__VLS_544, new __VLS_544({
     modelValue: (__VLS_ctx.dashForm.name),
     placeholder: "请输入大屏名称",
 }));
-const __VLS_544 = __VLS_543({
+const __VLS_546 = __VLS_545({
     modelValue: (__VLS_ctx.dashForm.name),
     placeholder: "请输入大屏名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_543));
-var __VLS_541;
-var __VLS_537;
+}, ...__VLS_functionalComponentArgsRest(__VLS_545));
+var __VLS_543;
+var __VLS_539;
 {
-    const { footer: __VLS_thisSlot } = __VLS_533.slots;
-    const __VLS_546 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_535.slots;
+    const __VLS_548 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_547 = __VLS_asFunctionalComponent(__VLS_546, new __VLS_546({
+    const __VLS_549 = __VLS_asFunctionalComponent(__VLS_548, new __VLS_548({
         ...{ 'onClick': {} },
     }));
-    const __VLS_548 = __VLS_547({
+    const __VLS_550 = __VLS_549({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_547));
-    let __VLS_550;
-    let __VLS_551;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_549));
     let __VLS_552;
-    const __VLS_553 = {
+    let __VLS_553;
+    let __VLS_554;
+    const __VLS_555 = {
         onClick: (...[$event]) => {
             __VLS_ctx.createDashVisible = false;
         }
     };
-    __VLS_549.slots.default;
-    var __VLS_549;
-    const __VLS_554 = {}.ElButton;
+    __VLS_551.slots.default;
+    var __VLS_551;
+    const __VLS_556 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_555 = __VLS_asFunctionalComponent(__VLS_554, new __VLS_554({
+    const __VLS_557 = __VLS_asFunctionalComponent(__VLS_556, new __VLS_556({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.dashSaving),
     }));
-    const __VLS_556 = __VLS_555({
+    const __VLS_558 = __VLS_557({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.dashSaving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_555));
-    let __VLS_558;
-    let __VLS_559;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_557));
     let __VLS_560;
-    const __VLS_561 = {
+    let __VLS_561;
+    let __VLS_562;
+    const __VLS_563 = {
         onClick: (__VLS_ctx.handleCreateDashboard)
     };
-    __VLS_557.slots.default;
-    var __VLS_557;
+    __VLS_559.slots.default;
+    var __VLS_559;
 }
-var __VLS_533;
-const __VLS_562 = {}.ElDialog;
+var __VLS_535;
+const __VLS_564 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_563 = __VLS_asFunctionalComponent(__VLS_562, new __VLS_562({
+const __VLS_565 = __VLS_asFunctionalComponent(__VLS_564, new __VLS_564({
     modelValue: (__VLS_ctx.templateSaveVisible),
     title: "保存为可复用组件",
     width: "460px",
     destroyOnClose: true,
 }));
-const __VLS_564 = __VLS_563({
+const __VLS_566 = __VLS_565({
     modelValue: (__VLS_ctx.templateSaveVisible),
     title: "保存为可复用组件",
     width: "460px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_563));
-__VLS_565.slots.default;
-const __VLS_566 = {}.ElForm;
+}, ...__VLS_functionalComponentArgsRest(__VLS_565));
+__VLS_567.slots.default;
+const __VLS_568 = {}.ElForm;
 /** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
-const __VLS_567 = __VLS_asFunctionalComponent(__VLS_566, new __VLS_566({
+const __VLS_569 = __VLS_asFunctionalComponent(__VLS_568, new __VLS_568({
     model: (__VLS_ctx.templateForm),
     labelWidth: "90px",
 }));
-const __VLS_568 = __VLS_567({
+const __VLS_570 = __VLS_569({
     model: (__VLS_ctx.templateForm),
     labelWidth: "90px",
-}, ...__VLS_functionalComponentArgsRest(__VLS_567));
-__VLS_569.slots.default;
-const __VLS_570 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_569));
+__VLS_571.slots.default;
+const __VLS_572 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_571 = __VLS_asFunctionalComponent(__VLS_570, new __VLS_570({
+const __VLS_573 = __VLS_asFunctionalComponent(__VLS_572, new __VLS_572({
     label: "组件名称",
 }));
-const __VLS_572 = __VLS_571({
+const __VLS_574 = __VLS_573({
     label: "组件名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_571));
-__VLS_573.slots.default;
-const __VLS_574 = {}.ElInput;
+}, ...__VLS_functionalComponentArgsRest(__VLS_573));
+__VLS_575.slots.default;
+const __VLS_576 = {}.ElInput;
 /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
-const __VLS_575 = __VLS_asFunctionalComponent(__VLS_574, new __VLS_574({
+const __VLS_577 = __VLS_asFunctionalComponent(__VLS_576, new __VLS_576({
     modelValue: (__VLS_ctx.templateForm.name),
     placeholder: "请输入组件资产名称",
 }));
-const __VLS_576 = __VLS_575({
+const __VLS_578 = __VLS_577({
     modelValue: (__VLS_ctx.templateForm.name),
     placeholder: "请输入组件资产名称",
-}, ...__VLS_functionalComponentArgsRest(__VLS_575));
-var __VLS_573;
-const __VLS_578 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_577));
+var __VLS_575;
+const __VLS_580 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_579 = __VLS_asFunctionalComponent(__VLS_578, new __VLS_578({
+const __VLS_581 = __VLS_asFunctionalComponent(__VLS_580, new __VLS_580({
     label: "说明",
 }));
-const __VLS_580 = __VLS_579({
+const __VLS_582 = __VLS_581({
     label: "说明",
-}, ...__VLS_functionalComponentArgsRest(__VLS_579));
-__VLS_581.slots.default;
-const __VLS_582 = {}.ElInput;
+}, ...__VLS_functionalComponentArgsRest(__VLS_581));
+__VLS_583.slots.default;
+const __VLS_584 = {}.ElInput;
 /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
-const __VLS_583 = __VLS_asFunctionalComponent(__VLS_582, new __VLS_582({
+const __VLS_585 = __VLS_asFunctionalComponent(__VLS_584, new __VLS_584({
     modelValue: (__VLS_ctx.templateForm.description),
     type: "textarea",
     rows: (3),
     placeholder: "说明这个组件适合什么场景",
 }));
-const __VLS_584 = __VLS_583({
+const __VLS_586 = __VLS_585({
     modelValue: (__VLS_ctx.templateForm.description),
     type: "textarea",
     rows: (3),
     placeholder: "说明这个组件适合什么场景",
-}, ...__VLS_functionalComponentArgsRest(__VLS_583));
-var __VLS_581;
-var __VLS_569;
+}, ...__VLS_functionalComponentArgsRest(__VLS_585));
+var __VLS_583;
+var __VLS_571;
 {
-    const { footer: __VLS_thisSlot } = __VLS_565.slots;
-    const __VLS_586 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_567.slots;
+    const __VLS_588 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_587 = __VLS_asFunctionalComponent(__VLS_586, new __VLS_586({
+    const __VLS_589 = __VLS_asFunctionalComponent(__VLS_588, new __VLS_588({
         ...{ 'onClick': {} },
     }));
-    const __VLS_588 = __VLS_587({
+    const __VLS_590 = __VLS_589({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_587));
-    let __VLS_590;
-    let __VLS_591;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_589));
     let __VLS_592;
-    const __VLS_593 = {
+    let __VLS_593;
+    let __VLS_594;
+    const __VLS_595 = {
         onClick: (...[$event]) => {
             __VLS_ctx.templateSaveVisible = false;
         }
     };
-    __VLS_589.slots.default;
-    var __VLS_589;
-    const __VLS_594 = {}.ElButton;
+    __VLS_591.slots.default;
+    var __VLS_591;
+    const __VLS_596 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_595 = __VLS_asFunctionalComponent(__VLS_594, new __VLS_594({
+    const __VLS_597 = __VLS_asFunctionalComponent(__VLS_596, new __VLS_596({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.templateSaving),
     }));
-    const __VLS_596 = __VLS_595({
+    const __VLS_598 = __VLS_597({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.templateSaving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_595));
-    let __VLS_598;
-    let __VLS_599;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_597));
     let __VLS_600;
-    const __VLS_601 = {
+    let __VLS_601;
+    let __VLS_602;
+    const __VLS_603 = {
         onClick: (__VLS_ctx.saveActiveComponentAsAsset)
     };
-    __VLS_597.slots.default;
-    var __VLS_597;
+    __VLS_599.slots.default;
+    var __VLS_599;
 }
-var __VLS_565;
-const __VLS_602 = {}.ElDialog;
+var __VLS_567;
+const __VLS_604 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_603 = __VLS_asFunctionalComponent(__VLS_602, new __VLS_602({
+const __VLS_605 = __VLS_asFunctionalComponent(__VLS_604, new __VLS_604({
     modelValue: (__VLS_ctx.shareVisible),
     title: "分享数据大屏",
     width: "520px",
     destroyOnClose: true,
 }));
-const __VLS_604 = __VLS_603({
+const __VLS_606 = __VLS_605({
     modelValue: (__VLS_ctx.shareVisible),
     title: "分享数据大屏",
     width: "520px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_603));
-__VLS_605.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_605));
+__VLS_607.slots.default;
 if (__VLS_ctx.isPublished) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "share-block" },
@@ -6698,306 +6877,306 @@ if (__VLS_ctx.isPublished) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "share-label" },
     });
-    const __VLS_606 = {}.ElInput;
+    const __VLS_608 = {}.ElInput;
     /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
     // @ts-ignore
-    const __VLS_607 = __VLS_asFunctionalComponent(__VLS_606, new __VLS_606({
+    const __VLS_609 = __VLS_asFunctionalComponent(__VLS_608, new __VLS_608({
         modelValue: (__VLS_ctx.shareLink),
         readonly: true,
     }));
-    const __VLS_608 = __VLS_607({
+    const __VLS_610 = __VLS_609({
         modelValue: (__VLS_ctx.shareLink),
         readonly: true,
-    }, ...__VLS_functionalComponentArgsRest(__VLS_607));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_609));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "share-tip" },
     });
 }
 else {
-    const __VLS_610 = {}.ElAlert;
+    const __VLS_612 = {}.ElAlert;
     /** @type {[typeof __VLS_components.ElAlert, typeof __VLS_components.elAlert, ]} */ ;
     // @ts-ignore
-    const __VLS_611 = __VLS_asFunctionalComponent(__VLS_610, new __VLS_610({
+    const __VLS_613 = __VLS_asFunctionalComponent(__VLS_612, new __VLS_612({
         title: "当前数据大屏尚未正式发布",
         type: "warning",
         closable: (false),
         description: "请先设置发布状态、访问角色和正式分享链接，再对外分享。",
     }));
-    const __VLS_612 = __VLS_611({
+    const __VLS_614 = __VLS_613({
         title: "当前数据大屏尚未正式发布",
         type: "warning",
         closable: (false),
         description: "请先设置发布状态、访问角色和正式分享链接，再对外分享。",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_611));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_613));
 }
 {
-    const { footer: __VLS_thisSlot } = __VLS_605.slots;
-    const __VLS_614 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_607.slots;
+    const __VLS_616 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_615 = __VLS_asFunctionalComponent(__VLS_614, new __VLS_614({
+    const __VLS_617 = __VLS_asFunctionalComponent(__VLS_616, new __VLS_616({
         ...{ 'onClick': {} },
     }));
-    const __VLS_616 = __VLS_615({
+    const __VLS_618 = __VLS_617({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_615));
-    let __VLS_618;
-    let __VLS_619;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_617));
     let __VLS_620;
-    const __VLS_621 = {
+    let __VLS_621;
+    let __VLS_622;
+    const __VLS_623 = {
         onClick: (...[$event]) => {
             __VLS_ctx.shareVisible = false;
         }
     };
-    __VLS_617.slots.default;
-    var __VLS_617;
+    __VLS_619.slots.default;
+    var __VLS_619;
     if (!__VLS_ctx.isPublished) {
-        const __VLS_622 = {}.ElButton;
+        const __VLS_624 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_623 = __VLS_asFunctionalComponent(__VLS_622, new __VLS_622({
+        const __VLS_625 = __VLS_asFunctionalComponent(__VLS_624, new __VLS_624({
             ...{ 'onClick': {} },
             type: "primary",
         }));
-        const __VLS_624 = __VLS_623({
+        const __VLS_626 = __VLS_625({
             ...{ 'onClick': {} },
             type: "primary",
-        }, ...__VLS_functionalComponentArgsRest(__VLS_623));
-        let __VLS_626;
-        let __VLS_627;
+        }, ...__VLS_functionalComponentArgsRest(__VLS_625));
         let __VLS_628;
-        const __VLS_629 = {
+        let __VLS_629;
+        let __VLS_630;
+        const __VLS_631 = {
             onClick: (__VLS_ctx.openPublishDialog)
         };
-        __VLS_625.slots.default;
-        var __VLS_625;
+        __VLS_627.slots.default;
+        var __VLS_627;
     }
     else {
-        const __VLS_630 = {}.ElButton;
+        const __VLS_632 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_631 = __VLS_asFunctionalComponent(__VLS_630, new __VLS_630({
+        const __VLS_633 = __VLS_asFunctionalComponent(__VLS_632, new __VLS_632({
             ...{ 'onClick': {} },
         }));
-        const __VLS_632 = __VLS_631({
+        const __VLS_634 = __VLS_633({
             ...{ 'onClick': {} },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_631));
-        let __VLS_634;
-        let __VLS_635;
+        }, ...__VLS_functionalComponentArgsRest(__VLS_633));
         let __VLS_636;
-        const __VLS_637 = {
+        let __VLS_637;
+        let __VLS_638;
+        const __VLS_639 = {
             onClick: (...[$event]) => {
                 if (!!(!__VLS_ctx.isPublished))
                     return;
                 __VLS_ctx.openPreview(true);
             }
         };
-        __VLS_633.slots.default;
-        var __VLS_633;
-        const __VLS_638 = {}.ElButton;
+        __VLS_635.slots.default;
+        var __VLS_635;
+        const __VLS_640 = {}.ElButton;
         /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
         // @ts-ignore
-        const __VLS_639 = __VLS_asFunctionalComponent(__VLS_638, new __VLS_638({
+        const __VLS_641 = __VLS_asFunctionalComponent(__VLS_640, new __VLS_640({
             ...{ 'onClick': {} },
             type: "primary",
         }));
-        const __VLS_640 = __VLS_639({
+        const __VLS_642 = __VLS_641({
             ...{ 'onClick': {} },
             type: "primary",
-        }, ...__VLS_functionalComponentArgsRest(__VLS_639));
-        let __VLS_642;
-        let __VLS_643;
+        }, ...__VLS_functionalComponentArgsRest(__VLS_641));
         let __VLS_644;
-        const __VLS_645 = {
+        let __VLS_645;
+        let __VLS_646;
+        const __VLS_647 = {
             onClick: (__VLS_ctx.copyShareLink)
         };
-        __VLS_641.slots.default;
-        var __VLS_641;
+        __VLS_643.slots.default;
+        var __VLS_643;
     }
 }
-var __VLS_605;
-const __VLS_646 = {}.ElDialog;
+var __VLS_607;
+const __VLS_648 = {}.ElDialog;
 /** @type {[typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, typeof __VLS_components.ElDialog, typeof __VLS_components.elDialog, ]} */ ;
 // @ts-ignore
-const __VLS_647 = __VLS_asFunctionalComponent(__VLS_646, new __VLS_646({
+const __VLS_649 = __VLS_asFunctionalComponent(__VLS_648, new __VLS_648({
     modelValue: (__VLS_ctx.publishVisible),
     title: "发布数据大屏",
     width: "560px",
     destroyOnClose: true,
 }));
-const __VLS_648 = __VLS_647({
+const __VLS_650 = __VLS_649({
     modelValue: (__VLS_ctx.publishVisible),
     title: "发布数据大屏",
     width: "560px",
     destroyOnClose: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_647));
-__VLS_649.slots.default;
-const __VLS_650 = {}.ElForm;
+}, ...__VLS_functionalComponentArgsRest(__VLS_649));
+__VLS_651.slots.default;
+const __VLS_652 = {}.ElForm;
 /** @type {[typeof __VLS_components.ElForm, typeof __VLS_components.elForm, typeof __VLS_components.ElForm, typeof __VLS_components.elForm, ]} */ ;
 // @ts-ignore
-const __VLS_651 = __VLS_asFunctionalComponent(__VLS_650, new __VLS_650({
+const __VLS_653 = __VLS_asFunctionalComponent(__VLS_652, new __VLS_652({
     labelWidth: "120px",
 }));
-const __VLS_652 = __VLS_651({
+const __VLS_654 = __VLS_653({
     labelWidth: "120px",
-}, ...__VLS_functionalComponentArgsRest(__VLS_651));
-__VLS_653.slots.default;
-const __VLS_654 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_653));
+__VLS_655.slots.default;
+const __VLS_656 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_655 = __VLS_asFunctionalComponent(__VLS_654, new __VLS_654({
+const __VLS_657 = __VLS_asFunctionalComponent(__VLS_656, new __VLS_656({
     label: "发布状态",
 }));
-const __VLS_656 = __VLS_655({
+const __VLS_658 = __VLS_657({
     label: "发布状态",
-}, ...__VLS_functionalComponentArgsRest(__VLS_655));
-__VLS_657.slots.default;
-const __VLS_658 = {}.ElSwitch;
+}, ...__VLS_functionalComponentArgsRest(__VLS_657));
+__VLS_659.slots.default;
+const __VLS_660 = {}.ElSwitch;
 /** @type {[typeof __VLS_components.ElSwitch, typeof __VLS_components.elSwitch, ]} */ ;
 // @ts-ignore
-const __VLS_659 = __VLS_asFunctionalComponent(__VLS_658, new __VLS_658({
+const __VLS_661 = __VLS_asFunctionalComponent(__VLS_660, new __VLS_660({
     modelValue: (__VLS_ctx.publishForm.published),
     activeText: "已发布",
     inactiveText: "草稿",
 }));
-const __VLS_660 = __VLS_659({
+const __VLS_662 = __VLS_661({
     modelValue: (__VLS_ctx.publishForm.published),
     activeText: "已发布",
     inactiveText: "草稿",
-}, ...__VLS_functionalComponentArgsRest(__VLS_659));
-var __VLS_657;
-const __VLS_662 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_661));
+var __VLS_659;
+const __VLS_664 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_663 = __VLS_asFunctionalComponent(__VLS_662, new __VLS_662({
+const __VLS_665 = __VLS_asFunctionalComponent(__VLS_664, new __VLS_664({
     label: "允许匿名链接",
 }));
-const __VLS_664 = __VLS_663({
+const __VLS_666 = __VLS_665({
     label: "允许匿名链接",
-}, ...__VLS_functionalComponentArgsRest(__VLS_663));
-__VLS_665.slots.default;
-const __VLS_666 = {}.ElSwitch;
+}, ...__VLS_functionalComponentArgsRest(__VLS_665));
+__VLS_667.slots.default;
+const __VLS_668 = {}.ElSwitch;
 /** @type {[typeof __VLS_components.ElSwitch, typeof __VLS_components.elSwitch, ]} */ ;
 // @ts-ignore
-const __VLS_667 = __VLS_asFunctionalComponent(__VLS_666, new __VLS_666({
+const __VLS_669 = __VLS_asFunctionalComponent(__VLS_668, new __VLS_668({
     modelValue: (__VLS_ctx.publishForm.allowAnonymousAccess),
     activeText: "允许",
     inactiveText: "关闭",
 }));
-const __VLS_668 = __VLS_667({
+const __VLS_670 = __VLS_669({
     modelValue: (__VLS_ctx.publishForm.allowAnonymousAccess),
     activeText: "允许",
     inactiveText: "关闭",
-}, ...__VLS_functionalComponentArgsRest(__VLS_667));
-var __VLS_665;
-const __VLS_670 = {}.ElFormItem;
+}, ...__VLS_functionalComponentArgsRest(__VLS_669));
+var __VLS_667;
+const __VLS_672 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_671 = __VLS_asFunctionalComponent(__VLS_670, new __VLS_670({
+const __VLS_673 = __VLS_asFunctionalComponent(__VLS_672, new __VLS_672({
     label: "允许访问角色",
 }));
-const __VLS_672 = __VLS_671({
+const __VLS_674 = __VLS_673({
     label: "允许访问角色",
-}, ...__VLS_functionalComponentArgsRest(__VLS_671));
-__VLS_673.slots.default;
-const __VLS_674 = {}.ElCheckboxGroup;
+}, ...__VLS_functionalComponentArgsRest(__VLS_673));
+__VLS_675.slots.default;
+const __VLS_676 = {}.ElCheckboxGroup;
 /** @type {[typeof __VLS_components.ElCheckboxGroup, typeof __VLS_components.elCheckboxGroup, typeof __VLS_components.ElCheckboxGroup, typeof __VLS_components.elCheckboxGroup, ]} */ ;
 // @ts-ignore
-const __VLS_675 = __VLS_asFunctionalComponent(__VLS_674, new __VLS_674({
+const __VLS_677 = __VLS_asFunctionalComponent(__VLS_676, new __VLS_676({
     modelValue: (__VLS_ctx.publishForm.allowedRoles),
 }));
-const __VLS_676 = __VLS_675({
+const __VLS_678 = __VLS_677({
     modelValue: (__VLS_ctx.publishForm.allowedRoles),
-}, ...__VLS_functionalComponentArgsRest(__VLS_675));
-__VLS_677.slots.default;
+}, ...__VLS_functionalComponentArgsRest(__VLS_677));
+__VLS_679.slots.default;
 for (const [role] of __VLS_getVForSourceType((__VLS_ctx.roleOptions))) {
-    const __VLS_678 = {}.ElCheckbox;
+    const __VLS_680 = {}.ElCheckbox;
     /** @type {[typeof __VLS_components.ElCheckbox, typeof __VLS_components.elCheckbox, typeof __VLS_components.ElCheckbox, typeof __VLS_components.elCheckbox, ]} */ ;
     // @ts-ignore
-    const __VLS_679 = __VLS_asFunctionalComponent(__VLS_678, new __VLS_678({
+    const __VLS_681 = __VLS_asFunctionalComponent(__VLS_680, new __VLS_680({
         key: (role),
         label: (role),
     }));
-    const __VLS_680 = __VLS_679({
+    const __VLS_682 = __VLS_681({
         key: (role),
         label: (role),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_679));
-    __VLS_681.slots.default;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_681));
+    __VLS_683.slots.default;
     (role);
-    var __VLS_681;
+    var __VLS_683;
 }
-var __VLS_677;
-var __VLS_673;
-const __VLS_682 = {}.ElFormItem;
+var __VLS_679;
+var __VLS_675;
+const __VLS_684 = {}.ElFormItem;
 /** @type {[typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, typeof __VLS_components.ElFormItem, typeof __VLS_components.elFormItem, ]} */ ;
 // @ts-ignore
-const __VLS_683 = __VLS_asFunctionalComponent(__VLS_682, new __VLS_682({
+const __VLS_685 = __VLS_asFunctionalComponent(__VLS_684, new __VLS_684({
     label: "正式分享链接",
 }));
-const __VLS_684 = __VLS_683({
+const __VLS_686 = __VLS_685({
     label: "正式分享链接",
-}, ...__VLS_functionalComponentArgsRest(__VLS_683));
-__VLS_685.slots.default;
-const __VLS_686 = {}.ElInput;
+}, ...__VLS_functionalComponentArgsRest(__VLS_685));
+__VLS_687.slots.default;
+const __VLS_688 = {}.ElInput;
 /** @type {[typeof __VLS_components.ElInput, typeof __VLS_components.elInput, ]} */ ;
 // @ts-ignore
-const __VLS_687 = __VLS_asFunctionalComponent(__VLS_686, new __VLS_686({
+const __VLS_689 = __VLS_asFunctionalComponent(__VLS_688, new __VLS_688({
     modelValue: (__VLS_ctx.draftPublishedLink),
     readonly: true,
 }));
-const __VLS_688 = __VLS_687({
+const __VLS_690 = __VLS_689({
     modelValue: (__VLS_ctx.draftPublishedLink),
     readonly: true,
-}, ...__VLS_functionalComponentArgsRest(__VLS_687));
-var __VLS_685;
-var __VLS_653;
+}, ...__VLS_functionalComponentArgsRest(__VLS_689));
+var __VLS_687;
+var __VLS_655;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "share-tip" },
 });
 {
-    const { footer: __VLS_thisSlot } = __VLS_649.slots;
-    const __VLS_690 = {}.ElButton;
+    const { footer: __VLS_thisSlot } = __VLS_651.slots;
+    const __VLS_692 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_691 = __VLS_asFunctionalComponent(__VLS_690, new __VLS_690({
+    const __VLS_693 = __VLS_asFunctionalComponent(__VLS_692, new __VLS_692({
         ...{ 'onClick': {} },
     }));
-    const __VLS_692 = __VLS_691({
+    const __VLS_694 = __VLS_693({
         ...{ 'onClick': {} },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_691));
-    let __VLS_694;
-    let __VLS_695;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_693));
     let __VLS_696;
-    const __VLS_697 = {
+    let __VLS_697;
+    let __VLS_698;
+    const __VLS_699 = {
         onClick: (...[$event]) => {
             __VLS_ctx.publishVisible = false;
         }
     };
-    __VLS_693.slots.default;
-    var __VLS_693;
-    const __VLS_698 = {}.ElButton;
+    __VLS_695.slots.default;
+    var __VLS_695;
+    const __VLS_700 = {}.ElButton;
     /** @type {[typeof __VLS_components.ElButton, typeof __VLS_components.elButton, typeof __VLS_components.ElButton, typeof __VLS_components.elButton, ]} */ ;
     // @ts-ignore
-    const __VLS_699 = __VLS_asFunctionalComponent(__VLS_698, new __VLS_698({
+    const __VLS_701 = __VLS_asFunctionalComponent(__VLS_700, new __VLS_700({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.publishSaving),
     }));
-    const __VLS_700 = __VLS_699({
+    const __VLS_702 = __VLS_701({
         ...{ 'onClick': {} },
         type: "primary",
         loading: (__VLS_ctx.publishSaving),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_699));
-    let __VLS_702;
-    let __VLS_703;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_701));
     let __VLS_704;
-    const __VLS_705 = {
+    let __VLS_705;
+    let __VLS_706;
+    const __VLS_707 = {
         onClick: (__VLS_ctx.savePublishSettings)
     };
-    __VLS_701.slots.default;
-    var __VLS_701;
+    __VLS_703.slots.default;
+    var __VLS_703;
 }
-var __VLS_649;
+var __VLS_651;
 /** @type {__VLS_StyleScopedClasses['screen-root']} */ ;
 /** @type {__VLS_StyleScopedClasses['screen-layer-rail']} */ ;
 /** @type {__VLS_StyleScopedClasses['layer-rail-head']} */ ;
@@ -7267,6 +7446,8 @@ var __VLS_649;
 /** @type {__VLS_StyleScopedClasses['share-label']} */ ;
 /** @type {__VLS_StyleScopedClasses['share-tip']} */ ;
 /** @type {__VLS_StyleScopedClasses['share-tip']} */ ;
+// @ts-ignore
+var __VLS_527 = __VLS_526;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -7299,6 +7480,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             getAssetBadgeText: getAssetBadgeText,
             shouldUseTypeVisualPreview: shouldUseTypeVisualPreview,
             getTypeChipPreviewChartConfig: getTypeChipPreviewChartConfig,
+            getTypeChipPreviewStyleConfig: getTypeChipPreviewStyleConfig,
             getTemplateAssetConfig: getTemplateAssetConfig,
             isTemplateStaticAsset: isTemplateStaticAsset,
             activeAssetCategory: activeAssetCategory,
@@ -7336,6 +7518,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             capturingCover: capturingCover,
             bgImgInputRef: bgImgInputRef,
             bgImgUploading: bgImgUploading,
+            componentInspectorRef: componentInspectorRef,
             libraryTab: libraryTab,
             assetSearch: assetSearch,
             assetType: assetType,

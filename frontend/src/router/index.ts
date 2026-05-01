@@ -67,12 +67,14 @@ router.beforeEach(async (to) => {
     return '/login'
   }
   const roles = Array.isArray(to.meta.roles) ? to.meta.roles : []
-  if (roles.length && !roles.includes(getAuthRole())) {
+  const currentRole = (getAuthRole() || '').toUpperCase()
+  const isAdmin = currentRole === 'ADMIN'
+  if (roles.length && !isAdmin && !roles.includes(getAuthRole())) {
     ElMessage.error('当前账号没有权限访问该页面')
     return '/home'
   }
 
-  if (to.meta.requiresAuth) {
+  if (to.meta.requiresAuth && !isAdmin) {
     const allowedPaths = await loadAllowedPaths()
     if (allowedPaths.size && !allowedPaths.has(to.path) &&
         !Array.from(allowedPaths).some((p) => to.path.startsWith(p + '/'))) {

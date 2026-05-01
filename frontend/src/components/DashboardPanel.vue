@@ -520,7 +520,14 @@ const previewActiveComponent = async (payload: { chartId: number; configJson: st
 const saveActiveComponent = async (payload: { chartId: number; configJson: string }) => {
   const comp = activeComponent.value
   if (!comp || !currentDashboard.value) return
-  await updateDashboardComponent(currentDashboard.value.id, comp.id, payload)
+  await updateDashboardComponent(currentDashboard.value.id, comp.id, {
+    posX: comp.posX,
+    posY: comp.posY,
+    width: comp.width,
+    height: comp.height,
+    zIndex: comp.zIndex,
+    ...payload,
+  })
   comp.chartId = payload.chartId
   comp.configJson = payload.configJson
   await loadComponents()

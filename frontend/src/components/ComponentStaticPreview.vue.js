@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { chartTypeLabel, isDecorationChartType, isVectorIconChartType, } from '../utils/component-config';
+import { chartTypeLabel, isDecorationChartType, isStyleDecorationChartType, isVectorIconChartType, } from '../utils/component-config';
 const props = withDefaults(defineProps(), {
     styleConfig: undefined,
     data: null,
@@ -24,23 +24,61 @@ onBeforeUnmount(() => {
 const titleText = computed(() => props.styleConfig?.titleText || props.chartConfig.name || chartTypeLabel(props.chartType));
 const shouldShowTitle = computed(() => Boolean(props.showTitle || props.styleConfig?.titleText));
 const rawRows = computed(() => props.data?.rawRows ?? []);
+const withAlpha = (color, alpha, fallback) => {
+    const normalized = String(color ?? '').trim();
+    if (!normalized)
+        return fallback;
+    if (normalized.startsWith('#')) {
+        const hex = normalized.slice(1);
+        const toChannel = (value) => Number.parseInt(value, 16);
+        if (hex.length === 3 || hex.length === 4) {
+            const red = toChannel(hex[0] + hex[0]);
+            const green = toChannel(hex[1] + hex[1]);
+            const blue = toChannel(hex[2] + hex[2]);
+            return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+        }
+        if (hex.length === 6 || hex.length === 8) {
+            const red = toChannel(hex.slice(0, 2));
+            const green = toChannel(hex.slice(2, 4));
+            const blue = toChannel(hex.slice(4, 6));
+            return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+        }
+    }
+    const rgbaMatch = normalized.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*[\d.]+)?\s*\)$/i);
+    if (rgbaMatch) {
+        return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${alpha})`;
+    }
+    return normalized;
+};
 const widgetStyle = computed(() => {
     const borderWidth = Math.max(0, Number(props.styleConfig?.borderWidth ?? 1));
     const radius = Math.max(0, Number(props.styleConfig?.cardRadius ?? 14));
+    const titleFontSize = Math.max(10, Number(props.styleConfig?.titleFontSize ?? 14));
+    const metricFontSize = Math.max(16, Number(props.styleConfig?.metricValueFontSize ?? 36));
     const isDecoration = isDecorationChartType(props.chartType);
+    const isStyleDecoration = isStyleDecorationChartType(props.chartType);
+    const isTransparentDecoration = isDecoration && !isStyleDecoration;
     const baseColor = props.styleConfig?.titleColor || (props.dark ? '#eaf4ff' : '#18324d');
-    const accentColor = props.styleConfig?.metricValueColor || props.styleConfig?.iconStrokeColor || (props.dark ? '#4fdfff' : '#4db3ff');
+    const accentColor = isVectorIconChartType(props.chartType)
+        ? (props.styleConfig?.iconStrokeColor || (props.dark ? '#4fdfff' : '#4db3ff'))
+        : (props.styleConfig?.metricValueColor || (props.dark ? '#4fdfff' : '#4db3ff'));
     const successColor = props.styleConfig?.metricTrendUpColor || '#29c27c';
-    const mutedColor = props.dark ? 'rgba(234, 244, 255, 0.72)' : 'rgba(24, 50, 77, 0.72)';
+    const mutedColor = withAlpha(baseColor, 0.72, props.dark ? 'rgba(234, 244, 255, 0.72)' : 'rgba(24, 50, 77, 0.72)');
     return {
         '--static-widget-text-color': baseColor,
         '--static-widget-accent-color': accentColor,
         '--static-widget-success-color': successColor,
         '--static-widget-muted-color': mutedColor,
-        background: isDecoration ? 'transparent' : (props.styleConfig?.bgColor || 'transparent'),
-        border: !isDecoration && props.styleConfig?.borderShow ? `${borderWidth}px solid ${props.styleConfig.borderColor || accentColor}` : 'none',
-        borderRadius: isDecoration ? '0px' : `${radius}px`,
-        boxShadow: !isDecoration && props.styleConfig?.shadowShow
+        '--static-widget-title-font-size': `${titleFontSize}px`,
+        '--static-widget-metric-font-size': `${metricFontSize}px`,
+        background: isTransparentDecoration ? 'transparent' : (props.styleConfig?.bgColor || 'transparent'),
+        border: !isTransparentDecoration && props.styleConfig?.borderShow ? `${borderWidth}px solid ${props.styleConfig.borderColor || accentColor}` : 'none',
+        borderRadius: isTransparentDecoration
+            ? '0px'
+            : props.chartType === 'decor_shape_circle'
+                ? '9999px'
+                : `${radius}px`,
+        boxShadow: !isTransparentDecoration && props.styleConfig?.shadowShow
             ? `0 0 ${Math.max(0, Number(props.styleConfig.shadowBlur ?? 12))}px ${props.styleConfig.shadowColor || 'rgba(77, 179, 255, 0.18)'}`
             : 'none',
     };
@@ -93,25 +131,9 @@ const activeIframeTabUrl = computed(() => {
 });
 // ─── text block ───────────────────────────────────────────────────────
 const textBlockContent = computed(() => {
-    // Priority: data source > static text content > default placeholder
-    if (rawRows.value.length) {
-        const firstRow = rawRows.value[0];
-        // If yField is set, show its value
-        if (props.chartConfig.yField && firstRow[props.chartConfig.yField] != null) {
-            return String(firstRow[props.chartConfig.yField]);
-        }
-        // If xField is set, show its value
-        if (props.chartConfig.xField && firstRow[props.chartConfig.xField] != null) {
-            return String(firstRow[props.chartConfig.xField]);
-        }
-        // Show first column value
-        const cols = props.data?.columns ?? Object.keys(firstRow);
-        if (cols.length)
-            return String(firstRow[cols[0]] ?? '');
-    }
     if (props.styleConfig?.textContent)
         return props.styleConfig.textContent;
-    return '本区域适合展示公告、提示信息、模块说明或重点摘要，支持作为独立文字组件进行视觉编排。';
+    return '在右侧基础设置中输入文本内容';
 });
 const primaryMetric = computed(() => {
     if (props.chartConfig.yField && rawRows.value.length) {
@@ -130,6 +152,22 @@ const primaryMetric = computed(() => {
         return Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(seriesValues.reduce((sum, value) => sum + value, 0));
     }
     return '128,560';
+});
+const singleFieldValue = computed(() => {
+    if (rawRows.value.length) {
+        const firstRow = rawRows.value[0];
+        if (props.chartConfig.xField && firstRow[props.chartConfig.xField] != null) {
+            return String(firstRow[props.chartConfig.xField]);
+        }
+        if (props.chartConfig.yField && firstRow[props.chartConfig.yField] != null) {
+            return String(firstRow[props.chartConfig.yField]);
+        }
+        const columns = props.data?.columns ?? Object.keys(firstRow);
+        if (columns.length) {
+            return String(firstRow[columns[0]] ?? '--');
+        }
+    }
+    return '--';
 });
 const listItems = computed(() => {
     const xField = props.chartConfig.xField;
@@ -223,6 +261,58 @@ const iconMarkup = computed(() => ({
     icon_cube_wire: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M60 18L92 36V82L60 100L28 82V36L60 18Z" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><path d="M28 36L60 54L92 36" fill="none" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/><path d="M60 54V100" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>',
     icon_wave_ribbon: '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><path d="M18 70C28 52 40 46 52 58C64 70 76 76 88 58C96 46 102 42 102 42" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 92C28 74 40 68 52 80C64 92 76 98 88 80C96 68 102 64 102 64" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.52"/></svg>',
 }[props.chartType] ?? '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="60" cy="60" r="28" fill="none" stroke="currentColor" stroke-width="10"/></svg>'));
+const COMPACT_ACCENT_ICON_TYPES = new Set([
+    'icon_plus',
+    'icon_minus',
+    'icon_search',
+    'icon_focus_frame',
+    'icon_home_badge',
+    'icon_share_nodes',
+    'icon_link_chain',
+    'icon_message_chat',
+    'icon_eye_watch',
+    'icon_lock_safe',
+    'icon_bell_notice',
+    'icon_user_profile',
+    'icon_check_mark',
+    'icon_alert_mark',
+    'icon_close_mark',
+    'icon_settings_gear',
+]);
+const FOCUS_ACCENT_ICON_TYPES = new Set([
+    'icon_arrow_trend',
+    'icon_warning_badge',
+    'icon_location_pin',
+    'icon_data_signal',
+    'icon_user_badge',
+    'icon_chart_mark',
+]);
+const FEATURE_MD_ACCENT_ICON_TYPES = new Set([
+    'icon_chevron_double',
+    'icon_shield_guard',
+    'icon_lightning_bolt',
+]);
+const FEATURE_LG_ACCENT_ICON_TYPES = new Set([
+    'icon_orbit_ring',
+    'icon_compass_star',
+    'icon_database_stack',
+    'icon_globe_grid',
+    'icon_radar_pulse',
+    'icon_cube_wire',
+]);
+const iconShellClass = computed(() => {
+    if (COMPACT_ACCENT_ICON_TYPES.has(props.chartType))
+        return 'icon-shell--compact';
+    if (FOCUS_ACCENT_ICON_TYPES.has(props.chartType))
+        return 'icon-shell--focus';
+    if (FEATURE_MD_ACCENT_ICON_TYPES.has(props.chartType))
+        return 'icon-shell--feature-md';
+    if (FEATURE_LG_ACCENT_ICON_TYPES.has(props.chartType))
+        return 'icon-shell--feature-lg';
+    if (props.chartType === 'icon_wave_ribbon')
+        return 'icon-shell--ribbon';
+    return '';
+});
 const themeName = computed(() => {
     if (isDecorationChartType(props.chartType))
         return 'decor';
@@ -302,16 +392,31 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['icon-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-shell__stage']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-shell--compact']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-shell__stage']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-shell__stage']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-shell__stage']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-shell__stage']} */ ;
+/** @type {__VLS_StyleScopedClasses['icon-shell__stage']} */ ;
 /** @type {__VLS_StyleScopedClasses['time-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['time-shell__date']} */ ;
 /** @type {__VLS_StyleScopedClasses['qr-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['link-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['frame-shell__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['time-shell__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['qr-shell__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['cloud-shell__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['frame-shell__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['cloud-shell__title']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell__tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['metric-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell--single-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell__value']} */ ;
 /** @type {__VLS_StyleScopedClasses['metric-shell__trend']} */ ;
 /** @type {__VLS_StyleScopedClasses['list-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['list-shell__value']} */ ;
 /** @type {__VLS_StyleScopedClasses['cloud-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['trend-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['trend-shell__axis']} */ ;
@@ -327,7 +432,13 @@ if (__VLS_ctx.isDecorationChartType(__VLS_ctx.chartType)) {
         ...{ class: "decor-shell" },
         ...{ class: (`decor-shell--${__VLS_ctx.chartType}`) },
     });
-    if (__VLS_ctx.chartType === 'decor_title_plate') {
+    if (__VLS_ctx.chartType === 'decor_shape_rect' || __VLS_ctx.chartType === 'decor_shape_circle') {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
+            ...{ class: "decor-shape" },
+            ...{ class: (`decor-shape--${__VLS_ctx.chartType}`) },
+        });
+    }
+    else if (__VLS_ctx.chartType === 'decor_title_plate') {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "decor-title-plate" },
         });
@@ -449,6 +560,7 @@ if (__VLS_ctx.isDecorationChartType(__VLS_ctx.chartType)) {
 else if (__VLS_ctx.isVectorIconChartType(__VLS_ctx.chartType)) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "icon-shell" },
+        ...{ class: (__VLS_ctx.iconShellClass) },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
         ...{ class: "icon-shell__stage" },
@@ -469,6 +581,12 @@ else if (__VLS_ctx.chartType === 'clock_display') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "time-shell" },
     });
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "time-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "time-shell__date" },
     });
@@ -485,6 +603,12 @@ else if (__VLS_ctx.chartType === 'qr_code') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "qr-shell" },
     });
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "qr-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "qr-grid" },
     });
@@ -521,6 +645,12 @@ else if (__VLS_ctx.chartType === 'iframe_single' || __VLS_ctx.chartType === 'ifr
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "frame-shell" },
     });
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "frame-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     if (__VLS_ctx.chartType === 'iframe_tabs' && __VLS_ctx.iframeTabList.length) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "frame-shell__tabs" },
@@ -621,7 +751,37 @@ else if (__VLS_ctx.chartType === 'text_block') {
     });
     (__VLS_ctx.textBlockContent);
 }
-else if (__VLS_ctx.chartType === 'single_field' || __VLS_ctx.chartType === 'metric_indicator' || __VLS_ctx.chartType === 'number_flipper') {
+else if (__VLS_ctx.chartType === 'single_field') {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "metric-shell metric-shell--single-field" },
+    });
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "metric-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "metric-shell__value" },
+    });
+    (__VLS_ctx.singleFieldValue);
+}
+else if (__VLS_ctx.chartType === 'number_flipper') {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "metric-shell metric-shell--flipper" },
+    });
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "metric-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "metric-shell__value metric-shell__value--flipper" },
+    });
+    (__VLS_ctx.primaryMetric);
+}
+else if (__VLS_ctx.chartType === 'metric_indicator') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "metric-shell" },
     });
@@ -633,7 +793,6 @@ else if (__VLS_ctx.chartType === 'single_field' || __VLS_ctx.chartType === 'metr
     }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "metric-shell__value" },
-        ...{ class: ({ 'metric-shell__value--flipper': __VLS_ctx.chartType === 'number_flipper' }) },
     });
     (__VLS_ctx.primaryMetric);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -680,6 +839,12 @@ else if (__VLS_ctx.chartType === 'word_cloud') {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "cloud-shell" },
     });
+    if (__VLS_ctx.shouldShowTitle) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "cloud-shell__title" },
+        });
+        (__VLS_ctx.titleText);
+    }
     for (const [item] of __VLS_getVForSourceType((__VLS_ctx.cloudItems))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             key: (item.word),
@@ -736,6 +901,7 @@ else {
 }
 /** @type {__VLS_StyleScopedClasses['static-widget']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['decor-shape']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-title-plate']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-title-plate__rail']} */ ;
 /** @type {__VLS_StyleScopedClasses['decor-title-plate__rail--left']} */ ;
@@ -793,10 +959,12 @@ else {
 /** @type {__VLS_StyleScopedClasses['icon-shell__label']} */ ;
 /** @type {__VLS_StyleScopedClasses['icon-shell__meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['time-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['time-shell__title']} */ ;
 /** @type {__VLS_StyleScopedClasses['time-shell__date']} */ ;
 /** @type {__VLS_StyleScopedClasses['time-shell__time']} */ ;
 /** @type {__VLS_StyleScopedClasses['time-shell__meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['qr-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['qr-shell__title']} */ ;
 /** @type {__VLS_StyleScopedClasses['qr-grid']} */ ;
 /** @type {__VLS_StyleScopedClasses['qr-grid__cell']} */ ;
 /** @type {__VLS_StyleScopedClasses['qr-shell__meta']} */ ;
@@ -805,6 +973,7 @@ else {
 /** @type {__VLS_StyleScopedClasses['link-shell__url']} */ ;
 /** @type {__VLS_StyleScopedClasses['link-shell__hint']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['frame-shell__title']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell__tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell__tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['frame-shell__iframe']} */ ;
@@ -824,6 +993,15 @@ else {
 /** @type {__VLS_StyleScopedClasses['text-shell__title']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-shell__paragraph']} */ ;
 /** @type {__VLS_StyleScopedClasses['metric-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell--single-field']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell__value']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell--flipper']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell__title']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell__value']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell__value--flipper']} */ ;
+/** @type {__VLS_StyleScopedClasses['metric-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['metric-shell__title']} */ ;
 /** @type {__VLS_StyleScopedClasses['metric-shell__value']} */ ;
 /** @type {__VLS_StyleScopedClasses['metric-shell__trend']} */ ;
@@ -835,6 +1013,7 @@ else {
 /** @type {__VLS_StyleScopedClasses['list-shell__label']} */ ;
 /** @type {__VLS_StyleScopedClasses['list-shell__value']} */ ;
 /** @type {__VLS_StyleScopedClasses['cloud-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['cloud-shell__title']} */ ;
 /** @type {__VLS_StyleScopedClasses['cloud-shell__word']} */ ;
 /** @type {__VLS_StyleScopedClasses['trend-shell']} */ ;
 /** @type {__VLS_StyleScopedClasses['trend-shell__title']} */ ;
@@ -860,6 +1039,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             activeIframeTabUrl: activeIframeTabUrl,
             textBlockContent: textBlockContent,
             primaryMetric: primaryMetric,
+            singleFieldValue: singleFieldValue,
             listItems: listItems,
             cloudItems: cloudItems,
             trendBars: trendBars,
@@ -867,6 +1047,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             nowTime: nowTime,
             qrCells: qrCells,
             iconMarkup: iconMarkup,
+            iconShellClass: iconShellClass,
             themeName: themeName,
         };
     },

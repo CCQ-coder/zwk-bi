@@ -1,5 +1,8 @@
 package com.aibi.bi.model.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class UpdateDashboardComponentRequest {
 
     private Long chartId;
@@ -56,10 +59,13 @@ public class UpdateDashboardComponentRequest {
         this.height = height;
     }
 
+    @JsonProperty("zIndex")
     public Integer getZIndex() {
         return zIndex;
     }
 
+    @JsonProperty("zIndex")
+    @JsonAlias("zindex")
     public void setZIndex(Integer zIndex) {
         this.zIndex = zIndex;
     }

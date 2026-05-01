@@ -139,6 +139,7 @@
                   <ComponentStaticPreview
                     :chart-type="item.type"
                     :chart-config="getTypeChipPreviewChartConfig(item.type)"
+                    :style-config="getTypeChipPreviewStyleConfig(item.type)"
                     :show-title="false"
                     dark
                   />
@@ -192,6 +193,7 @@
                         v-if="isTemplateStaticAsset(template)"
                         :chart-type="getTemplateAssetConfig(template).chart.chartType"
                         :chart-config="getTemplateAssetConfig(template).chart"
+                        :style-config="getTemplateAssetConfig(template).style"
                         :show-title="false"
                       />
                       <Suspense v-else>
@@ -262,6 +264,7 @@
               v-if="isTemplateStaticAsset(hoveredTemplate)"
               :chart-type="getTemplateAssetConfig(hoveredTemplate).chart.chartType"
               :chart-config="getTemplateAssetConfig(hoveredTemplate).chart"
+              :style-config="getTemplateAssetConfig(hoveredTemplate).style"
               :show-title="false"
               dark
             />
@@ -737,6 +740,7 @@
       <Suspense v-else>
         <template #default>
           <AsyncEditorComponentInspector
+            ref="componentInspectorRef"
             scene="screen"
             :component="activeComponent"
             :chart="activeChart"
@@ -879,6 +883,8 @@ import {
   buildComponentConfig,
   buildComponentOption,
   chartTypeLabel,
+  type ComponentStyleConfig,
+  DEFAULT_COMPONENT_STYLE,
   getChartFieldLabels,
   getConfiguredTableRows,
   getConfiguredTableStepCount,
@@ -893,6 +899,7 @@ import {
   normalizeComponentConfig,
   postProcessChartOption,
   resolveConfiguredTableColumns,
+  STYLE_DECORATION_STYLE_PRESETS,
 } from '../utils/component-config'
 import { echarts, type ECharts } from '../utils/echarts'
 import {
@@ -902,6 +909,8 @@ import {
   normalizeCoverConfig,
   normalizePublishConfig,
   parseReportConfig,
+  SCREEN_COMPONENT_MIN_HEIGHT,
+  SCREEN_COMPONENT_MIN_WIDTH,
   SCREEN_CANVAS_PRESETS,
   type ReportCanvasConfig,
 } from '../utils/report-config'
@@ -926,6 +935,87 @@ interface StaticAssetSeed {
   name: string
   description: string
   layout: { width: number; height: number }
+}
+type StaticAssetSizeGroup = 'panel' | 'card' | 'accent'
+interface StaticAssetSeedDefinition {
+  type: string
+  name: string
+  description: string
+  sizeGroup: StaticAssetSizeGroup
+  sizeProfile: string
+}
+
+const STATIC_TEMPLATE_LAYOUT_MATRIX: Record<StaticAssetSizeGroup, Record<string, { width: number; height: number }>> = {
+  panel: {
+    frame: { width: 520, height: 220 },
+    surface: { width: 520, height: 260 },
+    iframe: { width: 520, height: 320 },
+    iframeTabs: { width: 560, height: 340 },
+    copy: { width: 460, height: 240 },
+    ranking: { width: 460, height: 280 },
+    list: { width: 460, height: 260 },
+    wordCloud: { width: 420, height: 260 },
+    media: { width: 480, height: 300 },
+    trend: { width: 400, height: 220 },
+  },
+  card: {
+    metric: { width: 360, height: 200 },
+    info: { width: 360, height: 180 },
+    link: { width: 420, height: 180 },
+    square: { width: 280, height: 280 },
+  },
+  accent: {
+    banner: { width: 420, height: 96 },
+    strip: { width: 520, height: 64 },
+    focus: { width: 220, height: 220 },
+    shapeRect: { width: 300, height: 150 },
+    shapeCircle: { width: 180, height: 180 },
+    compactIcon: { width: 120, height: 120 },
+    featureIconMd: { width: 160, height: 160 },
+    featureIconLg: { width: 180, height: 180 },
+    ribbon: { width: 180, height: 120 },
+  },
+}
+
+const STATIC_TEMPLATE_LEGACY_LAYOUT_MATRIX: Record<StaticAssetSizeGroup, Record<string, { width: number; height: number }>> = {
+  panel: {
+    frame: { width: 520, height: 220 },
+    surface: { width: 520, height: 260 },
+    iframe: { width: 520, height: 320 },
+    iframeTabs: { width: 560, height: 340 },
+    copy: { width: 420, height: 220 },
+    ranking: { width: 420, height: 260 },
+    list: { width: 420, height: 240 },
+    wordCloud: { width: 420, height: 260 },
+    media: { width: 440, height: 260 },
+    trend: { width: 420, height: 240 },
+  },
+  card: {
+    metric: { width: 320, height: 180 },
+    info: { width: 360, height: 180 },
+    link: { width: 420, height: 180 },
+    square: { width: 280, height: 280 },
+  },
+  accent: {
+    banner: { width: 420, height: 96 },
+    strip: { width: 520, height: 64 },
+    focus: { width: 220, height: 220 },
+    shapeRect: { width: 300, height: 150 },
+    shapeCircle: { width: 180, height: 180 },
+    compactIcon: { width: 120, height: 120 },
+    featureIconMd: { width: 160, height: 160 },
+    featureIconLg: { width: 180, height: 180 },
+    ribbon: { width: 180, height: 120 },
+  },
+}
+
+const resolveStaticAssetLayout = (
+  group: StaticAssetSizeGroup,
+  profile: string,
+  matrix: Record<StaticAssetSizeGroup, Record<string, { width: number; height: number }>> = STATIC_TEMPLATE_LAYOUT_MATRIX,
+) => {
+  const layout = matrix[group]?.[profile]
+  return layout ? { width: layout.width, height: layout.height } : { width: 520, height: 320 }
 }
 
 const makeBarComboIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="18" width="6" height="10" fill="currentColor" rx="1"/><rect x="12" y="10" width="6" height="18" fill="currentColor" rx="1"/><rect x="20" y="14" width="6" height="14" fill="currentColor" rx="1"/><rect x="28" y="6" width="6" height="22" fill="currentColor" rx="1"/><polyline points="7,12 15,8 23,11 31,4" fill="none" stroke="currentColor" stroke-width="2" opacity=".7" stroke-linecap="round"/></svg>`
@@ -960,6 +1050,8 @@ const makeDecorDividerIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w
 const makeDecorTargetIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".68"/><circle cx="20" cy="16" r="5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".4"/><path d="M20 4V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M20 22V28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 16H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M26 16H32" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
 const makeDecorScanIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="currentColor" opacity=".08" stroke="currentColor" stroke-width="1.4"/><path d="M9 12H31" stroke="currentColor" stroke-width="2" opacity=".72"/><path d="M9 18H31" stroke="currentColor" stroke-width="1" opacity=".32"/><path d="M9 24H23" stroke="currentColor" stroke-width="1" opacity=".22"/></svg>`
 const makeDecorHexIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><path d="M15 5H25L32 16L25 27H15L8 16Z" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="1.4"/><path d="M18 11H22L25 16L22 21H18L15 16Z" fill="currentColor" opacity=".55"/></svg>`
+const makeDecorRectShapeIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="7" width="26" height="18" rx="4" fill="currentColor" opacity=".22" stroke="currentColor" stroke-width="1.5"/><path d="M11 12H29" stroke="currentColor" stroke-width="1.3" opacity=".48"/><path d="M11 20H24" stroke="currentColor" stroke-width="1.3" opacity=".3"/></svg>`
+const makeDecorCircleShapeIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="16" r="10" fill="currentColor" opacity=".22" stroke="currentColor" stroke-width="1.5"/><circle cx="20" cy="16" r="4" fill="currentColor" opacity=".5"/></svg>`
 const makeDecorPanelIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".45"/><path d="M9 9H18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M24 9H31V16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M29 20V23H25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 const makeDecorStreamIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="30" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"/><path d="M8 10H24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 22H32" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".75"/></svg>`
 const makeDecorPulseIcon = () => `<svg viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><rect x="7" y="7" width="26" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".24"/><path d="M13 11H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M22 11H27" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M13 21H18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M22 21H27" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M11 13V19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><path d="M29 13V19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".9"/><circle cx="13" cy="11" r="1.4" fill="currentColor" opacity=".86"/><circle cx="27" cy="11" r="1.4" fill="currentColor" opacity=".86"/><circle cx="13" cy="21" r="1.4" fill="currentColor" opacity=".86"/><circle cx="27" cy="21" r="1.4" fill="currentColor" opacity=".86"/></svg>`
@@ -1069,6 +1161,8 @@ const DECORATION_COMPONENT_ITEMS: ChartTypeItem[] = [
   createTypeItem('decor_target_ring', makeDecorTargetIcon()),
   createTypeItem('decor_scan_panel', makeDecorScanIcon()),
   createTypeItem('decor_hex_badge', makeDecorHexIcon()),
+  createTypeItem('decor_shape_rect', makeDecorRectShapeIcon()),
+  createTypeItem('decor_shape_circle', makeDecorCircleShapeIcon()),
 ]
 
 const TEXT_COMPONENT_ITEMS: ChartTypeItem[] = [
@@ -1167,6 +1261,7 @@ const getTypeChipPreviewChartConfig = (type: string) => {
   }
   return cached
 }
+const getTypeChipPreviewStyleConfig = (type: string): Partial<ComponentStyleConfig> | undefined => STYLE_DECORATION_STYLE_PRESETS[type]
 
 // 缓存模板/组件配置解析结果，避免 v-for 内多次 JSON.parse
 const _templateConfigCache = new WeakMap<ChartTemplate, ReturnType<typeof normalizeComponentAssetConfig>>()
@@ -1177,68 +1272,88 @@ const getTemplateAssetConfig = (template: ChartTemplate) => {
 }
 const isTemplateStaticAsset = (template: ChartTemplate) => isStaticWidgetChartType(getTemplateAssetConfig(template).chart.chartType || template.chartType)
 
-const STATIC_TEMPLATE_LIBRARY: StaticAssetSeed[] = [
-  { type: 'decor_border_frame', name: '边框1', description: '基础外框边界，适合做模块包裹。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_corner', name: '边框2', description: '四角强调型边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_glow', name: '边框3', description: '带发光效果的高亮边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_grid', name: '边框4', description: '带网格和刻度肌理的科技边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_stream', name: '边框5', description: '带流光扫过效果的动效边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_pulse', name: '边框6', description: '带脉冲感的提示边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_bracket', name: '边框7', description: '结构支架感边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_circuit', name: '边框8', description: '链路电路风格边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_border_panel', name: '边框9', description: '折角面板风格边框。', layout: { width: 520, height: 220 } },
-  { type: 'decor_title_plate', name: '标题牌', description: '适合章节标题、指标模块抬头和栏位标识。', layout: { width: 420, height: 96 } },
-  { type: 'decor_divider_glow', name: '发光分隔条', description: '适合区块之间的节奏分隔和视觉导向。', layout: { width: 520, height: 64 } },
-  { type: 'decor_target_ring', name: '目标环', description: '适合重点指标、地图落点和雷达锁定效果。', layout: { width: 220, height: 220 } },
-  { type: 'decor_scan_panel', name: '扫描面板', description: '带扫描流光的科技底板，可作为信息区背景。', layout: { width: 520, height: 260 } },
-  { type: 'decor_hex_badge', name: '六边形徽记', description: '适合中心徽章、状态标签和图标承载。', layout: { width: 220, height: 220 } },
-  { type: 'text_block', name: '文本组件', description: '用于公告、说明和长文本排版。', layout: { width: 420, height: 220 } },
-  { type: 'single_field', name: '单字段组件', description: '适合展示单值和摘要。', layout: { width: 320, height: 180 } },
-  { type: 'number_flipper', name: '数字翻牌器', description: '适合大屏 KPI 强调。', layout: { width: 320, height: 180 } },
-  { type: 'table_rank', name: '排名表格', description: '适合榜单和排名列表。', layout: { width: 420, height: 260 } },
-  { type: 'iframe_single', name: '单页 iframe', description: '嵌入单个外部页面。', layout: { width: 520, height: 320 } },
-  { type: 'iframe_tabs', name: '页签 iframe', description: '适合多页面切换展示。', layout: { width: 560, height: 340 } },
-  { type: 'hyperlink', name: '超级链接', description: '适合门户跳转和深链入口。', layout: { width: 420, height: 180 } },
-  { type: 'image_list', name: '图片列表', description: '适合图文卡片流。', layout: { width: 440, height: 260 } },
-  { type: 'text_list', name: '文字列表', description: '适合公告、列表和摘要。', layout: { width: 420, height: 240 } },
-  { type: 'clock_display', name: '显示时间', description: '实时展示当前日期与时间。', layout: { width: 360, height: 180 } },
-  { type: 'word_cloud', name: '词云图', description: '展示业务高频关键词。', layout: { width: 420, height: 260 } },
-  { type: 'qr_code', name: '二维码', description: '适合扫码跳转和分享。', layout: { width: 280, height: 280 } },
-  { type: 'business_trend', name: '业务趋势', description: '适合轻量趋势占位和摘要。', layout: { width: 420, height: 240 } },
-  { type: 'metric_indicator', name: '指标组件', description: '适合关键经营指标展示。', layout: { width: 320, height: 180 } },
-  { type: 'icon_arrow_trend', name: '趋势箭头图标', description: '用于强调涨跌趋势。', layout: { width: 220, height: 220 } },
-  { type: 'icon_warning_badge', name: '预警图标', description: '适合告警和异常提醒。', layout: { width: 220, height: 220 } },
-  { type: 'icon_location_pin', name: '定位图标', description: '适合地图和区域说明。', layout: { width: 220, height: 220 } },
-  { type: 'icon_data_signal', name: '数据信号图标', description: '适合状态和联通性提示。', layout: { width: 220, height: 220 } },
-  { type: 'icon_user_badge', name: '用户徽章图标', description: '适合人物、角色和身份展示。', layout: { width: 220, height: 220 } },
-  { type: 'icon_chart_mark', name: '图表标记图标', description: '适合图例和图表注记。', layout: { width: 220, height: 220 } },
-  { type: 'icon_plus', name: '加号', description: '用于新增和叠加提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_minus', name: '减号', description: '用于收起和减弱提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_search', name: '搜索', description: '用于检索和放大提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_focus_frame', name: '聚焦框', description: '用于聚焦和框选区域提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_home_badge', name: '主页', description: '用于门户和首页标识。', layout: { width: 140, height: 140 } },
-  { type: 'icon_share_nodes', name: '分享', description: '用于分享传播和连接提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_link_chain', name: '链接', description: '用于链路与跳转提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_message_chat', name: '消息', description: '用于评论和消息提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_eye_watch', name: '可视', description: '用于可见状态和查看提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_lock_safe', name: '锁定', description: '用于权限和安全提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_bell_notice', name: '铃铛', description: '用于通知和提醒入口。', layout: { width: 140, height: 140 } },
-  { type: 'icon_user_profile', name: '用户', description: '用于用户身份标识。', layout: { width: 140, height: 140 } },
-  { type: 'icon_check_mark', name: '勾选', description: '用于通过和完成状态。', layout: { width: 140, height: 140 } },
-  { type: 'icon_alert_mark', name: '提醒', description: '用于警示和注意提示。', layout: { width: 140, height: 140 } },
-  { type: 'icon_close_mark', name: '关闭', description: '用于关闭和移除动作。', layout: { width: 140, height: 140 } },
-  { type: 'icon_settings_gear', name: '设置', description: '用于参数与系统设置入口。', layout: { width: 140, height: 140 } },
-  { type: 'icon_chevron_double', name: '双箭头', description: '适合流程引导、方向强调和切换提示。', layout: { width: 160, height: 160 } },
-  { type: 'icon_orbit_ring', name: '轨道环', description: '适合中心视觉、指标环绕和焦点装饰。', layout: { width: 180, height: 180 } },
-  { type: 'icon_compass_star', name: '星芒标', description: '适合目标点、中心徽标和章节强调。', layout: { width: 180, height: 180 } },
-  { type: 'icon_database_stack', name: '数据仓', description: '适合仓储、底座和数据中心语义提示。', layout: { width: 180, height: 180 } },
-  { type: 'icon_shield_guard', name: '安全盾牌', description: '适合权限、安全和守护状态提示。', layout: { width: 160, height: 160 } },
-  { type: 'icon_lightning_bolt', name: '闪电', description: '适合速度、告警和瞬时动作强调。', layout: { width: 160, height: 160 } },
-  { type: 'icon_globe_grid', name: '地球网格', description: '适合全球视角、网络和空间连接表达。', layout: { width: 180, height: 180 } },
-  { type: 'icon_radar_pulse', name: '雷达脉冲', description: '适合扫描、侦测和动态响应提示。', layout: { width: 180, height: 180 } },
-  { type: 'icon_cube_wire', name: '立方线框', description: '适合模型、容器和模块化结构表达。', layout: { width: 180, height: 180 } },
-  { type: 'icon_wave_ribbon', name: '波纹带', description: '适合流向、波动和连续态势装饰。', layout: { width: 180, height: 120 } },
+const STATIC_TEMPLATE_SIZE_DEFINITIONS: StaticAssetSeedDefinition[] = [
+  { type: 'decor_border_frame', name: '边框1', description: '基础外框边界，适合做模块包裹。', sizeGroup: 'panel', sizeProfile: 'frame' },
+  { type: 'decor_border_corner', name: '边框2', description: '四角强调型边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+  { type: 'decor_border_glow', name: '边框3', description: '带发光效果的高亮边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+  { type: 'decor_border_grid', name: '边框4', description: '带网格和刻度肌理的科技边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+  { type: 'decor_border_stream', name: '边框5', description: '带流光扫过效果的动效边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+  { type: 'decor_border_pulse', name: '边框6', description: '带脉冲感的提示边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+  { type: 'decor_border_bracket', name: '边框7', description: '结构支架感边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+  { type: 'decor_border_circuit', name: '边框8', description: '链路电路风格边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+  { type: 'decor_border_panel', name: '边框9', description: '折角面板风格边框。', sizeGroup: 'panel', sizeProfile: 'frame' },
+  { type: 'decor_scan_panel', name: '扫描面板', description: '带扫描流光的科技底板，可作为信息区背景。', sizeGroup: 'panel', sizeProfile: 'surface' },
+  { type: 'text_block', name: '文本组件', description: '用于公告、说明和长文本排版。', sizeGroup: 'panel', sizeProfile: 'copy' },
+  { type: 'table_rank', name: '排名表格', description: '适合榜单和排名列表。', sizeGroup: 'panel', sizeProfile: 'ranking' },
+  { type: 'iframe_single', name: '单页 iframe', description: '嵌入单个外部页面。', sizeGroup: 'panel', sizeProfile: 'iframe' },
+  { type: 'iframe_tabs', name: '页签 iframe', description: '适合多页面切换展示。', sizeGroup: 'panel', sizeProfile: 'iframeTabs' },
+  { type: 'image_list', name: '图片列表', description: '适合图文卡片流。', sizeGroup: 'panel', sizeProfile: 'media' },
+  { type: 'text_list', name: '文字列表', description: '适合公告、列表和摘要。', sizeGroup: 'panel', sizeProfile: 'list' },
+  { type: 'word_cloud', name: '词云图', description: '展示业务高频关键词。', sizeGroup: 'panel', sizeProfile: 'wordCloud' },
+  { type: 'business_trend', name: '业务趋势', description: '适合轻量趋势占位和摘要。', sizeGroup: 'panel', sizeProfile: 'trend' },
+  { type: 'single_field', name: '单字段组件', description: '适合展示单值和摘要。', sizeGroup: 'card', sizeProfile: 'metric' },
+  { type: 'number_flipper', name: '数字翻牌器', description: '适合大屏 KPI 强调。', sizeGroup: 'card', sizeProfile: 'metric' },
+  { type: 'metric_indicator', name: '指标组件', description: '适合关键经营指标展示。', sizeGroup: 'card', sizeProfile: 'metric' },
+  { type: 'clock_display', name: '显示时间', description: '实时展示当前日期与时间。', sizeGroup: 'card', sizeProfile: 'info' },
+  { type: 'hyperlink', name: '超级链接', description: '适合门户跳转和深链入口。', sizeGroup: 'card', sizeProfile: 'link' },
+  { type: 'qr_code', name: '二维码', description: '适合扫码跳转和分享。', sizeGroup: 'card', sizeProfile: 'square' },
+  { type: 'decor_title_plate', name: '标题牌', description: '适合章节标题、指标模块抬头和栏位标识。', sizeGroup: 'accent', sizeProfile: 'banner' },
+  { type: 'decor_divider_glow', name: '发光分隔条', description: '适合区块之间的节奏分隔和视觉导向。', sizeGroup: 'accent', sizeProfile: 'strip' },
+  { type: 'decor_target_ring', name: '目标环', description: '适合重点指标、地图落点和雷达锁定效果。', sizeGroup: 'accent', sizeProfile: 'focus' },
+  { type: 'decor_hex_badge', name: '六边形徽记', description: '适合中心徽章、状态标签和图标承载。', sizeGroup: 'accent', sizeProfile: 'focus' },
+  { type: 'decor_shape_rect', name: '矩形', description: '只保留样式属性的基础矩形底板。', sizeGroup: 'accent', sizeProfile: 'shapeRect' },
+  { type: 'decor_shape_circle', name: '圆形', description: '只保留样式属性的基础圆形底板。', sizeGroup: 'accent', sizeProfile: 'shapeCircle' },
+  { type: 'icon_arrow_trend', name: '趋势箭头图标', description: '用于强调涨跌趋势。', sizeGroup: 'accent', sizeProfile: 'focus' },
+  { type: 'icon_warning_badge', name: '预警图标', description: '适合告警和异常提醒。', sizeGroup: 'accent', sizeProfile: 'focus' },
+  { type: 'icon_location_pin', name: '定位图标', description: '适合地图和区域说明。', sizeGroup: 'accent', sizeProfile: 'focus' },
+  { type: 'icon_data_signal', name: '数据信号图标', description: '适合状态和联通性提示。', sizeGroup: 'accent', sizeProfile: 'focus' },
+  { type: 'icon_user_badge', name: '用户徽章图标', description: '适合人物、角色和身份展示。', sizeGroup: 'accent', sizeProfile: 'focus' },
+  { type: 'icon_chart_mark', name: '图表标记图标', description: '适合图例和图表注记。', sizeGroup: 'accent', sizeProfile: 'focus' },
+  { type: 'icon_plus', name: '加号', description: '用于新增和叠加提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_minus', name: '减号', description: '用于收起和减弱提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_search', name: '搜索', description: '用于检索和放大提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_focus_frame', name: '聚焦框', description: '用于聚焦和框选区域提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_home_badge', name: '主页', description: '用于门户和首页标识。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_share_nodes', name: '分享', description: '用于分享传播和连接提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_link_chain', name: '链接', description: '用于链路与跳转提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_message_chat', name: '消息', description: '用于评论和消息提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_eye_watch', name: '可视', description: '用于可见状态和查看提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_lock_safe', name: '锁定', description: '用于权限和安全提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_bell_notice', name: '铃铛', description: '用于通知和提醒入口。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_user_profile', name: '用户', description: '用于用户身份标识。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_check_mark', name: '勾选', description: '用于通过和完成状态。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_alert_mark', name: '提醒', description: '用于警示和注意提示。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_close_mark', name: '关闭', description: '用于关闭和移除动作。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_settings_gear', name: '设置', description: '用于参数与系统设置入口。', sizeGroup: 'accent', sizeProfile: 'compactIcon' },
+  { type: 'icon_chevron_double', name: '双箭头', description: '适合流程引导、方向强调和切换提示。', sizeGroup: 'accent', sizeProfile: 'featureIconMd' },
+  { type: 'icon_orbit_ring', name: '轨道环', description: '适合中心视觉、指标环绕和焦点装饰。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+  { type: 'icon_compass_star', name: '星芒标', description: '适合目标点、中心徽标和章节强调。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+  { type: 'icon_database_stack', name: '数据仓', description: '适合仓储、底座和数据中心语义提示。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+  { type: 'icon_shield_guard', name: '安全盾牌', description: '适合权限、安全和守护状态提示。', sizeGroup: 'accent', sizeProfile: 'featureIconMd' },
+  { type: 'icon_lightning_bolt', name: '闪电', description: '适合速度、告警和瞬时动作强调。', sizeGroup: 'accent', sizeProfile: 'featureIconMd' },
+  { type: 'icon_globe_grid', name: '地球网格', description: '适合全球视角、网络和空间连接表达。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+  { type: 'icon_radar_pulse', name: '雷达脉冲', description: '适合扫描、侦测和动态响应提示。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+  { type: 'icon_cube_wire', name: '立方线框', description: '适合模型、容器和模块化结构表达。', sizeGroup: 'accent', sizeProfile: 'featureIconLg' },
+  { type: 'icon_wave_ribbon', name: '波纹带', description: '适合流向、波动和连续态势装饰。', sizeGroup: 'accent', sizeProfile: 'ribbon' },
 ]
+
+const STATIC_TEMPLATE_LIBRARY: StaticAssetSeed[] = STATIC_TEMPLATE_SIZE_DEFINITIONS.map((item) => ({
+  type: item.type,
+  name: item.name,
+  description: item.description,
+  layout: resolveStaticAssetLayout(item.sizeGroup, item.sizeProfile),
+}))
+
+const LEGACY_STATIC_TEMPLATE_LAYOUTS: Record<string, { width: number; height: number }> = Object.fromEntries(
+  STATIC_TEMPLATE_SIZE_DEFINITIONS.flatMap((item) => {
+    const legacyLayout = resolveStaticAssetLayout(item.sizeGroup, item.sizeProfile, STATIC_TEMPLATE_LEGACY_LAYOUT_MATRIX)
+    const currentLayout = resolveStaticAssetLayout(item.sizeGroup, item.sizeProfile)
+    if (legacyLayout.width === currentLayout.width && legacyLayout.height === currentLayout.height) {
+      return []
+    }
+    return [[item.type, legacyLayout] as const]
+  })
+) as Record<string, { width: number; height: number }>
 
 const defaultChartTemplateLayout = (chartType: string) => {
   const staticAsset = STATIC_TEMPLATE_LIBRARY.find((item) => item.type === chartType)
@@ -1304,9 +1419,9 @@ const clearAssetFilters = () => {
   assetType.value = ''
 }
 
-const sidebarCollapsed = ref(Boolean(props.screenId))
+const sidebarCollapsed = ref(false)
 const compactEditorMode = ref(false)
-const inspectorCollapsed = ref(true)
+const inspectorCollapsed = ref(false)
 const autoFitCanvas = ref(true)
 let sidebarHoverTimer: number | null = null
 const COMPACT_EDITOR_BREAKPOINT = 1440
@@ -1380,8 +1495,14 @@ const clampLeftPanelPosition = (left: number, top: number) => {
   }
 }
 const resetLeftPanelPosition = () => {
-  leftPanelPosition.left = getLeftPanelMinLeft()
-  leftPanelPosition.top = getLeftPanelMinTop()
+  const top = getLeftPanelMinTop()
+  if (!compactEditorMode.value && typeof window !== 'undefined') {
+    // 默认停靠到右侧浮层（不占网格空间）
+    leftPanelPosition.left = Math.max(getLeftPanelMinLeft(), window.innerWidth - leftPanelWidth.value - 16)
+  } else {
+    leftPanelPosition.left = getLeftPanelMinLeft()
+  }
+  leftPanelPosition.top = top
 }
 const leftPanelStyle = computed(() => {
   const position = clampLeftPanelPosition(leftPanelPosition.left, leftPanelPosition.top)
@@ -1484,6 +1605,9 @@ const localStaticTemplates = computed<ChartTemplate[]>(() => BUILTIN_TEMPLATE_LI
       tableCarouselInterval: 20000,
       dataRefreshInterval: 0,
     },
+    style: STYLE_DECORATION_STYLE_PRESETS[item.type]
+      ? ({ ...DEFAULT_COMPONENT_STYLE, ...STYLE_DECORATION_STYLE_PRESETS[item.type] } as ComponentStyleConfig)
+      : undefined,
   }, item.layout),
   builtIn: true,
   sortOrder: index + 1,
@@ -1500,6 +1624,7 @@ const stageScrollRef = ref<HTMLElement | null>(null)
 const stageScrollOffset = reactive({ left: 0, top: 0 })
 const activeCompId = ref<number | null>(null)
 const selectedComponentIds = ref<number[]>([])
+const draggingCompId = ref<number | null>(null)
 const dashboardSearch = ref('')
 const shareVisible = ref(false)
 const publishVisible = ref(false)
@@ -1510,6 +1635,9 @@ const coverSaving = ref(false)
 const capturingCover = ref(false)
 const bgImgInputRef = ref<HTMLInputElement | null>(null)
 const bgImgUploading = ref(false)
+const componentInspectorRef = ref<{
+  flushPendingDraft: () => { chartId: number; configJson: string } | null
+} | null>(null)
 
 const libraryTab = ref('templates')
 const assetSearch = ref('')
@@ -1752,8 +1880,17 @@ const startCurtainResize = (e: MouseEvent, handle: string) => {
   document.addEventListener('mouseup', onUp)
 }
 
-const MIN_CARD_WIDTH = 160
-const MIN_CARD_HEIGHT = 120
+const MIN_CARD_WIDTH = SCREEN_COMPONENT_MIN_WIDTH
+const MIN_CARD_HEIGHT = SCREEN_COMPONENT_MIN_HEIGHT
+const COMPACT_VECTOR_ICON_TYPES = new Set(
+  STATIC_TEMPLATE_LIBRARY
+    .filter((item) => isVectorIconChartType(item.type) && item.layout.width <= 140 && item.layout.height <= 140)
+    .map((item) => item.type),
+)
+const getComponentMinLayout = (_chartType: string) => ({
+  width: MIN_CARD_WIDTH,
+  height: MIN_CARD_HEIGHT,
+})
 const LEGACY_GRID_COL_PX = 42
 const LEGACY_GRID_ROW_PX = 70
 const chartTypeOptions = Array.from(new Map(
@@ -2014,41 +2151,68 @@ const getDashboardCoverUrl = (dashboard: Dashboard) => normalizeCoverConfig(pars
 const normalizeLayout = (component: DashboardComponent) => {
   const rawWidth = Number(component.width) || 0
   const rawHeight = Number(component.height) || 0
+  const chartType = getComponentChartConfig(component).chartType ?? ''
+  const minLayout = getComponentMinLayout(chartType)
   const isLegacyGridLayout = rawWidth > 0 && rawHeight > 0 && (rawWidth <= 24 || rawHeight <= 12)
 
   if (isLegacyGridLayout) {
-    if (rawWidth <= 24) component.width = Math.max(MIN_CARD_WIDTH, rawWidth * LEGACY_GRID_COL_PX)
-    if (rawHeight <= 12) component.height = Math.max(MIN_CARD_HEIGHT, rawHeight * LEGACY_GRID_ROW_PX)
+    if (rawWidth <= 24) component.width = Math.max(minLayout.width, rawWidth * LEGACY_GRID_COL_PX)
+    if (rawHeight <= 12) component.height = Math.max(minLayout.height, rawHeight * LEGACY_GRID_ROW_PX)
     if ((Number(component.posX) || 0) <= 24) component.posX = (Number(component.posX) || 0) * LEGACY_GRID_COL_PX
     if ((Number(component.posY) || 0) <= 24) component.posY = (Number(component.posY) || 0) * LEGACY_GRID_ROW_PX
   }
 
-  const chartType = getComponentChartConfig(component).chartType ?? ''
   const preferredLayout = defaultChartTemplateLayout(chartType)
+  const legacyStaticLayout = LEGACY_STATIC_TEMPLATE_LAYOUTS[chartType]
   const shouldNormalizeStaticFallbackSize =
     rawWidth === 520 && rawHeight === 320
     && (preferredLayout.width !== 520 || preferredLayout.height !== 320)
     && (isStaticWidgetChartType(chartType) || isVectorIconChartType(chartType))
+  const shouldNormalizeLegacyStaticSize =
+    !!legacyStaticLayout
+    && rawWidth === legacyStaticLayout.width
+    && rawHeight === legacyStaticLayout.height
+    && (preferredLayout.width !== legacyStaticLayout.width || preferredLayout.height !== legacyStaticLayout.height)
+  const shouldNormalizeCompactVectorIconSize =
+    COMPACT_VECTOR_ICON_TYPES.has(chartType)
+    && rawHeight === 140
+    && (rawWidth === 140 || rawWidth === 160)
+    && preferredLayout.width === 120
+    && preferredLayout.height === 120
 
   if (shouldNormalizeStaticFallbackSize) {
     component.width = preferredLayout.width
     component.height = preferredLayout.height
   }
 
+  if (shouldNormalizeLegacyStaticSize) {
+    component.width = preferredLayout.width
+    component.height = preferredLayout.height
+  }
+
+  if (shouldNormalizeCompactVectorIconSize) {
+    component.width = preferredLayout.width
+    component.height = preferredLayout.height
+  }
+
   component.posX = Math.max(0, Number(component.posX) || 0)
   component.posY = Math.max(0, Number(component.posY) || 0)
-  component.width = Math.max(MIN_CARD_WIDTH, Number(component.width) || MIN_CARD_WIDTH)
-  component.height = Math.max(MIN_CARD_HEIGHT, Number(component.height) || MIN_CARD_HEIGHT)
+  component.width = Math.max(minLayout.width, Number(component.width) || minLayout.width)
+  component.height = Math.max(minLayout.height, Number(component.height) || minLayout.height)
   component.zIndex = Number(component.zIndex) || 0
 }
 
-const cloneComponentLayout = (component: Pick<DashboardComponent, 'posX' | 'posY' | 'width' | 'height' | 'zIndex'>): ComponentLayoutSnapshot => ({
-  posX: Math.max(0, Math.round(Number(component.posX) || 0)),
-  posY: Math.max(0, Math.round(Number(component.posY) || 0)),
-  width: Math.max(MIN_CARD_WIDTH, Math.round(Number(component.width) || MIN_CARD_WIDTH)),
-  height: Math.max(MIN_CARD_HEIGHT, Math.round(Number(component.height) || MIN_CARD_HEIGHT)),
-  zIndex: Math.max(0, Math.round(Number(component.zIndex) || 0)),
-})
+const cloneComponentLayout = (component: DashboardComponent): ComponentLayoutSnapshot => {
+  const chartType = getComponentChartConfig(component).chartType ?? ''
+  const minLayout = getComponentMinLayout(chartType)
+  return {
+    posX: Math.max(0, Math.round(Number(component.posX) || 0)),
+    posY: Math.max(0, Math.round(Number(component.posY) || 0)),
+    width: Math.max(minLayout.width, Math.round(Number(component.width) || minLayout.width)),
+    height: Math.max(minLayout.height, Math.round(Number(component.height) || minLayout.height)),
+    zIndex: Math.max(0, Math.round(Number(component.zIndex) || 0)),
+  }
+}
 
 const cloneComponentSnapshot = (component: DashboardComponent): ComponentSnapshot => ({
   id: component.id,
@@ -2136,7 +2300,7 @@ const getCardStyle = (component: DashboardComponent) => {
     top: `${component.posY}px`,
     width: `${component.width}px`,
     height: `${component.height}px`,
-    zIndex: String(Math.max(2, component.zIndex ?? 2)),
+    zIndex: draggingCompId.value === component.id ? '9999' : String(Math.max(2, component.zIndex ?? 2)),
     borderRadius: !isDecoration && style.cardRadius != null ? `${style.cardRadius}px` : undefined,
     border: !isDecoration && style.borderShow ? `${style.borderWidth}px solid ${style.borderColor}` : undefined,
     opacity: style.componentOpacity != null && style.componentOpacity < 1 ? String(style.componentOpacity) : undefined,
@@ -2315,7 +2479,11 @@ const handleComponentVisibilityChange = (componentId: number, visible: boolean) 
 }
 
 const setupComponentVisibilityObserver = () => {
-  disposeComponentVisibilityObserver()
+  // Only reset the observer; preserve stageCardRefs so the new observer can observe them.
+  // disposeComponentVisibilityObserver() would clear stageCardRefs, leaving nothing to observe.
+  componentVisibilityObserver?.disconnect()
+  componentVisibilityObserver = null
+  clearVisibleComponentIds()
   if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return false
   if (!stageScrollRef.value) return false
   componentVisibilityObserver = new IntersectionObserver((entries) => {
@@ -2502,6 +2670,18 @@ const loadComponentData = async (component: DashboardComponent, loadToken = comp
     if (loadToken !== componentDataLoadToken) return
     ElMessage.warning(`组件 ${chart.name} 数据加载失败`)
   }
+}
+
+const persistComponentSnapshot = async (dashboardId: number, component: DashboardComponent) => {
+  await updateDashboardComponent(dashboardId, component.id, {
+    chartId: component.chartId,
+    configJson: component.configJson ?? '',
+    posX: component.posX,
+    posY: component.posY,
+    width: component.width,
+    height: component.height,
+    zIndex: component.zIndex,
+  })
 }
 
 const renderChart = (component: DashboardComponent, data: ChartDataResult) => {
@@ -2823,6 +3003,7 @@ const getStageCardMemo = (component: DashboardComponent) => {
     component.chartId,
     component.configJson ?? '',
     activeCompId.value === component.id,
+    draggingCompId.value === component.id,
     isComponentSelected(component.id),
     shouldDeferComponentPreview(component),
     isComponentPreviewLoading(component),
@@ -2913,6 +3094,7 @@ const handleCurtainPointerDown = (event: MouseEvent) => {
 }
 
 const focusComponent = (component: DashboardComponent, options: { preserveSelection?: boolean; bringToFront?: boolean } = {}) => {
+  const zBefore = component.zIndex ?? 0
   const preserveSelection = options.preserveSelection === true && isComponentSelected(component.id)
   if (preserveSelection) {
     overlaySelected.value = false
@@ -2920,9 +3102,15 @@ const focusComponent = (component: DashboardComponent, options: { preserveSelect
   } else {
     setSelectedComponents([component.id], component.id)
   }
-  if (options.bringToFront === false) return
+  if (options.bringToFront === false) {
+    console.debug('[Layer] focusComponent: bringToFront=false, zIndex unchanged', component.id, zBefore)
+    return
+  }
   const nextZ = getMaxZ() + 1
-  if ((component.zIndex ?? 0) < nextZ) component.zIndex = nextZ
+  if ((component.zIndex ?? 0) < nextZ) {
+    component.zIndex = nextZ
+    console.warn('[Layer] focusComponent: zIndex RAISED', component.id, zBefore, '->', nextZ)
+  }
 }
 
 const selectOverlayLayer = () => {
@@ -2941,7 +3129,7 @@ const handleStageCardMouseDown = (event: MouseEvent, component: DashboardCompone
   hideComponentContextMenu()
   if (event.button !== 0) return
   const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id)
-  focusComponent(component, { preserveSelection, bringToFront: !preserveSelection })
+  focusComponent(component, { preserveSelection, bringToFront: false })
 }
 
 const openComponentContextMenu = (event: MouseEvent, component: DashboardComponent) => {
@@ -2960,10 +3148,12 @@ const openComponentContextMenu = (event: MouseEvent, component: DashboardCompone
 
 const buildPatchedLayoutSnapshot = (component: DashboardComponent, patch: Partial<DashboardComponent>): ComponentLayoutSnapshot => {
   const next = cloneComponentLayout(component)
+  const chartType = getComponentChartConfig(component).chartType ?? ''
+  const minLayout = getComponentMinLayout(chartType)
   if (typeof patch.posX === 'number') next.posX = Math.max(0, Math.round(patch.posX))
   if (typeof patch.posY === 'number') next.posY = Math.max(0, Math.round(patch.posY))
-  if (typeof patch.width === 'number') next.width = Math.max(MIN_CARD_WIDTH, Math.round(patch.width))
-  if (typeof patch.height === 'number') next.height = Math.max(MIN_CARD_HEIGHT, Math.round(patch.height))
+  if (typeof patch.width === 'number') next.width = Math.max(minLayout.width, Math.round(patch.width))
+  if (typeof patch.height === 'number') next.height = Math.max(minLayout.height, Math.round(patch.height))
   if (typeof patch.zIndex === 'number') next.zIndex = Math.max(0, Math.round(patch.zIndex))
   return next
 }
@@ -3146,7 +3336,14 @@ const saveActiveComponent = async (payload: { chartId: number; configJson: strin
     chartId: component.chartId,
     configJson: component.configJson ?? '',
   }
-  const updated = await updateDashboardComponent(currentDashboard.value.id, component.id, payload)
+  const updated = await updateDashboardComponent(currentDashboard.value.id, component.id, {
+    posX: component.posX,
+    posY: component.posY,
+    width: component.width,
+    height: component.height,
+    ...payload,
+    zIndex: component.zIndex,
+  })
   const next = {
     chartId: updated.chartId ?? payload.chartId,
     configJson: updated.configJson ?? payload.configJson,
@@ -3303,6 +3500,7 @@ const applyInteractionFrame = () => {
   if (!interaction || !pendingPointer) return
   const component = findComponent(interaction.compId)
   if (!component) return
+  const minLayout = getComponentMinLayout(getComponentChartConfig(component).chartType ?? '')
 
   const scale = canvasScale.value || 1
   const dx = (pendingPointer.x - interaction.startMouseX) / scale
@@ -3374,36 +3572,36 @@ const applyInteractionFrame = () => {
     let snapHorizontalLine: number[] | undefined
 
     if (handle.includes('e')) {
-      nextWidth = Math.min(Math.max(MIN_CARD_WIDTH, interaction.startWidth + dx), Math.max(MIN_CARD_WIDTH, canvasWidth - interaction.startX))
+      nextWidth = Math.min(Math.max(minLayout.width, interaction.startWidth + dx), Math.max(minLayout.width, canvasWidth - interaction.startX))
       const match = findNearestSnapMatch([nextX + nextWidth], snapTargets.vertical)
       if (match) {
         const snappedWidth = match.line - nextX
-        if (snappedWidth >= MIN_CARD_WIDTH && nextX + snappedWidth <= canvasWidth) {
+        if (snappedWidth >= minLayout.width && nextX + snappedWidth <= canvasWidth) {
           nextWidth = snappedWidth
           snapVerticalLine = [match.line]
         }
       }
     }
     if (handle.includes('s')) {
-      nextHeight = Math.max(MIN_CARD_HEIGHT, interaction.startHeight + dy)
+      nextHeight = Math.max(minLayout.height, interaction.startHeight + dy)
       const match = findNearestSnapMatch([nextY + nextHeight], snapTargets.horizontal)
       if (match) {
         const snappedHeight = match.line - nextY
-        if (snappedHeight >= MIN_CARD_HEIGHT) {
+        if (snappedHeight >= minLayout.height) {
           nextHeight = snappedHeight
           snapHorizontalLine = [match.line]
         }
       }
     }
     if (handle.includes('w')) {
-      const maxLeft = interaction.startX + interaction.startWidth - MIN_CARD_WIDTH
+      const maxLeft = interaction.startX + interaction.startWidth - minLayout.width
       nextX = Math.min(Math.max(0, interaction.startX + dx), maxLeft)
       nextWidth = interaction.startWidth - (nextX - interaction.startX)
       const match = findNearestSnapMatch([nextX], snapTargets.vertical)
       if (match) {
         const snappedX = Math.min(Math.max(0, match.line), maxLeft)
         const snappedWidth = interaction.startWidth - (snappedX - interaction.startX)
-        if (snappedWidth >= MIN_CARD_WIDTH) {
+        if (snappedWidth >= minLayout.width) {
           nextX = snappedX
           nextWidth = snappedWidth
           snapVerticalLine = [snappedX]
@@ -3411,14 +3609,14 @@ const applyInteractionFrame = () => {
       }
     }
     if (handle.includes('n')) {
-      const maxTop = interaction.startY + interaction.startHeight - MIN_CARD_HEIGHT
+      const maxTop = interaction.startY + interaction.startHeight - minLayout.height
       nextY = Math.min(Math.max(0, interaction.startY + dy), maxTop)
       nextHeight = interaction.startHeight - (nextY - interaction.startY)
       const match = findNearestSnapMatch([nextY], snapTargets.horizontal)
       if (match) {
         const snappedY = Math.min(Math.max(0, match.line), maxTop)
         const snappedHeight = interaction.startHeight - (snappedY - interaction.startY)
-        if (snappedHeight >= MIN_CARD_HEIGHT) {
+        if (snappedHeight >= minLayout.height) {
           nextY = snappedY
           nextHeight = snappedHeight
           snapHorizontalLine = [snappedY]
@@ -3482,7 +3680,8 @@ const startDrag = (event: MouseEvent, component: DashboardComponent) => {
   hideComponentContextMenu()
   const startZIndex = component.zIndex ?? 0
   const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id)
-  focusComponent(component, { preserveSelection, bringToFront: !preserveSelection })
+  focusComponent(component, { preserveSelection, bringToFront: false })
+  draggingCompId.value = component.id
   interaction = {
     mode: 'move',
     compId: component.id,
@@ -3504,7 +3703,8 @@ const startResize = (event: MouseEvent, component: DashboardComponent, handle: R
   hideComponentContextMenu()
   const startZIndex = component.zIndex ?? 0
   const preserveSelection = selectedComponentIds.value.length > 1 && isComponentSelected(component.id)
-  focusComponent(component, { preserveSelection, bringToFront: !preserveSelection })
+  focusComponent(component, { preserveSelection, bringToFront: false })
+  draggingCompId.value = component.id
   interaction = {
     mode: 'resize',
     compId: component.id,
@@ -3538,6 +3738,7 @@ const onPointerUp = async () => {
   }
   const preview = interactionPreviewSnapshot?.compId === finalizedInteraction.compId ? { ...interactionPreviewSnapshot } : null
   interaction = null
+  draggingCompId.value = null
   document.removeEventListener('mousemove', onPointerMove)
   document.removeEventListener('mouseup', onPointerUp)
   cleanupInteractionFrame(false)
@@ -3549,6 +3750,7 @@ const onPointerUp = async () => {
       height: finalizedInteraction.startHeight,
       zIndex: finalizedInteraction.startZIndex,
     }
+    console.debug('[Layer] onPointerUp before:', component.id, 'zIndex=', before.zIndex)
     const next: ComponentLayoutSnapshot = preview
       ? {
           posX: preview.nextX,
@@ -3558,6 +3760,7 @@ const onPointerUp = async () => {
           zIndex: Math.max(0, Math.round(Number(component.zIndex) || before.zIndex)),
         }
       : cloneComponentLayout(component)
+    console.debug('[Layer] onPointerUp next:', component.id, 'zIndex=', next.zIndex, '(before=', before.zIndex, ')')
     clearInteractionPreviewFromCard(component.id)
     interactionPreviewSnapshot = null
     applyComponentLayoutSnapshot(component, next)
@@ -3617,13 +3820,15 @@ const saveCurrentScreen = async () => {
 
   pageSaving.value = true
   try {
+    componentInspectorRef.value?.flushPendingDraft()
+    await Promise.all(components.value.map((component) => persistComponentSnapshot(dashboard.id, component)))
     const updated = await updateDashboard(dashboard.id, {
       name: dashboard.name,
       configJson: dashboard.configJson,
     })
     currentDashboard.value = updated
     dashboards.value = dashboards.value.map((item) => item.id === updated.id ? updated : item)
-    ElMessage.success('页面已保存')
+    ElMessage.success('页面与组件实例已保存')
   } catch {
     ElMessage.error('页面保存失败，请重试')
   } finally {
@@ -4072,18 +4277,20 @@ const addChartToScreen = async (
   }
   const nextSize = size ?? defaultChartTemplateLayout(chart.chartType)
   const placement = resolveDropPlacement(nextSize.width, nextSize.height, point)
+  const nextZIndex = getMaxZ() + 1
   const component = await addDashboardComponent(currentDashboard.value.id, {
     chartId: chart.id,
     posX: placement.posX,
     posY: placement.posY,
     width: placement.width,
     height: placement.height,
-    zIndex: getMaxZ() + 1,
+    zIndex: nextZIndex,
     configJson: configJson ?? buildComponentConfig(chart, undefined, {
       chart: buildChartSnapshot(chart),
     }),
   })
   normalizeLayout(component)
+  component.zIndex = Math.max(nextZIndex, Number(component.zIndex) || 0)
   components.value.push(component)
   setSelectedComponents([component.id], component.id)
   dashboardCounts.value = new Map(dashboardCounts.value).set(currentDashboard.value.id, components.value.length)
@@ -5886,6 +6093,7 @@ onBeforeUnmount(() => {
   max-width: calc(100% - var(--screen-layer-rail-width) - 28px);
   transition: width 0.22s ease, transform 0.18s ease, opacity 0.18s ease;
 }
+
 
 @media (max-width: 1440px) {
   .screen-root--editor {

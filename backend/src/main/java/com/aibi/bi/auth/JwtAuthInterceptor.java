@@ -42,7 +42,10 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         AuthUser user = jwtTokenService.parseToken(authorization.substring(7).trim());
         AuthContext.set(user);
         RequireRoles roles = findRequiredRoles(handlerMethod);
-        if (roles != null && Arrays.stream(roles.value()).noneMatch(role -> role.equalsIgnoreCase(user.role()))) {
+        // ADMIN 作为最高权限，绕过所有 @RequireRoles 检查
+        if (roles != null
+                && !"ADMIN".equalsIgnoreCase(user.role())
+                && Arrays.stream(roles.value()).noneMatch(role -> role.equalsIgnoreCase(user.role()))) {
             throw new ForbiddenException("当前账号无权访问该资源");
         }
         return true;

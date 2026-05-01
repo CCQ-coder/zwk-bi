@@ -1,40 +1,42 @@
 <template>
   <div class="designer-table" :style="wrapperStyle">
-    <div class="designer-table__header" :style="gridStyle">
-      <div v-if="styleConfig.tableShowIndex" class="designer-table__cell designer-table__cell--header designer-table__cell--index">#</div>
-      <div
-        v-for="column in columns"
-        :key="column.id"
-        class="designer-table__cell designer-table__cell--header"
-        :class="columnAlignClass(column.align)"
-        :title="column.label"
-      >
-        {{ column.label }}
-      </div>
-    </div>
-
-    <div v-if="rows.length" class="designer-table__body">
-      <div
-        v-for="(row, rowIndex) in rows"
-        :key="rowKey(row, rowIndex)"
-        class="designer-table__row"
-        :class="rowIndex % 2 === 0 ? 'designer-table__row--odd' : 'designer-table__row--even'"
-        :style="gridStyle"
-      >
-        <div v-if="styleConfig.tableShowIndex" class="designer-table__cell designer-table__cell--index">{{ rowIndex + 1 }}</div>
+    <div class="designer-table__scroll">
+      <div class="designer-table__header" :style="gridStyle">
+        <div v-if="styleConfig.tableShowIndex" class="designer-table__cell designer-table__cell--header designer-table__cell--index">#</div>
         <div
           v-for="column in columns"
           :key="column.id"
-          class="designer-table__cell"
+          class="designer-table__cell designer-table__cell--header"
           :class="columnAlignClass(column.align)"
-          :title="formatCell(row[column.field])"
+          :title="column.label"
         >
-          {{ formatCell(row[column.field]) }}
+          {{ column.label }}
         </div>
       </div>
-    </div>
 
-    <div v-else class="designer-table__empty">暂无数据</div>
+      <div v-if="rows.length" class="designer-table__body">
+        <div
+          v-for="(row, rowIndex) in rows"
+          :key="rowKey(row, rowIndex)"
+          class="designer-table__row"
+          :class="rowIndex % 2 === 0 ? 'designer-table__row--odd' : 'designer-table__row--even'"
+          :style="gridStyle"
+        >
+          <div v-if="styleConfig.tableShowIndex" class="designer-table__cell designer-table__cell--index">{{ rowIndex + 1 }}</div>
+          <div
+            v-for="column in columns"
+            :key="column.id"
+            class="designer-table__cell"
+            :class="columnAlignClass(column.align)"
+            :title="formatCell(row[column.field])"
+          >
+            {{ formatCell(row[column.field]) }}
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="designer-table__empty">暂无数据</div>
+    </div>
   </div>
 </template>
 
@@ -94,6 +96,16 @@ const columnAlignClass = (align: TableColumnConfig['align']) => `designer-table_
   contain: layout paint style;
 }
 
+/* Shared horizontal scroll container for header + body */
+.designer-table__scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .designer-table__header,
 .designer-table__row {
   display: grid;
@@ -110,7 +122,8 @@ const columnAlignClass = (align: TableColumnConfig['align']) => `designer-table_
 .designer-table__body {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .designer-table__row {
